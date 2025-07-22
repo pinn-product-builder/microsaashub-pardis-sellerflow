@@ -196,6 +196,10 @@ export class ApprovalService {
       });
   }
 
+  static getAllApprovals(): ApprovalRequest[] {
+    return this.getRequests();
+  }
+
   static getRequestsByQuote(quoteId: string): ApprovalRequest[] {
     return this.getRequests().filter(r => r.quoteId === quoteId);
   }
