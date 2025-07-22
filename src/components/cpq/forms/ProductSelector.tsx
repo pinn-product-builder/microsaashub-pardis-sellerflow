@@ -1,6 +1,6 @@
 
 import { useState, useMemo } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,20 +21,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { mockProducts } from '@/data/mockData';
-import { Product, QuoteItem } from '@/types/cpq';
+import { Product, QuoteItem, Customer } from '@/types/cpq';
 import { PricingService } from '@/services/pricingService';
 
 interface ProductSelectorProps {
   destinationUF: string;
+  selectedCustomer: Customer | null;
   onAddProduct: (item: QuoteItem) => void;
 }
 
-export function ProductSelector({ destinationUF, onAddProduct }: ProductSelectorProps) {
+export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct }: ProductSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [campaignCode, setCampaignCode] = useState('');
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return mockProducts;
@@ -52,18 +55,33 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
     const quoteItem = PricingService.calculateQuoteItem(
       selectedProduct,
       quantity,
-      destinationUF
+      destinationUF,
+      selectedCustomer || undefined,
+      undefined,
+      campaignCode || undefined
     );
 
     onAddProduct(quoteItem);
     setSelectedProduct(null);
     setQuantity(1);
+    setCampaignCode('');
     setOpen(false);
   };
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
   };
+
+  // Simular preço para preview
+  const previewPrice = selectedProduct && selectedCustomer ? 
+    PricingService.calculateQuoteItem(
+      selectedProduct,
+      quantity,
+      destinationUF,
+      selectedCustomer,
+      undefined,
+      campaignCode || undefined
+    ) : null;
 
   return (
     <div className="space-y-4">
@@ -76,7 +94,7 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
               Adicionar Produto
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Selecionar Produto</DialogTitle>
             </DialogHeader>
@@ -92,7 +110,7 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full overflow-hidden">
                 {/* Products List */}
                 <Card className="overflow-hidden">
                   <CardHeader className="pb-3">
@@ -104,7 +122,6 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
                         <TableRow>
                           <TableHead>Produto</TableHead>
                           <TableHead>Categoria</TableHead>
-                          <TableHead>Peso</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -118,16 +135,15 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
                           >
                             <TableCell>
                               <div>
-                                <div className="font-medium">{product.name}</div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="font-medium text-sm">{product.name}</div>
+                                <div className="text-xs text-muted-foreground">
                                   SKU: {product.sku}
                                 </div>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary">{product.category}</Badge>
+                              <Badge variant="secondary" className="text-xs">{product.category}</Badge>
                             </TableCell>
-                            <TableCell>{product.weight}kg</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -135,66 +151,139 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
                   </CardContent>
                 </Card>
 
-                {/* Product Details & Add */}
+                {/* Product Details */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm">
                       {selectedProduct ? 'Detalhes do Produto' : 'Selecione um Produto'}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3">
                     {selectedProduct ? (
                       <>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           <div>
                             <Label className="text-xs text-muted-foreground">Nome</Label>
-                            <p className="font-medium">{selectedProduct.name}</p>
+                            <p className="text-sm font-medium">{selectedProduct.name}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">SKU</Label>
-                            <p className="font-medium">{selectedProduct.sku}</p>
+                            <p className="text-sm">{selectedProduct.sku}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Categoria</Label>
-                            <p className="font-medium">{selectedProduct.category}</p>
+                            <p className="text-sm">{selectedProduct.category}</p>
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Peso</Label>
-                            <p className="font-medium">{selectedProduct.weight}kg</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Dimensões (L×W×H)</Label>
-                            <p className="font-medium">
-                              {selectedProduct.dimensions.length}×{selectedProduct.dimensions.width}×{selectedProduct.dimensions.height}cm
-                            </p>
+                            <p className="text-sm">{selectedProduct.weight}kg</p>
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Custo Base</Label>
-                            <p className="font-medium">
+                            <p className="text-sm font-medium">
                               {new Intl.NumberFormat('pt-BR', {
                                 style: 'currency',
                                 currency: 'BRL'
                               }).format(selectedProduct.baseCost)}
                             </p>
                           </div>
-                          {selectedProduct.description && (
-                            <div>
-                              <Label className="text-xs text-muted-foreground">Descrição</Label>
-                              <p className="text-sm">{selectedProduct.description}</p>
-                            </div>
-                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground text-center py-8 text-sm">
+                        Clique em um produto na lista para ver os detalhes
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Configuration & Preview */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Configuração & Preview</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {selectedProduct ? (
+                      <>
+                        <div className="space-y-3">
+                          <div>
+                            <Label htmlFor="quantity" className="text-sm">Quantidade</Label>
+                            <Input
+                              id="quantity"
+                              type="number"
+                              min="1"
+                              value={quantity}
+                              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="campaign" className="text-sm">Código de Campanha (opcional)</Label>
+                            <Input
+                              id="campaign"
+                              placeholder="Ex: BLACKFRIDAY2024"
+                              value={campaignCode}
+                              onChange={(e) => setCampaignCode(e.target.value)}
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="quantity">Quantidade</Label>
-                          <Input
-                            id="quantity"
-                            type="number"
-                            min="1"
-                            value={quantity}
-                            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                          />
-                        </div>
+                        {/* Preview de Preço */}
+                        {previewPrice && (
+                          <div className="space-y-3 p-3 bg-muted rounded-lg">
+                            <h4 className="text-sm font-medium">Preview de Preço</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Preço Unitário:</span>
+                                <span className="font-medium">
+                                  {new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL'
+                                  }).format(previewPrice.unitPrice)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Total:</span>
+                                <span className="font-bold">
+                                  {new Intl.NumberFormat('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL'
+                                  }).format(previewPrice.totalPrice)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Margem:</span>
+                                <Badge variant={previewPrice.margin >= 20 ? "default" : "secondary"}>
+                                  {previewPrice.margin.toFixed(1)}%
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Alertas */}
+                            {previewPrice.alerts && previewPrice.alerts.length > 0 && (
+                              <div className="space-y-2">
+                                {previewPrice.alerts.map((alert, index) => (
+                                  <Alert key={index} className="p-2">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <AlertDescription className="text-xs">
+                                      {alert.message}
+                                    </AlertDescription>
+                                  </Alert>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Approval Required */}
+                            {previewPrice.approvalRequired && (
+                              <Alert className="p-2">
+                                <AlertTriangle className="h-3 w-3" />
+                                <AlertDescription className="text-xs">
+                                  Esta cotação requer aprovação
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </div>
+                        )}
 
                         <Button onClick={handleAddProduct} className="w-full">
                           <Plus className="h-4 w-4 mr-2" />
@@ -202,8 +291,8 @@ export function ProductSelector({ destinationUF, onAddProduct }: ProductSelector
                         </Button>
                       </>
                     ) : (
-                      <p className="text-muted-foreground text-center py-8">
-                        Clique em um produto na lista para ver os detalhes
+                      <p className="text-muted-foreground text-center py-8 text-sm">
+                        Configure a quantidade e campanha
                       </p>
                     )}
                   </CardContent>

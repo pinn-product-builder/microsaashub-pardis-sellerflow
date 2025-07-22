@@ -306,6 +306,7 @@ export default function NovaQuotacao() {
               <CardContent className="space-y-4">
                 <ProductSelector 
                   destinationUF={destinationUF}
+                  selectedCustomer={selectedCustomer}
                   onAddProduct={addItem}
                 />
                 {items.length > 0 && (

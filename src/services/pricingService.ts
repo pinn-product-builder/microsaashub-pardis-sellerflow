@@ -1,6 +1,8 @@
 
 import { Product, Customer, QuoteItem, TaxRule, FreightRate, PricingRule } from '@/types/cpq';
 import { taxRules, freightRates, pricingRules } from '@/data/mockData';
+import { AdvancedPricingEngine, PricingContext } from './advancedPricingEngine';
+import { ApprovalService } from './approvalService';
 
 export class PricingService {
   static calculateTaxes(product: Product, destinationUF: string, basePrice: number) {
@@ -60,8 +62,41 @@ export class PricingService {
     product: Product, 
     quantity: number, 
     destinationUF: string,
-    customMargin?: number
+    customer?: Customer,
+    customMargin?: number,
+    campaignCode?: string
   ): QuoteItem {
+    // Usar motor avançado se há cliente
+    if (customer) {
+      const context: PricingContext = {
+        customer,
+        product,
+        quantity,
+        destinationUF,
+        channel: 'B2B',
+        campaignCode
+      };
+
+      const advancedResult = AdvancedPricingEngine.calculateAdvancedPrice(context);
+      
+      return {
+        id: `${product.id}-${Date.now()}`,
+        product,
+        quantity,
+        unitPrice: advancedResult.finalPrice,
+        totalPrice: advancedResult.finalPrice * quantity,
+        taxes: advancedResult.taxes,
+        freight: advancedResult.freight,
+        margin: advancedResult.margin,
+        // Propriedades adicionais do motor avançado
+        discounts: advancedResult.discounts,
+        alerts: advancedResult.alerts,
+        approvalRequired: advancedResult.approvalRequired,
+        minimumPrice: advancedResult.minimumPrice
+      };
+    }
+
+    // Cálculo básico (fallback)
     const margin = customMargin || this.calculateMargin(product);
     const basePrice = product.baseCost * (1 + margin / 100);
     
@@ -98,5 +133,89 @@ export class PricingService {
     );
     
     return rule ? rule.maxDiscount : 5;
+  }
+
+  // Novos métodos para motor avançado
+  static simulatePricing(
+    product: Product,
+    customer: Customer,
+    quantity: number,
+    destinationUF: string,
+    scenarios: { margin?: number; discount?: number; quantity?: number }[]
+  ) {
+    const context: PricingContext = {
+      customer,
+      product,
+      quantity,
+      destinationUF,
+      channel: 'B2B'
+    };
+
+    return AdvancedPricingEngine.simulateScenario(context, scenarios);
+  }
+
+  static checkApprovalRequired(
+    value: number,
+    margin: number,
+    discount: number
+  ): boolean {
+    return ApprovalService.isApprovalRequired(value, margin, discount);
+  }
+
+  static createApprovalRequest(
+    quoteId: string,
+    quoteNumber: string,
+    requestedBy: string,
+    reason: string,
+    value: number,
+    margin: number,
+    discount: number
+  ) {
+    return ApprovalService.createApprovalRequest(
+      quoteId,
+      quoteNumber,
+      requestedBy,
+      reason,
+      value,
+      margin,
+      discount
+    );
+  }
+
+  // Análise competitiva (mock)
+  static getCompetitiveAnalysis(productId: string) {
+    return {
+      ourPrice: 1200,
+      competitorPrices: [
+        { competitor: 'Concorrente A', price: 1250, marketShare: 25 },
+        { competitor: 'Concorrente B', price: 1180, marketShare: 15 },
+        { competitor: 'Concorrente C', price: 1320, marketShare: 30 }
+      ],
+      recommendation: 'Preço competitivo - margem para redução de 5%',
+      pricePosition: 'BELOW_AVERAGE'
+    };
+  }
+
+  // Otimização de margem
+  static optimizeMargin(product: Product, targetMargin: number, constraints?: {
+    maxDiscount?: number;
+    minPrice?: number;
+  }) {
+    const currentMargin = this.calculateMargin(product);
+    const maxDiscount = constraints?.maxDiscount || this.getMaxDiscount(product);
+    const minPrice = constraints?.minPrice || product.baseCost * 1.1;
+    
+    const optimizedPrice = product.baseCost * (1 + targetMargin / 100);
+    const maxDiscountedPrice = optimizedPrice * (1 - maxDiscount / 100);
+    
+    return {
+      targetPrice: Math.max(optimizedPrice, minPrice),
+      achievableMargin: targetMargin,
+      maxDiscountPrice: maxDiscountedPrice,
+      recommendation: targetMargin > currentMargin 
+        ? 'Aumento de preço necessário'
+        : 'Redução de margem possível',
+      riskLevel: targetMargin < 15 ? 'HIGH' : targetMargin < 20 ? 'MEDIUM' : 'LOW'
+    };
   }
 }

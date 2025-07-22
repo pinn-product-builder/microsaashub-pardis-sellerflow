@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   sku: string;
@@ -40,6 +39,21 @@ export interface QuoteItem {
   };
   freight: number;
   margin: number;
+  // Novas propriedades do motor avançado
+  discounts?: Array<{
+    type: 'VOLUME' | 'PROMOTIONAL' | 'CUSTOMER' | 'CAMPAIGN' | 'MANUAL';
+    description: string;
+    percentage: number;
+    amount: number;
+    priority: number;
+  }>;
+  alerts?: Array<{
+    type: 'WARNING' | 'ERROR' | 'INFO';
+    message: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  }>;
+  approvalRequired?: boolean;
+  minimumPrice?: number;
 }
 
 export interface Quote {
