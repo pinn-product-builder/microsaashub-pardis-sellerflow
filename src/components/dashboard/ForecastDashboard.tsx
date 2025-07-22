@@ -15,7 +15,7 @@ import {
   Brain
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { forecastService, ForecastMetrics, SalesForecast } from '@/services/forecastService';
+import { forecastService, type ForecastMetrics, type SalesForecast } from '@/services/forecastService';
 
 export default function ForecastDashboard() {
   const [forecast, setForecast] = useState<SalesForecast | null>(null);
