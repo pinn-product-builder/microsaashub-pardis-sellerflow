@@ -2,7 +2,7 @@
 import { Badge } from '@/components/ui/badge';
 
 interface QuoteStatusBadgeProps {
-  status: 'draft' | 'calculated' | 'approved' | 'sent' | 'expired';
+  status: 'draft' | 'calculated' | 'approved' | 'sent' | 'expired' | 'pending' | 'processing';
 }
 
 export function QuoteStatusBadge({ status }: QuoteStatusBadgeProps) {
@@ -31,6 +31,16 @@ export function QuoteStatusBadge({ status }: QuoteStatusBadgeProps) {
       label: 'Expirada',
       variant: 'destructive' as const,
       className: 'bg-red-100 text-red-800 hover:bg-red-100'
+    },
+    pending: {
+      label: 'Pendente',
+      variant: 'default' as const,
+      className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+    },
+    processing: {
+      label: 'Processando',
+      variant: 'default' as const,
+      className: 'bg-indigo-100 text-indigo-800 hover:bg-indigo-100'
     }
   };
 

@@ -88,7 +88,7 @@ export interface Quote {
   totalFreight: number;
   discount: number;
   total: number;
-  status: 'draft' | 'calculated' | 'approved' | 'sent' | 'expired';
+  status: 'draft' | 'calculated' | 'approved' | 'sent' | 'expired' | 'pending' | 'processing';
   paymentConditions: string;
   validUntil: Date;
   createdAt: Date;
