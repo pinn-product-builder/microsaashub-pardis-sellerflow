@@ -16,9 +16,11 @@ import {
   ShoppingCart,
   Calendar,
   User,
-  MapPin
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
 import { QuoteService } from '@/services/quoteService';
+import { VTEXService } from '@/services/vtexService';
 import { Quote } from '@/types/cpq';
 import { QuoteStatusBadge } from '@/components/cpq/display/QuoteStatusBadge';
 import { QuoteItemsTable } from '@/components/cpq/tables/QuoteItemsTable';
@@ -35,6 +37,7 @@ export default function VisualizarCotacao() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -103,6 +106,44 @@ export default function VisualizarCotacao() {
     setShowEmailDialog(true);
   };
 
+  const handleSendToVTEX = async () => {
+    if (!quote) return;
+
+    setIsSendingToVTEX(true);
+    try {
+      const result = await VTEXService.sendOrderToVTEX(quote);
+      
+      if (result.success) {
+        toast({
+          title: "Enviado para VTEX",
+          description: result.message
+        });
+        
+        // Atualizar status da cotação
+        QuoteService.updateQuote(quote.id, { 
+          status: 'sent',
+          notes: `${quote.notes}\n\nEnviado para VTEX - Pedido: ${result.orderId}`
+        });
+        
+        setQuote(prev => prev ? { ...prev, status: 'sent' } : null);
+      } else {
+        toast({
+          title: "Erro ao Enviar",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao enviar para VTEX",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSendingToVTEX(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -137,6 +178,10 @@ export default function VisualizarCotacao() {
       </div>
     );
   }
+
+  const vtexSettings = VTEXService.getCurrentSettings();
+  const canSendToVTEX = vtexSettings?.isEnabled && 
+    (quote.status === 'calculated' || quote.status === 'approved');
 
   return (
     <div className="space-y-6">
@@ -175,6 +220,17 @@ export default function VisualizarCotacao() {
             <Button variant="outline" onClick={handleSendEmail}>
               <Mail className="h-4 w-4 mr-2" />
               Enviar
+            </Button>
+          )}
+          {canSendToVTEX && (
+            <Button 
+              variant="outline" 
+              onClick={handleSendToVTEX}
+              disabled={isSendingToVTEX}
+              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              {isSendingToVTEX ? 'Enviando...' : 'Enviar para VTEX'}
             </Button>
           )}
           {quote.status === 'calculated' && (
@@ -317,6 +373,31 @@ export default function VisualizarCotacao() {
               </div>
             </CardContent>
           </Card>
+
+          {/* VTEX Integration Status */}
+          {vtexSettings && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ExternalLink className="h-4 w-4 mr-2 text-orange-600" />
+                  Integração VTEX
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Status:</span>
+                  <Badge variant={vtexSettings.isEnabled ? "default" : "secondary"}>
+                    {vtexSettings.isEnabled ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
+                {canSendToVTEX && (
+                  <div className="text-xs text-muted-foreground">
+                    Esta cotação pode ser enviada para VTEX
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

@@ -27,6 +27,19 @@ interface CPQStore {
   // Estado da UI
   isCalculating: boolean;
   setIsCalculating: (calculating: boolean) => void;
+
+  // Estado das integrações
+  integrations: {
+    vtex: {
+      enabled: boolean;
+      configured: boolean;
+    };
+    datasul: {
+      enabled: boolean;
+      configured: boolean;
+    };
+  };
+  setIntegrationStatus: (integration: 'vtex' | 'datasul', status: { enabled: boolean; configured: boolean }) => void;
 }
 
 export const useCPQStore = create<CPQStore>((set, get) => ({
@@ -39,6 +52,18 @@ export const useCPQStore = create<CPQStore>((set, get) => ({
   paymentConditions: 'À vista',
   notes: '',
   isCalculating: false,
+
+  // Estado inicial das integrações
+  integrations: {
+    vtex: {
+      enabled: false,
+      configured: false
+    },
+    datasul: {
+      enabled: false,
+      configured: false
+    }
+  },
 
   // Ações
   setCurrentQuote: (quote) => set({ currentQuote: quote }),
@@ -78,5 +103,12 @@ export const useCPQStore = create<CPQStore>((set, get) => ({
     notes: ''
   }),
 
-  setIsCalculating: (calculating) => set({ isCalculating: calculating })
+  setIsCalculating: (calculating) => set({ isCalculating: calculating }),
+
+  setIntegrationStatus: (integration, status) => set((state) => ({
+    integrations: {
+      ...state.integrations,
+      [integration]: status
+    }
+  }))
 }));
