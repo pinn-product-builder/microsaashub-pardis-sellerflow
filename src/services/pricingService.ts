@@ -1,8 +1,8 @@
-
 import { Product, Customer, QuoteItem, TaxRule, FreightRate, PricingRule } from '@/types/cpq';
 import { taxRules, freightRates, pricingRules } from '@/data/mockData';
 import { AdvancedPricingEngine, PricingContext } from './advancedPricingEngine';
 import { ApprovalService } from './approvalService';
+import { TaxService } from './taxService';
 
 export class PricingService {
   static calculateTaxes(product: Product, destinationUF: string, basePrice: number) {
@@ -21,7 +21,9 @@ export class PricingService {
       ipi,
       pis,
       cofins,
-      total: icms + ipi + pis + cofins
+      total: icms + ipi + pis + cofins,
+      taxBasis: basePrice,
+      effectiveRate: ((icms + ipi + pis + cofins) / basePrice) * 100
     };
   }
 
@@ -79,20 +81,40 @@ export class PricingService {
 
       const advancedResult = AdvancedPricingEngine.calculateAdvancedPrice(context);
       
+      // Usar TaxService para cálculos fiscais avançados
+      const taxContext = {
+        product,
+        customer,
+        quantity,
+        unitPrice: advancedResult.finalPrice,
+        originUF: 'SP',
+        destinationUF,
+        operationType: 'VENDA' as const,
+        paymentTerm: 'À vista'
+      };
+
+      const taxResult = TaxService.calculateAdvancedTaxes(taxContext);
+      
       return {
         id: `${product.id}-${Date.now()}`,
         product,
         quantity,
         unitPrice: advancedResult.finalPrice,
         totalPrice: advancedResult.finalPrice * quantity,
-        taxes: advancedResult.taxes,
+        taxes: taxResult.taxes,
         freight: advancedResult.freight,
         margin: advancedResult.margin,
         // Propriedades adicionais do motor avançado
         discounts: advancedResult.discounts,
         alerts: advancedResult.alerts,
         approvalRequired: advancedResult.approvalRequired,
-        minimumPrice: advancedResult.minimumPrice
+        minimumPrice: advancedResult.minimumPrice,
+        // Alertas fiscais do TaxService
+        taxAlerts: taxResult.benefits.map(benefit => ({
+          type: 'TAX_BENEFIT' as const,
+          message: `Benefício aplicado: ${benefit.name}`,
+          impact: 'POSITIVE' as const
+        }))
       };
     }
 
@@ -182,18 +204,52 @@ export class PricingService {
     );
   }
 
-  // Análise competitiva (mock)
-  static getCompetitiveAnalysis(productId: string) {
-    return {
-      ourPrice: 1200,
-      competitorPrices: [
-        { competitor: 'Concorrente A', price: 1250, marketShare: 25 },
-        { competitor: 'Concorrente B', price: 1180, marketShare: 15 },
-        { competitor: 'Concorrente C', price: 1320, marketShare: 30 }
-      ],
-      recommendation: 'Preço competitivo - margem para redução de 5%',
-      pricePosition: 'BELOW_AVERAGE'
+  // Novos métodos integrados com TaxService
+  static calculateAdvancedTaxes(
+    product: Product,
+    customer: Customer,
+    quantity: number,
+    unitPrice: number,
+    destinationUF: string
+  ) {
+    const context = {
+      product,
+      customer,
+      quantity,
+      unitPrice,
+      originUF: 'SP',
+      destinationUF,
+      operationType: 'VENDA' as const,
+      paymentTerm: 'À vista'
     };
+
+    return TaxService.calculateAdvancedTaxes(context);
+  }
+
+  static simulateTaxScenarios(
+    product: Product,
+    customer: Customer,
+    quantity: number,
+    unitPrice: number,
+    destinationUF: string,
+    scenarios: any[]
+  ) {
+    const context = {
+      product,
+      customer,
+      quantity,
+      unitPrice,
+      originUF: 'SP',
+      destinationUF,
+      operationType: 'VENDA' as const,
+      paymentTerm: 'À vista'
+    };
+
+    return TaxService.simulateScenarios(context, scenarios);
+  }
+
+  static getTaxBreakdown(taxes: any) {
+    return TaxService.getTaxBreakdown(taxes);
   }
 
   // Otimização de margem

@@ -24,6 +24,7 @@ import PricingApprovals from '@/pages/pricing/Approvals';
 import PricingRules from '@/pages/pricing/Rules';
 import PricingAnalytics from '@/pages/pricing/Analytics';
 import MarketResearch from '@/pages/pricing/MarketResearch';
+import Taxes from '@/pages/pricing/Taxes';
 
 // Layout and Auth
 import AppLayout from '@/components/layout/AppLayout';
@@ -76,6 +77,7 @@ function App() {
               <Route path="/pricing/rules" element={<PricingRules />} />
               <Route path="/pricing/analytics" element={<PricingAnalytics />} />
               <Route path="/pricing/market-research" element={<MarketResearch />} />
+              <Route path="/pricing/taxes" element={<Taxes />} />
               
               <Route path="/settings" element={<div>Settings</div>} />
             </Route>

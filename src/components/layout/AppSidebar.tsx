@@ -1,4 +1,3 @@
-
 import {
   ChevronUp,
   Home,
@@ -17,6 +16,7 @@ import {
   Activity,
   Plug,
   Search,
+  Receipt,
 } from "lucide-react"
 
 import {
@@ -71,7 +71,7 @@ const cpqItems = [
   },
 ]
 
-// Módulo de Precificação (adicionada Pesquisa de Mercado)
+// Módulo de Precificação (nova entrada para Impostos)
 const pricingItems = [
   {
     title: "Painel Precificação",
@@ -102,6 +102,11 @@ const pricingItems = [
     title: "Pesquisa de Mercado",
     url: "/pricing/market-research",
     icon: Search,
+  },
+  {
+    title: "Impostos",
+    url: "/pricing/taxes",
+    icon: Receipt,
   },
 ]
 

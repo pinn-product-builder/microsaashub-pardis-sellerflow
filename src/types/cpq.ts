@@ -11,6 +11,11 @@ export interface Product {
   };
   baseCost: number;
   description?: string;
+  // Novas propriedades fiscais
+  ncm?: string;
+  cest?: string;
+  origin?: 'NACIONAL' | 'IMPORTADO';
+  taxCategory?: 'NORMAL' | 'SUBSTITUTO' | 'ISENTO';
 }
 
 export interface Customer {
@@ -22,6 +27,10 @@ export interface Customer {
   priceTableId?: string;
   creditLimit: number;
   paymentTerms: string[];
+  // Novas propriedades fiscais
+  taxRegime?: 'SIMPLES_NACIONAL' | 'LUCRO_PRESUMIDO' | 'LUCRO_REAL';
+  stateRegistration?: string;
+  taxExemptions?: string[];
 }
 
 export interface QuoteItem {
@@ -36,6 +45,12 @@ export interface QuoteItem {
     pis: number;
     cofins: number;
     total: number;
+    // Novos campos fiscais
+    icmsSt?: number;
+    difal?: number;
+    fcp?: number;
+    taxBasis: number;
+    effectiveRate: number;
   };
   freight: number;
   margin: number;
@@ -54,6 +69,12 @@ export interface QuoteItem {
   }>;
   approvalRequired?: boolean;
   minimumPrice?: number;
+  // Alertas fiscais
+  taxAlerts?: Array<{
+    type: 'TAX_SUBSTITUTION' | 'TAX_BENEFIT' | 'COMPLIANCE_ISSUE';
+    message: string;
+    impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+  }>;
 }
 
 export interface Quote {
@@ -82,6 +103,17 @@ export interface TaxRule {
   ipi: number;
   pis: number;
   cofins: number;
+  // Novos campos fiscais
+  icmsSt?: number;
+  difal?: number;
+  fcp?: number;
+  regime?: 'SIMPLES_NACIONAL' | 'LUCRO_PRESUMIDO' | 'LUCRO_REAL';
+  category?: string;
+  ncmExceptions?: Array<{
+    ncm: string;
+    icms: number;
+    ipi: number;
+  }>;
 }
 
 export interface FreightRate {
@@ -99,4 +131,79 @@ export interface PricingRule {
   minimumMargin: number;
   standardMargin: number;
   maxDiscount: number;
+}
+
+// Novas interfaces para sistema fiscal avançado
+export interface TaxBenefit {
+  id: string;
+  name: string;
+  description: string;
+  type: 'REDUCTION' | 'EXEMPTION' | 'DEFERRAL';
+  scope: 'UF' | 'MUNICIPALITY' | 'NATIONAL';
+  location: string;
+  category?: string;
+  ncm?: string;
+  reduction: number; // percentual de redução
+  validFrom: Date;
+  validUntil?: Date;
+  conditions: string[];
+}
+
+export interface TaxSubstitution {
+  id: string;
+  category: string;
+  ncm: string;
+  uf: string;
+  marginSt: number; // margem de valor agregado
+  aliquotaInterna: number;
+  aliquotaInterestadual: number;
+  isActive: boolean;
+}
+
+export interface TaxCalculationContext {
+  product: Product;
+  customer: Customer;
+  quantity: number;
+  unitPrice: number;
+  originUF: string;
+  destinationUF: string;
+  operationType: 'VENDA' | 'TRANSFERENCIA' | 'DEMONSTRACAO';
+  paymentTerm: string;
+}
+
+export interface TaxCalculationResult {
+  taxes: {
+    icms: number;
+    ipi: number;
+    pis: number;
+    cofins: number;
+    icmsSt?: number;
+    difal?: number;
+    fcp?: number;
+    total: number;
+    taxBasis: number;
+    effectiveRate: number;
+  };
+  benefits: TaxBenefit[];
+  substitution?: TaxSubstitution;
+  compliance: {
+    isCompliant: boolean;
+    issues: string[];
+    recommendations: string[];
+  };
+  optimization: {
+    potentialSavings: number;
+    suggestions: string[];
+  };
+}
+
+export interface TaxSimulationScenario {
+  name: string;
+  changes: {
+    destinationUF?: string;
+    customerRegime?: string;
+    productCategory?: string;
+    operationType?: string;
+  };
+  result?: TaxCalculationResult;
 }
