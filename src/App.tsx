@@ -15,6 +15,7 @@ import CPQDashboard from "./pages/cpq/Dashboard";
 import NovaQuotacao from "./pages/cpq/NovaQuotacao";
 import VisualizarCotacao from "./pages/cpq/VisualizarCotacao";
 import Historico from "./pages/cpq/Historico";
+import Integracoes from "./pages/cpq/Integracoes";
 import PricingDashboard from "./pages/pricing/Dashboard";
 import PricingTables from "./pages/pricing/Tables";
 import PricingApprovals from "./pages/pricing/Approvals";
@@ -67,6 +68,7 @@ const App = () => {
               <Route path="cpq/cotacao/:id" element={<VisualizarCotacao />} />
               <Route path="cpq/editar/:id" element={<NovaQuotacao />} />
               <Route path="cpq/historico" element={<Historico />} />
+              <Route path="cpq/integracoes" element={<Integracoes />} />
               
               {/* Pricing Routes */}
               <Route path="pricing/dashboard" element={<PricingDashboard />} />

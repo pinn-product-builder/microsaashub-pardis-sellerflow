@@ -1,3 +1,4 @@
+
 import {
   ChevronUp,
   Home,
@@ -14,6 +15,7 @@ import {
   Settings,
   Plus,
   Activity,
+  Plug,
 } from "lucide-react"
 
 import {
@@ -62,6 +64,11 @@ const cpqItems = [
     title: "Histórico",
     url: "/cpq/historico",
     icon: History,
+  },
+  {
+    title: "Integrações",
+    url: "/cpq/integracoes",
+    icon: Plug,
   },
 ]
 
@@ -194,9 +201,11 @@ export function AppSidebar() {
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Configurações
+                <DropdownMenuItem asChild>
+                  <NavLink to="/settings" className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configurações
+                  </NavLink>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={logout}>
                   <User2 className="mr-2 h-4 w-4" />
