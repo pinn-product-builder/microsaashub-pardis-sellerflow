@@ -56,7 +56,7 @@ const mainItems = [
 // Módulo de Cotações
 const cpqItems = [
   {
-    title: "Dashboard CPQ",
+    title: "Dashboard Cotações",
     url: "/cpq/dashboard",
     icon: Activity,
   },
