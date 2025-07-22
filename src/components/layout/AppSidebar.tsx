@@ -13,6 +13,8 @@ import {
   TrendingUp,
   User2,
   Settings,
+  Plus,
+  Activity,
 } from "lucide-react"
 
 import {
@@ -48,14 +50,14 @@ const mainItems = [
 // Módulo de Cotações
 const cpqItems = [
   {
-    title: "Dashboard",
+    title: "Painel CPQ",
     url: "/cpq",
-    icon: BarChart3,
+    icon: Activity,
   },
   {
     title: "Nova Cotação",
     url: "/cpq/nova-cotacao",
-    icon: FileText,
+    icon: Plus,
   },
   {
     title: "Histórico",
@@ -67,9 +69,9 @@ const cpqItems = [
 // Módulo de Precificação
 const pricingItems = [
   {
-    title: "Dashboard",
+    title: "Painel Precificação",
     url: "/pricing/dashboard",
-    icon: DollarSign,
+    icon: BarChart3,
   },
   {
     title: "Tabelas de Preço",
@@ -117,7 +119,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Início</SidebarGroupLabel>
+          <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
