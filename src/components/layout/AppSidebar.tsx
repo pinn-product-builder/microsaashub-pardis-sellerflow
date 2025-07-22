@@ -1,3 +1,4 @@
+
 import {
   ChevronUp,
   Home,
@@ -46,17 +47,17 @@ import { useAuthStore } from "@/stores/authStore"
 // Menu principal
 const mainItems = [
   {
-    title: "Dashboard",
+    title: "Dashboard Principal",
     url: "/dashboard",
     icon: Home,
   },
 ]
 
-// Módulo de Cotações (removido Integrações)
+// Módulo de Cotações
 const cpqItems = [
   {
-    title: "Painel Cotação",
-    url: "/cpq",
+    title: "Dashboard CPQ",
+    url: "/cpq/dashboard",
     icon: Activity,
   },
   {
@@ -71,10 +72,10 @@ const cpqItems = [
   },
 ]
 
-// Módulo de Precificação (nova entrada para Impostos)
+// Módulo de Precificação
 const pricingItems = [
   {
-    title: "Painel Precificação",
+    title: "Dashboard Pricing",
     url: "/pricing/dashboard",
     icon: BarChart3,
   },
@@ -117,11 +118,6 @@ const configItems = [
     url: "/cpq/integracoes",
     icon: Plug,
   },
-  {
-    title: "Sistema",
-    url: "/settings",
-    icon: Settings,
-  },
 ]
 
 export function AppSidebar() {
@@ -133,7 +129,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <NavLink to="/dashboard">
+              <NavLink to="/cpq/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <Calculator className="size-4" />
                 </div>
@@ -238,8 +234,8 @@ export function AppSidebar() {
                 >
                   <User2 className="size-4" />
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user?.name}</span>
-                    <span className="truncate text-xs">{user?.email}</span>
+                    <span className="truncate font-semibold">{user?.name || 'Usuário'}</span>
+                    <span className="truncate text-xs">{user?.email || 'user@example.com'}</span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />
                 </SidebarMenuButton>

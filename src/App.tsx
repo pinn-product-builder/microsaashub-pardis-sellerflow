@@ -5,10 +5,8 @@ import { Toaster } from '@/components/ui/toaster';
 
 // Layout Components
 import AppLayout from '@/components/layout/AppLayout';
-import CPQLayout from '@/components/cpq/CPQLayout';
 
 // Page Components
-import Index from '@/pages/Index';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -40,25 +38,26 @@ function App() {
         <Suspense fallback={<div>Loading...</div>}>
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
-            {/* Protected Routes */}
+            {/* Redirect root to CPQ dashboard */}
+            <Route path="/" element={<Navigate to="/cpq/dashboard" replace />} />
+
+            {/* Main Dashboard */}
             <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
 
-            {/* CPQ Routes */}
-            <Route path="/cpq" element={<CPQLayout />}>
-              <Route path="dashboard" element={<CPQDashboard />} />
-              <Route path="nova" element={<NovaQuotacao />} />
-              <Route path="historico" element={<Historico />} />
-              <Route path="cotacao/:id" element={<VisualizarCotacao />} />
-              <Route path="editar/:id" element={<NovaQuotacao />} />
-              <Route path="integracoes" element={<Integracoes />} />
-              <Route path="integracoes/conversao" element={<ConversionDashboardPage />} />
-              <Route path="testes" element={<Testes />} />
-            </Route>
+            {/* CPQ Routes - using AppLayout instead of CPQLayout */}
+            <Route path="/cpq/dashboard" element={<AppLayout><CPQDashboard /></AppLayout>} />
+            <Route path="/cpq/nova" element={<AppLayout><NovaQuotacao /></AppLayout>} />
+            <Route path="/cpq/nova-cotacao" element={<AppLayout><NovaQuotacao /></AppLayout>} />
+            <Route path="/cpq/historico" element={<AppLayout><Historico /></AppLayout>} />
+            <Route path="/cpq/cotacao/:id" element={<AppLayout><VisualizarCotacao /></AppLayout>} />
+            <Route path="/cpq/editar/:id" element={<AppLayout><NovaQuotacao /></AppLayout>} />
+            <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
+            <Route path="/cpq/integracoes/conversao" element={<AppLayout><ConversionDashboardPage /></AppLayout>} />
+            <Route path="/cpq/testes" element={<AppLayout><Testes /></AppLayout>} />
 
             {/* Pricing Routes */}
             <Route path="/pricing/dashboard" element={<AppLayout><PricingDashboard /></AppLayout>} />
@@ -69,8 +68,10 @@ function App() {
             <Route path="/pricing/market-research" element={<AppLayout><MarketResearch /></AppLayout>} />
             <Route path="/pricing/taxes" element={<AppLayout><Taxes /></AppLayout>} />
 
-            {/* Fallback Routes */}
+            {/* Legacy redirects */}
             <Route path="/cpq" element={<Navigate to="/cpq/dashboard" replace />} />
+
+            {/* Fallback Route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

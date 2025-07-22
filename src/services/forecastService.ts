@@ -1,6 +1,4 @@
 
-import { Quote } from '@/types/cpq';
-
 export interface ForecastData {
   period: string;
   predicted: number;
