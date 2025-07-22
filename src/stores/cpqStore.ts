@@ -34,12 +34,8 @@ interface CPQStore {
       enabled: boolean;
       configured: boolean;
     };
-    datasul: {
-      enabled: boolean;
-      configured: boolean;
-    };
   };
-  setIntegrationStatus: (integration: 'vtex' | 'datasul', status: { enabled: boolean; configured: boolean }) => void;
+  setIntegrationStatus: (integration: 'vtex', status: { enabled: boolean; configured: boolean }) => void;
 }
 
 export const useCPQStore = create<CPQStore>((set, get) => ({
@@ -56,10 +52,6 @@ export const useCPQStore = create<CPQStore>((set, get) => ({
   // Estado inicial das integrações
   integrations: {
     vtex: {
-      enabled: false,
-      configured: false
-    },
-    datasul: {
       enabled: false,
       configured: false
     }

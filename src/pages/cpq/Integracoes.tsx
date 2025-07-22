@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,7 +8,6 @@ import {
   Activity, 
   ExternalLink, 
   ShoppingCart,
-  Database,
   TrendingUp,
   ArrowLeft
 } from 'lucide-react';
@@ -31,15 +29,6 @@ export default function Integracoes() {
       color: 'orange',
       status: vtexSettings?.isEnabled ? 'active' : 'inactive',
       features: ['Criação automática de pedidos', 'Sincronização de produtos', 'Gestão de preços']
-    },
-    {
-      id: 'datasul',
-      name: 'ERP Datasul',
-      description: 'Integração com ERP Datasul para sincronização completa',
-      icon: Database,
-      color: 'blue',
-      status: 'coming-soon',
-      features: ['Sincronização de clientes', 'Gestão de estoque', 'Controle financeiro']
     },
     {
       id: 'market-research',
@@ -107,7 +96,7 @@ export default function Integracoes() {
 
         <TabsContent value="overview" className="space-y-6">
           {/* Integrations Overview */}
-          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
             {integrations.map((integration) => {
               const IconComponent = integration.icon;
               return (
