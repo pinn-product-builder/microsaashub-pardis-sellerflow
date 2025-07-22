@@ -1,10 +1,10 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Save, Send, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { CustomerSelector } from '@/components/cpq/forms/CustomerSelector';
 import { ProductSelector } from '@/components/cpq/forms/ProductSelector';
 import { QuoteItemsTable } from '@/components/cpq/tables/QuoteItemsTable';
@@ -17,6 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Customer } from '@/types/cpq';
 
 export default function NovaQuotacao() {
+  const { id } = useParams();
+  const isEditing = !!id;
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -33,14 +35,47 @@ export default function NovaQuotacao() {
     setDiscount,
     setPaymentConditions,
     setNotes,
-    clearQuote
+    clearQuote,
+    setCurrentQuote
   } = useCPQStore();
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
 
+  // Carregar cotação para edição
+  useEffect(() => {
+    if (isEditing && id) {
+      const quote = QuoteService.getQuote(id);
+      if (quote) {
+        setCurrentQuote(quote);
+        setSelectedCustomer(quote.customer);
+        setDiscount(quote.discount);
+        setPaymentConditions(quote.paymentConditions);
+        setNotes(quote.notes || '');
+        
+        // Adicionar itens da cotação
+        quote.items.forEach(item => addItem(item));
+        
+        // Se tem cliente e itens, vai para o step 3
+        if (quote.customer && quote.items.length > 0) {
+          setCurrentStep(3);
+        } else if (quote.customer) {
+          setCurrentStep(2);
+        }
+      } else {
+        toast({
+          title: "Erro",
+          description: "Cotação não encontrada.",
+          variant: "destructive"
+        });
+      }
+    }
+  }, [isEditing, id]);
+
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer);
-    setCurrentStep(2);
+    if (!isEditing) {
+      setCurrentStep(2);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -55,26 +90,48 @@ export default function NovaQuotacao() {
 
     setIsLoading(true);
     try {
-      const quote = QuoteService.createQuote({
-        customer: selectedCustomer,
-        destinationUF,
-        items,
-        subtotal: totals.subtotal,
-        totalTaxes: totals.totalTaxes,
-        totalFreight: totals.totalFreight,
-        discount: totals.discount,
-        total: totals.total,
-        status: 'draft',
-        paymentConditions,
-        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-        createdBy: 'current-user',
-        notes
-      });
+      if (isEditing && id) {
+        // Atualizar cotação existente
+        QuoteService.updateQuote(id, {
+          customer: selectedCustomer,
+          destinationUF,
+          items,
+          subtotal: totals.subtotal,
+          totalTaxes: totals.totalTaxes,
+          totalFreight: totals.totalFreight,
+          discount: totals.discount,
+          total: totals.total,
+          paymentConditions,
+          notes
+        });
 
-      toast({
-        title: "Sucesso",
-        description: `Cotação ${quote.number} salva como rascunho.`
-      });
+        toast({
+          title: "Sucesso",
+          description: "Cotação atualizada com sucesso."
+        });
+      } else {
+        // Criar nova cotação
+        const quote = QuoteService.createQuote({
+          customer: selectedCustomer,
+          destinationUF,
+          items,
+          subtotal: totals.subtotal,
+          totalTaxes: totals.totalTaxes,
+          totalFreight: totals.totalFreight,
+          discount: totals.discount,
+          total: totals.total,
+          status: 'draft',
+          paymentConditions,
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
+          createdBy: 'current-user',
+          notes
+        });
+
+        toast({
+          title: "Sucesso",
+          description: `Cotação ${quote.number} salva como rascunho.`
+        });
+      }
 
       clearQuote();
       setCurrentStep(1);
@@ -101,26 +158,49 @@ export default function NovaQuotacao() {
 
     setIsLoading(true);
     try {
-      const quote = QuoteService.createQuote({
-        customer: selectedCustomer,
-        destinationUF,
-        items,
-        subtotal: totals.subtotal,
-        totalTaxes: totals.totalTaxes,
-        totalFreight: totals.totalFreight,
-        discount: totals.discount,
-        total: totals.total,
-        status: 'calculated',
-        paymentConditions,
-        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-        createdBy: 'current-user',
-        notes
-      });
+      if (isEditing && id) {
+        // Finalizar cotação existente
+        QuoteService.updateQuote(id, {
+          customer: selectedCustomer,
+          destinationUF,
+          items,
+          subtotal: totals.subtotal,
+          totalTaxes: totals.totalTaxes,
+          totalFreight: totals.totalFreight,
+          discount: totals.discount,
+          total: totals.total,
+          status: 'calculated',
+          paymentConditions,
+          notes
+        });
 
-      toast({
-        title: "Sucesso",
-        description: `Cotação ${quote.number} finalizada com sucesso!`
-      });
+        toast({
+          title: "Sucesso",
+          description: "Cotação finalizada com sucesso!"
+        });
+      } else {
+        // Criar e finalizar nova cotação
+        const quote = QuoteService.createQuote({
+          customer: selectedCustomer,
+          destinationUF,
+          items,
+          subtotal: totals.subtotal,
+          totalTaxes: totals.totalTaxes,
+          totalFreight: totals.totalFreight,
+          discount: totals.discount,
+          total: totals.total,
+          status: 'calculated',
+          paymentConditions,
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
+          createdBy: 'current-user',
+          notes
+        });
+
+        toast({
+          title: "Sucesso",
+          description: `Cotação ${quote.number} finalizada com sucesso!`
+        });
+      }
 
       clearQuote();
       setCurrentStep(1);
@@ -153,14 +233,18 @@ export default function NovaQuotacao() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Nova Cotação</h1>
-            <p className="text-muted-foreground">Crie uma nova cotação para seu cliente</p>
+            <h1 className="text-2xl font-bold">
+              {isEditing ? 'Editar Cotação' : 'Nova Cotação'}
+            </h1>
+            <p className="text-muted-foreground">
+              {isEditing ? 'Edite os dados da cotação' : 'Crie uma nova cotação para seu cliente'}
+            </p>
           </div>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleSaveDraft} disabled={isLoading}>
             <Save className="h-4 w-4 mr-2" />
-            Salvar Rascunho
+            {isEditing ? 'Salvar Alterações' : 'Salvar Rascunho'}
           </Button>
           <Button onClick={handleFinalize} disabled={isLoading || items.length === 0}>
             <Send className="h-4 w-4 mr-2" />
