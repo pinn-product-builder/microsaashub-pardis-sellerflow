@@ -1,10 +1,10 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DashboardStats } from "@/components/dashboard/DashboardStats";
-import { SalesChart } from "@/components/dashboard/SalesChart";
-import { CategoryChart } from "@/components/dashboard/CategoryChart";
-import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import DashboardStats from "@/components/dashboard/DashboardStats";
+import SalesChart from "@/components/dashboard/SalesChart";
+import CategoryChart from "@/components/dashboard/CategoryChart";
+import RecentActivity from "@/components/dashboard/RecentActivity";
 import { Link } from "react-router-dom";
 import { Calculator, FileText, TrendingUp, Users } from "lucide-react";
 
