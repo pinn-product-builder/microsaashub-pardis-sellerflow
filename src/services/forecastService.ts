@@ -183,4 +183,4 @@ class ForecastService {
   }
 }
 
-export const ForecastService = new ForecastService();
+export const forecastService = new ForecastService();

@@ -15,7 +15,7 @@ import {
   Brain
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { ForecastService, ForecastMetrics, SalesForecast } from '@/services/forecastService';
+import { forecastService, ForecastMetrics, SalesForecast } from '@/services/forecastService';
 
 export default function ForecastDashboard() {
   const [forecast, setForecast] = useState<SalesForecast | null>(null);
@@ -26,9 +26,9 @@ export default function ForecastDashboard() {
   const loadForecastData = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setForecast(ForecastService.generateSalesForecast());
-      setMetrics(ForecastService.getForecastMetrics());
-      setHistorical(ForecastService.getHistoricalAnalysis());
+      setForecast(forecastService.generateSalesForecast());
+      setMetrics(forecastService.getForecastMetrics());
+      setHistorical(forecastService.getHistoricalAnalysis());
       setIsLoading(false);
     }, 500);
   };
