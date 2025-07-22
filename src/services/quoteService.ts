@@ -1,12 +1,18 @@
-
 import { Quote, QuoteItem } from '@/types/cpq';
+import { mockQuotes } from '@/data/mockQuotes';
 
 const STORAGE_KEY = 'cpq_quotes';
 
 export class QuoteService {
   private static getQuotes(): Quote[] {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    
+    // Se não há dados no localStorage, inicializa com dados mock
+    this.saveQuotes(mockQuotes);
+    return mockQuotes;
   }
 
   private static saveQuotes(quotes: Quote[]): void {

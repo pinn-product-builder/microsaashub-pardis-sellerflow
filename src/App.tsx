@@ -12,6 +12,8 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import CPQDashboard from "./pages/cpq/Dashboard";
+import NovaQuotacao from "./pages/cpq/NovaQuotacao";
+import Historico from "./pages/cpq/Historico";
 import NotFound from "./pages/NotFound";
 
 // Components
@@ -53,8 +55,8 @@ const App = () => {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="cpq" element={<CPQDashboard />} />
-              <Route path="cpq/nova-cotacao" element={<div className="p-8">Nova Cotação - Em desenvolvimento</div>} />
-              <Route path="cpq/historico" element={<div className="p-8">Histórico - Em desenvolvimento</div>} />
+              <Route path="cpq/nova-cotacao" element={<NovaQuotacao />} />
+              <Route path="cpq/historico" element={<Historico />} />
               <Route path="settings" element={<div className="p-8">Configurações - Em desenvolvimento</div>} />
               <Route path="profile" element={<div className="p-8">Perfil - Em desenvolvimento</div>} />
             </Route>
