@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,11 @@ import Dashboard from "./pages/Dashboard";
 import CPQDashboard from "./pages/cpq/Dashboard";
 import NovaQuotacao from "./pages/cpq/NovaQuotacao";
 import Historico from "./pages/cpq/Historico";
+import PricingDashboard from "./pages/pricing/Dashboard";
+import PricingTables from "./pages/pricing/Tables";
+import PricingApprovals from "./pages/pricing/Approvals";
+import PricingRules from "./pages/pricing/Rules";
+import PricingAnalytics from "./pages/pricing/Analytics";
 import NotFound from "./pages/NotFound";
 
 // Components
@@ -54,10 +58,21 @@ const App = () => {
             }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              
+              {/* CPQ Routes */}
               <Route path="cpq" element={<CPQDashboard />} />
               <Route path="cpq/nova-cotacao" element={<NovaQuotacao />} />
               <Route path="cpq/editar/:id" element={<NovaQuotacao />} />
               <Route path="cpq/historico" element={<Historico />} />
+              
+              {/* Pricing Routes */}
+              <Route path="pricing/dashboard" element={<PricingDashboard />} />
+              <Route path="pricing/tables" element={<PricingTables />} />
+              <Route path="pricing/approvals" element={<PricingApprovals />} />
+              <Route path="pricing/rules" element={<PricingRules />} />
+              <Route path="pricing/analytics" element={<PricingAnalytics />} />
+              
+              {/* Other Routes */}
               <Route path="settings" element={<div className="p-8">Configurações - Em desenvolvimento</div>} />
               <Route path="profile" element={<div className="p-8">Perfil - Em desenvolvimento</div>} />
             </Route>

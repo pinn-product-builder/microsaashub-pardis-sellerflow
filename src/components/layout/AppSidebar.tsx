@@ -11,6 +11,11 @@ import {
   FileText,
   History,
   BarChart3,
+  DollarSign,
+  Table,
+  CheckCircle,
+  Zap,
+  TrendingUp,
 } from "lucide-react"
 
 import {
@@ -67,6 +72,34 @@ const cpqItems = [
   },
 ]
 
+const pricingItems = [
+  {
+    title: "Dashboard",
+    url: "/pricing/dashboard",
+    icon: DollarSign,
+  },
+  {
+    title: "Tabelas de Preço",
+    url: "/pricing/tables",
+    icon: Table,
+  },
+  {
+    title: "Aprovações",
+    url: "/pricing/approvals",
+    icon: CheckCircle,
+  },
+  {
+    title: "Regras",
+    url: "/pricing/rules",
+    icon: Zap,
+  },
+  {
+    title: "Analytics",
+    url: "/pricing/analytics",
+    icon: TrendingUp,
+  },
+]
+
 export function AppSidebar() {
   const { user, logout } = useAuthStore()
 
@@ -82,7 +115,7 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Sistema Pardis</span>
-                  <span className="truncate text-xs">Cotações</span>
+                  <span className="truncate text-xs">Cotações & Precificação</span>
                 </div>
               </NavLink>
             </SidebarMenuButton>
@@ -112,6 +145,23 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {cpqItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Precificação</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {pricingItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url}>
