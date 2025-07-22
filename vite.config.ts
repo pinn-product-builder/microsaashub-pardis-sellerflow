@@ -8,6 +8,19 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    watch: {
+      usePolling: true,
+      interval: 1000,
+      ignored: [
+        '**/node_modules/**', 
+        '**/.git/**',
+        '**/dist/**',
+        '**/coverage/**',
+        '**/*.log',
+        '**/tmp/**',
+        '**/temp/**'
+      ]
+    }
   },
   plugins: [
     react(),
@@ -18,5 +31,15 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-slot', '@radix-ui/react-toast']
+        }
+      }
+    }
   },
 }));
