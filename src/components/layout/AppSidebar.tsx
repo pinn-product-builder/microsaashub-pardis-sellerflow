@@ -16,6 +16,7 @@ import {
   Plus,
   Activity,
   Plug,
+  Search,
 } from "lucide-react"
 
 import {
@@ -70,7 +71,7 @@ const cpqItems = [
   },
 ]
 
-// Módulo de Precificação
+// Módulo de Precificação (adicionada Pesquisa de Mercado)
 const pricingItems = [
   {
     title: "Painel Precificação",
@@ -96,6 +97,11 @@ const pricingItems = [
     title: "Analytics",
     url: "/pricing/analytics",
     icon: TrendingUp,
+  },
+  {
+    title: "Pesquisa de Mercado",
+    url: "/pricing/market-research",
+    icon: Search,
   },
 ]
 
