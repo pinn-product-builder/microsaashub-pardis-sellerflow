@@ -1,12 +1,7 @@
 
 import {
-  Calendar,
   ChevronUp,
   Home,
-  Inbox,
-  Search,
-  Settings,
-  User2,
   Calculator,
   FileText,
   History,
@@ -16,6 +11,8 @@ import {
   CheckCircle,
   Zap,
   TrendingUp,
+  User2,
+  Settings,
 } from "lucide-react"
 
 import {
@@ -29,7 +26,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -40,20 +36,16 @@ import {
 import { NavLink } from "react-router-dom"
 import { useAuthStore } from "@/stores/authStore"
 
-// Menu items.
-const items = [
+// Menu principal
+const mainItems = [
   {
     title: "Dashboard",
     url: "/dashboard",
     icon: Home,
   },
-  {
-    title: "Cotações",
-    url: "/cpq",
-    icon: Calculator,
-  },
 ]
 
+// Módulo de Cotações
 const cpqItems = [
   {
     title: "Dashboard",
@@ -72,6 +64,7 @@ const cpqItems = [
   },
 ]
 
+// Módulo de Precificação
 const pricingItems = [
   {
     title: "Dashboard",
@@ -124,10 +117,10 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Início</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url}>
@@ -140,8 +133,9 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        
         <SidebarGroup>
-          <SidebarGroupLabel>Cotações</SidebarGroupLabel>
+          <SidebarGroupLabel>Cotações (CPQ)</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {cpqItems.map((item) => (
@@ -157,6 +151,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        
         <SidebarGroup>
           <SidebarGroupLabel>Precificação</SidebarGroupLabel>
           <SidebarGroupContent>
