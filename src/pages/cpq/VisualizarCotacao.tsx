@@ -17,15 +17,21 @@ import {
   Calendar,
   User,
   MapPin,
-  ExternalLink
+  ExternalLink,
+  Activity,
+  Shield
 } from 'lucide-react';
 import { QuoteService } from '@/services/quoteService';
 import { VTEXService } from '@/services/vtexService';
+import { ConversionService } from '@/services/conversionService';
 import { Quote } from '@/types/cpq';
+import { ValidationResult } from '@/types/vtex';
 import { QuoteStatusBadge } from '@/components/cpq/display/QuoteStatusBadge';
 import { QuoteItemsTable } from '@/components/cpq/tables/QuoteItemsTable';
 import { ExportActions } from '@/components/cpq/actions/ExportActions';
 import { EmailDialog } from '@/components/cpq/dialogs/EmailDialog';
+import { ConversionTimeline } from '@/components/cpq/conversion/ConversionTimeline';
+import { PreSendValidation } from '@/components/cpq/conversion/PreSendValidation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -38,6 +44,9 @@ export default function VisualizarCotacao() {
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [showValidation, setShowValidation] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -109,26 +118,45 @@ export default function VisualizarCotacao() {
   const handleSendToVTEX = async () => {
     if (!quote) return;
 
+    // Verificar se há falhas nas validações
+    const hasFailures = validationResults.some(r => r.status === 'failed');
+    if (hasFailures) {
+      toast({
+        title: "Validações Pendentes",
+        description: "Corrija os problemas nas validações antes de enviar para VTEX.",
+        variant: "destructive"
+      });
+      setShowValidation(true);
+      return;
+    }
+
     setIsSendingToVTEX(true);
     try {
-      const result = await VTEXService.sendOrderToVTEX(quote);
+      const result = await ConversionService.processConversion(quote);
       
       if (result.success) {
         toast({
-          title: "Enviado para VTEX",
+          title: "Processamento Iniciado",
           description: result.message
         });
         
-        // Atualizar status da cotação
+        // Atualizar status da cotação baseado no resultado
+        const newStatus = result.timeline.steps.some(s => s.name === 'Enviando para VTEX' && s.status === 'completed') 
+          ? 'sent' 
+          : result.timeline.steps.some(s => s.name === 'Avaliando aprovação' && s.status === 'completed' && s.details?.includes('Aprovação manual'))
+          ? 'pending'
+          : 'processing';
+
         QuoteService.updateQuote(quote.id, { 
-          status: 'sent',
-          notes: `${quote.notes}\n\nEnviado para VTEX - Pedido: ${result.orderId}`
+          status: newStatus,
+          notes: `${quote.notes}\n\nProcessamento iniciado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`
         });
         
-        setQuote(prev => prev ? { ...prev, status: 'sent' } : null);
+        setQuote(prev => prev ? { ...prev, status: newStatus } : null);
+        setShowTimeline(true);
       } else {
         toast({
-          title: "Erro ao Enviar",
+          title: "Erro no Processamento",
           description: result.message,
           variant: "destructive"
         });
@@ -136,12 +164,16 @@ export default function VisualizarCotacao() {
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Erro inesperado ao enviar para VTEX",
+        description: "Erro inesperado no processamento",
         variant: "destructive"
       });
     } finally {
       setIsSendingToVTEX(false);
     }
+  };
+
+  const handleValidationComplete = (results: ValidationResult[]) => {
+    setValidationResults(results);
   };
 
   if (isLoading) {
@@ -182,6 +214,7 @@ export default function VisualizarCotacao() {
   const vtexSettings = VTEXService.getCurrentSettings();
   const canSendToVTEX = vtexSettings?.isEnabled && 
     (quote.status === 'calculated' || quote.status === 'approved');
+  const conversionTimeline = ConversionService.getConversionTimeline(quote.id);
 
   return (
     <div className="space-y-6">
@@ -223,14 +256,34 @@ export default function VisualizarCotacao() {
             </Button>
           )}
           {canSendToVTEX && (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowValidation(!showValidation)}
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Validar
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleSendToVTEX}
+                disabled={isSendingToVTEX || validationResults.some(r => r.status === 'failed')}
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                {isSendingToVTEX ? 'Processando...' : 'Enviar para VTEX'}
+              </Button>
+            </>
+          )}
+          {conversionTimeline && (
             <Button 
               variant="outline" 
-              onClick={handleSendToVTEX}
-              disabled={isSendingToVTEX}
-              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              onClick={() => setShowTimeline(!showTimeline)}
+              className="border-purple-300 text-purple-700 hover:bg-purple-50"
             >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              {isSendingToVTEX ? 'Enviando...' : 'Enviar para VTEX'}
+              <Activity className="h-4 w-4 mr-2" />
+              Timeline
             </Button>
           )}
           {quote.status === 'calculated' && (
@@ -241,6 +294,19 @@ export default function VisualizarCotacao() {
           )}
         </div>
       </div>
+
+      {/* Validation Panel */}
+      {showValidation && canSendToVTEX && (
+        <PreSendValidation 
+          quote={quote} 
+          onValidationComplete={handleValidationComplete}
+        />
+      )}
+
+      {/* Timeline Panel */}
+      {showTimeline && conversionTimeline && (
+        <ConversionTimeline timeline={conversionTimeline} />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
@@ -393,6 +459,22 @@ export default function VisualizarCotacao() {
                 {canSendToVTEX && (
                   <div className="text-xs text-muted-foreground">
                     Esta cotação pode ser enviada para VTEX
+                  </div>
+                )}
+                {validationResults.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Validações:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {validationResults.map(r => (
+                        <Badge 
+                          key={r.ruleId} 
+                          variant={r.status === 'passed' ? 'default' : r.status === 'failed' ? 'destructive' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {r.status === 'passed' ? '✓' : r.status === 'failed' ? '✗' : '⚠'}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

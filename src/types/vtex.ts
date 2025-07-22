@@ -134,10 +134,12 @@ export interface VTEXIntegrationLog {
   id: string;
   quoteId: string;
   orderId?: string;
-  status: 'pending' | 'processing' | 'success' | 'error';
+  status: 'pending' | 'processing' | 'success' | 'error' | 'validating' | 'approved' | 'rejected';
   message: string;
   request?: any;
   response?: any;
+  validationResults?: ValidationResult[];
+  approvalData?: ApprovalData;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -150,6 +152,71 @@ export interface VTEXIntegrationSettings {
   defaultAffiliate: string;
   defaultSeller: string;
   productMapping: Record<string, string>; // CPQ Product ID -> VTEX SKU ID
+  approvalRules: ApprovalRule[];
+  validationRules: ValidationRule[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ApprovalRule {
+  id: string;
+  name: string;
+  condition: 'value' | 'margin' | 'customer' | 'product';
+  operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'contains';
+  value: string | number;
+  action: 'auto_approve' | 'require_approval' | 'reject';
+  priority: number;
+  isActive: boolean;
+}
+
+export interface ValidationRule {
+  id: string;
+  name: string;
+  type: 'stock' | 'price' | 'customer' | 'product' | 'tax';
+  isRequired: boolean;
+  isActive: boolean;
+}
+
+export interface ValidationResult {
+  ruleId: string;
+  ruleName: string;
+  status: 'passed' | 'failed' | 'warning';
+  message: string;
+  details?: any;
+}
+
+export interface ApprovalData {
+  status: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: Date;
+  rejectedBy?: string;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+  comments?: string;
+}
+
+export interface ConversionMetrics {
+  totalQuotes: number;
+  convertedQuotes: number;
+  conversionRate: number;
+  averageConversionTime: number;
+  totalRevenue: number;
+  successfulIntegrations: number;
+  failedIntegrations: number;
+  pendingApprovals: number;
+}
+
+export interface ConversionTimeline {
+  quoteId: string;
+  steps: ConversionStep[];
+}
+
+export interface ConversionStep {
+  id: string;
+  name: string;
+  status: 'completed' | 'pending' | 'failed' | 'skipped';
+  timestamp?: Date;
+  duration?: number;
+  details?: string;
+  error?: string;
 }
