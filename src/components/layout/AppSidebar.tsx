@@ -1,4 +1,3 @@
-
 import {
   ChevronUp,
   Home,
@@ -50,7 +49,7 @@ const mainItems = [
 // Módulo de Cotações
 const cpqItems = [
   {
-    title: "Painel CPQ",
+    title: "Painel Cotação",
     url: "/cpq",
     icon: Activity,
   },
@@ -137,7 +136,7 @@ export function AppSidebar() {
         </SidebarGroup>
         
         <SidebarGroup>
-          <SidebarGroupLabel>Cotações (CPQ)</SidebarGroupLabel>
+          <SidebarGroupLabel>Cotações</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {cpqItems.map((item) => (
