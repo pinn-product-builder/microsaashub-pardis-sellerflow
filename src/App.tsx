@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 
 import Index from '@/pages/Index';
@@ -38,7 +38,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function QueryClient({ children }: { children: React.ReactNode }) {
+function QueryWrapper({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
@@ -49,7 +49,7 @@ function QueryClient({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <QueryClient>
+    <QueryWrapper>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -57,7 +57,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           
-          <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               
@@ -84,7 +84,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
-    </QueryClient>
+    </QueryWrapper>
   );
 }
 

@@ -63,7 +63,10 @@ export default function MarketResearch() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CompetitiveAnalysis />
+              <CompetitiveAnalysis 
+                productId="sample-product" 
+                ourPrice={1000} 
+              />
             </CardContent>
           </Card>
         </TabsContent>
