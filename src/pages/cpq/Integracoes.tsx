@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,11 +15,15 @@ import {
 import { Link } from 'react-router-dom';
 import { VTEXConfig } from '@/components/cpq/integrations/VTEXConfig';
 import { VTEXMonitor } from '@/components/cpq/integrations/VTEXMonitor';
+import { MarketResearchConfig } from '@/components/cpq/integrations/MarketResearchConfig';
+import { MarketResearchMonitor } from '@/components/cpq/integrations/MarketResearchMonitor';
 import { VTEXService } from '@/services/vtexService';
+import { MarketResearchService } from '@/services/marketResearchService';
 
 export default function Integracoes() {
   const [activeTab, setActiveTab] = useState('overview');
   const vtexSettings = VTEXService.getCurrentSettings();
+  const marketResearchSettings = MarketResearchService.getSettings();
 
   const integrations = [
     {
@@ -36,7 +41,7 @@ export default function Integracoes() {
       description: 'Análise competitiva e monitoramento de preços',
       icon: TrendingUp,
       color: 'green',
-      status: 'coming-soon',
+      status: marketResearchSettings?.enabled ? 'active' : 'inactive',
       features: ['Comparação de preços', 'Alertas de mercado', 'Relatórios de competitividade']
     }
   ];
@@ -88,10 +93,12 @@ export default function Integracoes() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="vtex">VTEX</TabsTrigger>
-          <TabsTrigger value="monitor">Monitor</TabsTrigger>
+          <TabsTrigger value="market-research">Pesquisa de Mercado</TabsTrigger>
+          <TabsTrigger value="monitor">Monitor VTEX</TabsTrigger>
+          <TabsTrigger value="market-monitor">Monitor Mercado</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -132,21 +139,15 @@ export default function Integracoes() {
                     </div>
 
                     <div className="pt-2">
-                      {integration.id === 'vtex' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setActiveTab('vtex')}
-                          className="w-full"
-                        >
-                          <Settings className="h-4 w-4 mr-2" />
-                          {integration.status === 'active' ? 'Gerenciar' : 'Configurar'}
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" disabled className="w-full">
-                          Em Desenvolvimento
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActiveTab(integration.id)}
+                        className="w-full"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        {integration.status === 'active' ? 'Gerenciar' : 'Configurar'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -186,8 +187,16 @@ export default function Integracoes() {
           <VTEXConfig />
         </TabsContent>
 
+        <TabsContent value="market-research">
+          <MarketResearchConfig />
+        </TabsContent>
+
         <TabsContent value="monitor">
           <VTEXMonitor />
+        </TabsContent>
+
+        <TabsContent value="market-monitor">
+          <MarketResearchMonitor />
         </TabsContent>
       </Tabs>
     </div>
