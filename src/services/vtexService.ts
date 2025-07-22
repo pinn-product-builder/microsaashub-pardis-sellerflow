@@ -46,6 +46,8 @@ export class VTEXService {
       defaultAffiliate: 'CPQ',
       defaultSeller: '1',
       productMapping: {},
+      approvalRules: [],
+      validationRules: [],
       createdAt: new Date(),
       updatedAt: new Date(),
       ...defaultSettings

@@ -1,9 +1,13 @@
 
-import { Outlet } from 'react-router-dom';
+import { ReactNode } from 'react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 
-export default function AppLayout() {
+interface AppLayoutProps {
+  children: ReactNode;
+}
+
+export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -14,7 +18,7 @@ export default function AppLayout() {
             <div className="flex-1" />
           </header>
           <main className="flex-1 overflow-auto">
-            <Outlet />
+            {children}
           </main>
         </SidebarInset>
       </div>

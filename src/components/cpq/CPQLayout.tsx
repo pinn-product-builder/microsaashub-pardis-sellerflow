@@ -6,12 +6,12 @@ import { cn } from '@/lib/utils';
 const navigation = [
   {
     name: 'Dashboard',
-    href: '/cpq',
+    href: '/cpq/dashboard',
     icon: BarChart3,
   },
   {
     name: 'Nova Cotação',
-    href: '/cpq/nova-cotacao',
+    href: '/cpq/nova',
     icon: Calculator,
   },
   {

@@ -4,8 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from '@/components/ui/toaster';
 
 // Layout Components
-import { AppLayout } from '@/components/layout/AppLayout';
-import { CPQLayout } from '@/components/cpq/CPQLayout';
+import AppLayout from '@/components/layout/AppLayout';
+import CPQLayout from '@/components/cpq/CPQLayout';
 
 // Page Components
 import Index from '@/pages/Index';
