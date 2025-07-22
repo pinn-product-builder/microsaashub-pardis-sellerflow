@@ -29,6 +29,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -48,7 +51,7 @@ const mainItems = [
   },
 ]
 
-// Módulo de Cotações
+// Módulo de Cotações (removido Integrações)
 const cpqItems = [
   {
     title: "Painel Cotação",
@@ -64,11 +67,6 @@ const cpqItems = [
     title: "Histórico",
     url: "/cpq/historico",
     icon: History,
-  },
-  {
-    title: "Integrações",
-    url: "/cpq/integracoes",
-    icon: Plug,
   },
 ]
 
@@ -98,6 +96,20 @@ const pricingItems = [
     title: "Analytics",
     url: "/pricing/analytics",
     icon: TrendingUp,
+  },
+]
+
+// Módulo de Configurações
+const configItems = [
+  {
+    title: "Integrações",
+    url: "/cpq/integracoes",
+    icon: Plug,
+  },
+  {
+    title: "Sistema",
+    url: "/settings",
+    icon: Settings,
   },
 ]
 
@@ -177,6 +189,32 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Configurações</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton>
+                  <Settings />
+                  <span>Configurações</span>
+                </SidebarMenuButton>
+                <SidebarMenuSub>
+                  {configItems.map((item) => (
+                    <SidebarMenuSubItem key={item.title}>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -201,12 +239,6 @@ export function AppSidebar() {
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem asChild>
-                  <NavLink to="/settings" className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Configurações
-                  </NavLink>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={logout}>
                   <User2 className="mr-2 h-4 w-4" />
                   Sair
