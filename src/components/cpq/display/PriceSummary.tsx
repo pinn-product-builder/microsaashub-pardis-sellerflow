@@ -85,13 +85,6 @@ export function PriceSummary({ items, discount, totals }: PriceSummaryProps) {
             <Separator />
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Detalhamento de Impostos</h4>
-              {items.reduce((acc, item) => {
-                acc.icms += item.taxes.icms * item.quantity;
-                acc.ipi += item.taxes.ipi * item.quantity;
-                acc.pis += item.taxes.pis * item.quantity;
-                acc.cofins += item.taxes.cofins * item.quantity;
-                return acc;
-              }, { icms: 0, ipi: 0, pis: 0, cofins: 0 })}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex justify-between">
                   <span>ICMS:</span>
