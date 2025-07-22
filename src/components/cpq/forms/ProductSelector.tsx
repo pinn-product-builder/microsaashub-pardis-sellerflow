@@ -1,6 +1,6 @@
 
 import { useState, useMemo } from 'react';
-import { Plus, Search, AlertTriangle } from 'lucide-react';
+import { Plus, Search, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { mockProducts } from '@/data/mockData';
 import { Product, QuoteItem, Customer } from '@/types/cpq';
 import { PricingService } from '@/services/pricingService';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProductSelectorProps {
   destinationUF: string;
@@ -38,6 +39,10 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [campaignCode, setCampaignCode] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+  const { toast } = useToast();
+
+  console.log('ProductSelector props:', { destinationUF, selectedCustomer: selectedCustomer?.companyName });
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return mockProducts;
@@ -49,31 +54,62 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
     );
   }, [searchTerm]);
 
-  const handleAddProduct = () => {
-    if (!selectedProduct || !destinationUF) return;
+  const handleAddProduct = async () => {
+    if (!selectedProduct || !destinationUF || !selectedCustomer) {
+      toast({
+        title: "Erro",
+        description: "Selecione um produto válido e certifique-se de que um cliente foi selecionado.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    const quoteItem = PricingService.calculateQuoteItem(
-      selectedProduct,
-      quantity,
-      destinationUF,
-      selectedCustomer || undefined,
-      undefined,
-      campaignCode || undefined
-    );
+    setIsAdding(true);
+    try {
+      console.log('Adding product:', selectedProduct.name, 'Quantity:', quantity, 'UF:', destinationUF);
+      
+      const quoteItem = PricingService.calculateQuoteItem(
+        selectedProduct,
+        quantity,
+        destinationUF,
+        selectedCustomer,
+        undefined,
+        campaignCode || undefined
+      );
 
-    onAddProduct(quoteItem);
-    setSelectedProduct(null);
-    setQuantity(1);
-    setCampaignCode('');
-    setOpen(false);
+      console.log('Quote item calculated:', quoteItem);
+      
+      onAddProduct(quoteItem);
+      
+      toast({
+        title: "Produto adicionado",
+        description: `${selectedProduct.name} foi adicionado à cotação!`,
+        action: <CheckCircle className="h-4 w-4 text-green-600" />
+      });
+      
+      setSelectedProduct(null);
+      setQuantity(1);
+      setCampaignCode('');
+      setOpen(false);
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar o produto à cotação.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
+    console.log('Product selected:', product.name);
   };
 
   // Simular preço para preview
-  const previewPrice = selectedProduct && selectedCustomer ? 
+  const previewPrice = selectedProduct && selectedCustomer && destinationUF ? 
     PricingService.calculateQuoteItem(
       selectedProduct,
       quantity,
@@ -83,13 +119,19 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
       campaignCode || undefined
     ) : null;
 
+  const isButtonEnabled = !!destinationUF && !!selectedCustomer;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Label>Produtos</Label>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" disabled={!destinationUF}>
+            <Button 
+              size="sm" 
+              disabled={!isButtonEnabled}
+              title={!isButtonEnabled ? "Selecione um cliente primeiro" : "Adicionar produto"}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Adicionar Produto
             </Button>
@@ -97,6 +139,11 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Selecionar Produto</DialogTitle>
+              {selectedCustomer && (
+                <p className="text-sm text-muted-foreground">
+                  Cliente: {selectedCustomer.companyName} ({selectedCustomer.uf})
+                </p>
+              )}
             </DialogHeader>
             
             <div className="space-y-4 flex-1 overflow-hidden">
@@ -285,9 +332,13 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
                           </div>
                         )}
 
-                        <Button onClick={handleAddProduct} className="w-full">
+                        <Button 
+                          onClick={handleAddProduct} 
+                          className="w-full" 
+                          disabled={isAdding || !destinationUF}
+                        >
                           <Plus className="h-4 w-4 mr-2" />
-                          Adicionar à Cotação
+                          {isAdding ? 'Adicionando...' : 'Adicionar à Cotação'}
                         </Button>
                       </>
                     ) : (
@@ -303,10 +354,13 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
         </Dialog>
       </div>
 
-      {!destinationUF && (
-        <p className="text-sm text-muted-foreground">
-          Selecione um cliente primeiro para adicionar produtos
-        </p>
+      {!isButtonEnabled && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Selecione um cliente primeiro para adicionar produtos à cotação.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );

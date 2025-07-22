@@ -12,7 +12,7 @@ import { PriceSummary } from '@/components/cpq/display/PriceSummary';
 import { PaymentConditions } from '@/components/cpq/forms/PaymentConditions';
 import { useCPQStore } from '@/stores/cpqStore';
 import { QuoteService } from '@/services/quoteService';
-import { PricingService } from '@/services/pricingService';
+import { VTEXService } from '@/services/vtexService';
 import { useToast } from '@/hooks/use-toast';
 import { Customer } from '@/types/cpq';
 
@@ -21,6 +21,7 @@ export default function NovaQuotacao() {
   const isEditing = !!id;
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
   const { toast } = useToast();
   
   const {
@@ -40,6 +41,16 @@ export default function NovaQuotacao() {
   } = useCPQStore();
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
+
+  // Debug logs
+  useEffect(() => {
+    console.log('NovaQuotacao State:', {
+      selectedCustomer: selectedCustomer?.companyName,
+      destinationUF,
+      itemsCount: items.length,
+      currentStep
+    });
+  }, [selectedCustomer, destinationUF, items.length, currentStep]);
 
   // Carregar cotação para edição
   useEffect(() => {
@@ -72,9 +83,30 @@ export default function NovaQuotacao() {
   }, [isEditing, id]);
 
   const handleCustomerSelect = (customer: Customer) => {
+    console.log('Customer selected:', customer.companyName, 'UF:', customer.uf);
     setSelectedCustomer(customer);
-    if (!isEditing) {
-      setCurrentStep(2);
+    
+    // Aguardar um momento para garantir que o estado foi atualizado
+    setTimeout(() => {
+      if (!isEditing) {
+        setCurrentStep(2);
+        toast({
+          title: "Cliente selecionado",
+          description: `${customer.companyName} foi selecionado. Agora você pode adicionar produtos.`
+        });
+      }
+    }, 100);
+  };
+
+  const handleProductAdded = () => {
+    toast({
+      title: "Produto adicionado",
+      description: "Produto foi adicionado à cotação com sucesso!"
+    });
+    
+    // Se tem produtos, permitir ir para finalização
+    if (items.length > 0 && currentStep < 3) {
+      setCurrentStep(3);
     }
   };
 
@@ -158,9 +190,11 @@ export default function NovaQuotacao() {
 
     setIsLoading(true);
     try {
+      let quote;
+      
       if (isEditing && id) {
         // Finalizar cotação existente
-        QuoteService.updateQuote(id, {
+        quote = QuoteService.updateQuote(id, {
           customer: selectedCustomer,
           destinationUF,
           items,
@@ -173,14 +207,9 @@ export default function NovaQuotacao() {
           paymentConditions,
           notes
         });
-
-        toast({
-          title: "Sucesso",
-          description: "Cotação finalizada com sucesso!"
-        });
       } else {
         // Criar e finalizar nova cotação
-        const quote = QuoteService.createQuote({
+        quote = QuoteService.createQuote({
           customer: selectedCustomer,
           destinationUF,
           items,
@@ -195,12 +224,12 @@ export default function NovaQuotacao() {
           createdBy: 'current-user',
           notes
         });
-
-        toast({
-          title: "Sucesso",
-          description: `Cotação ${quote.number} finalizada com sucesso!`
-        });
       }
+
+      toast({
+        title: "Sucesso",
+        description: `Cotação ${quote.number} finalizada com sucesso!`
+      });
 
       clearQuote();
       setCurrentStep(1);
@@ -215,11 +244,93 @@ export default function NovaQuotacao() {
     }
   };
 
+  const handleSendToVTEX = async () => {
+    if (!selectedCustomer || items.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Selecione um cliente e adicione pelo menos um produto.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSendingToVTEX(true);
+    try {
+      // Primeiro, criar/atualizar a cotação
+      let quote;
+      
+      if (isEditing && id) {
+        quote = QuoteService.updateQuote(id, {
+          customer: selectedCustomer,
+          destinationUF,
+          items,
+          subtotal: totals.subtotal,
+          totalTaxes: totals.totalTaxes,
+          totalFreight: totals.totalFreight,
+          discount: totals.discount,
+          total: totals.total,
+          status: 'calculated',
+          paymentConditions,
+          notes
+        });
+      } else {
+        quote = QuoteService.createQuote({
+          customer: selectedCustomer,
+          destinationUF,
+          items,
+          subtotal: totals.subtotal,
+          totalTaxes: totals.totalTaxes,
+          totalFreight: totals.totalFreight,
+          discount: totals.discount,
+          total: totals.total,
+          status: 'calculated',
+          paymentConditions,
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          createdBy: 'current-user',
+          notes
+        });
+      }
+
+      // Enviar para VTEX
+      const result = await VTEXService.sendOrderToVTEX(quote);
+      
+      if (result.success) {
+        toast({
+          title: "Sucesso",
+          description: `Cotação enviada para VTEX! ${result.message}`
+        });
+        
+        // Atualizar status da cotação
+        QuoteService.updateQuote(quote.id, { status: 'sent' });
+        
+        clearQuote();
+        setCurrentStep(1);
+      } else {
+        toast({
+          title: "Erro na integração VTEX",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível enviar para VTEX.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSendingToVTEX(false);
+    }
+  };
+
   const steps = [
     { id: 1, title: "Cliente", description: "Selecione o cliente" },
     { id: 2, title: "Produtos", description: "Adicione os produtos" },
     { id: 3, title: "Finalização", description: "Revise e finalize" }
   ];
+
+  const canProceedToStep2 = selectedCustomer && destinationUF;
+  const canProceedToStep3 = canProceedToStep2 && items.length > 0;
 
   return (
     <div className="space-y-6">
@@ -242,13 +353,20 @@ export default function NovaQuotacao() {
           </div>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={handleSaveDraft} disabled={isLoading}>
+          <Button variant="outline" onClick={handleSaveDraft} disabled={isLoading || !canProceedToStep3}>
             <Save className="h-4 w-4 mr-2" />
             {isEditing ? 'Salvar Alterações' : 'Salvar Rascunho'}
           </Button>
-          <Button onClick={handleFinalize} disabled={isLoading || items.length === 0}>
+          <Button onClick={handleFinalize} disabled={isLoading || !canProceedToStep3}>
             <Send className="h-4 w-4 mr-2" />
             Finalizar Cotação
+          </Button>
+          <Button 
+            onClick={handleSendToVTEX} 
+            disabled={isSendingToVTEX || !canProceedToStep3}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            {isSendingToVTEX ? 'Enviando...' : 'Enviar para VTEX'}
           </Button>
         </div>
       </div>
@@ -283,22 +401,20 @@ export default function NovaQuotacao() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Step 1: Customer Selection */}
-          {currentStep >= 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>1. Seleção do Cliente</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CustomerSelector 
-                  selectedCustomer={selectedCustomer}
-                  onCustomerSelect={handleCustomerSelect}
-                />
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>1. Seleção do Cliente</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CustomerSelector 
+                selectedCustomer={selectedCustomer}
+                onCustomerSelect={handleCustomerSelect}
+              />
+            </CardContent>
+          </Card>
 
           {/* Step 2: Product Selection */}
-          {currentStep >= 2 && selectedCustomer && (
+          {canProceedToStep2 && (
             <Card>
               <CardHeader>
                 <CardTitle>2. Produtos</CardTitle>
@@ -307,7 +423,10 @@ export default function NovaQuotacao() {
                 <ProductSelector 
                   destinationUF={destinationUF}
                   selectedCustomer={selectedCustomer}
-                  onAddProduct={addItem}
+                  onAddProduct={(item) => {
+                    addItem(item);
+                    handleProductAdded();
+                  }}
                 />
                 {items.length > 0 && (
                   <>
@@ -315,7 +434,7 @@ export default function NovaQuotacao() {
                     <QuoteItemsTable items={items} />
                   </>
                 )}
-                {items.length > 0 && (
+                {items.length > 0 && currentStep < 3 && (
                   <div className="flex justify-end">
                     <Button onClick={() => setCurrentStep(3)}>
                       Continuar para Finalização
@@ -327,7 +446,7 @@ export default function NovaQuotacao() {
           )}
 
           {/* Step 3: Payment Conditions */}
-          {currentStep >= 3 && items.length > 0 && (
+          {canProceedToStep3 && currentStep >= 3 && (
             <Card>
               <CardHeader>
                 <CardTitle>3. Condições de Pagamento</CardTitle>

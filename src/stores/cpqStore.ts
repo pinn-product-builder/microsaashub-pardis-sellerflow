@@ -60,16 +60,25 @@ export const useCPQStore = create<CPQStore>((set, get) => ({
   // Ações
   setCurrentQuote: (quote) => set({ currentQuote: quote }),
   
-  setSelectedCustomer: (customer) => set({ 
-    selectedCustomer: customer,
-    destinationUF: customer?.uf || ''
-  }),
+  setSelectedCustomer: (customer) => {
+    console.log('Setting customer in store:', customer?.companyName, 'UF:', customer?.uf);
+    set({ 
+      selectedCustomer: customer,
+      destinationUF: customer?.uf || ''
+    });
+  },
   
-  setDestinationUF: (uf) => set({ destinationUF: uf }),
+  setDestinationUF: (uf) => {
+    console.log('Setting destinationUF:', uf);
+    set({ destinationUF: uf });
+  },
   
-  addItem: (item) => set((state) => ({
-    items: [...state.items, item]
-  })),
+  addItem: (item) => {
+    console.log('Adding item to store:', item.product.name, 'Quantity:', item.quantity);
+    set((state) => ({
+      items: [...state.items, item]
+    }));
+  },
   
   updateItem: (id, updates) => set((state) => ({
     items: state.items.map(item => 
