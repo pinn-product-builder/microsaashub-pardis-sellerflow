@@ -1,5 +1,5 @@
 
-import { Edit, Copy, Send, MoreHorizontal } from 'lucide-react';
+import { Edit, Copy, Send, MoreHorizontal, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -101,7 +101,12 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
           {quotes.map((quote) => (
             <TableRow key={quote.id}>
               <TableCell className="font-medium">
-                {quote.number}
+                <Link 
+                  to={`/cpq/cotacao/${quote.id}`}
+                  className="text-primary hover:underline"
+                >
+                  {quote.number}
+                </Link>
               </TableCell>
               <TableCell>
                 <div>
@@ -143,6 +148,12 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link to={`/cpq/cotacao/${quote.id}`}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Visualizar
+                      </Link>
+                    </DropdownMenuItem>
                     {quote.status === 'draft' && (
                       <DropdownMenuItem asChild>
                         <Link to={`/cpq/editar/${quote.id}`}>

@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +13,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import CPQDashboard from "./pages/cpq/Dashboard";
 import NovaQuotacao from "./pages/cpq/NovaQuotacao";
+import VisualizarCotacao from "./pages/cpq/VisualizarCotacao";
 import Historico from "./pages/cpq/Historico";
 import PricingDashboard from "./pages/pricing/Dashboard";
 import PricingTables from "./pages/pricing/Tables";
@@ -62,6 +64,7 @@ const App = () => {
               {/* CPQ Routes */}
               <Route path="cpq" element={<CPQDashboard />} />
               <Route path="cpq/nova-cotacao" element={<NovaQuotacao />} />
+              <Route path="cpq/cotacao/:id" element={<VisualizarCotacao />} />
               <Route path="cpq/editar/:id" element={<NovaQuotacao />} />
               <Route path="cpq/historico" element={<Historico />} />
               
