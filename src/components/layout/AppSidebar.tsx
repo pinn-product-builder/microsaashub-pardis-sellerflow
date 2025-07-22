@@ -1,15 +1,18 @@
 
-import { Link, useLocation } from 'react-router-dom';
-import { 
-  BarChart3, 
-  Calculator, 
-  CreditCard, 
-  History, 
-  Settings, 
-  User,
-  LogOut,
-  FileText
-} from 'lucide-react';
+import {
+  Calendar,
+  ChevronUp,
+  Home,
+  Inbox,
+  Search,
+  Settings,
+  User2,
+  Calculator,
+  FileText,
+  History,
+  BarChart3,
+} from "lucide-react"
+
 import {
   Sidebar,
   SidebarContent,
@@ -21,156 +24,100 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   useSidebar,
-} from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { useAuthStore } from '@/stores/authStore';
+} from "@/components/ui/sidebar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { NavLink } from "react-router-dom"
+import { useAuthStore } from "@/stores/authStore"
 
-const menuItems = [
+// Menu items.
+const items = [
   {
-    title: 'Dashboard',
-    url: '/dashboard',
-    icon: BarChart3,
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
   },
   {
-    title: 'CPQ - Cotações',
+    title: "Cotações",
+    url: "/cpq",
     icon: Calculator,
-    items: [
-      {
-        title: 'Dashboard CPQ',
-        url: '/cpq',
-      },
-      {
-        title: 'Nova Cotação',
-        url: '/cpq/nova-cotacao',
-      },
-      {
-        title: 'Histórico',
-        url: '/cpq/historico',
-      },
-    ],
   },
-  {
-    title: 'Checkout 3P',
-    url: '/checkout',
-    icon: CreditCard,
-    disabled: true,
-  },
-  {
-    title: 'Analytics & BI',
-    url: '/analytics',
-    icon: BarChart3,
-    disabled: true,
-  },
-];
+]
 
-const settingsItems = [
+const cpqItems = [
   {
-    title: 'Configurações',
-    url: '/settings',
-    icon: Settings,
+    title: "Dashboard",
+    url: "/cpq",
+    icon: BarChart3,
   },
   {
-    title: 'Perfil',
-    url: '/profile',
-    icon: User,
+    title: "Nova Cotação",
+    url: "/cpq/nova-cotacao",
+    icon: FileText,
   },
-];
+  {
+    title: "Histórico",
+    url: "/cpq/historico",
+    icon: History,
+  },
+]
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const location = useLocation();
-  const { user, logout } = useAuthStore();
-
-  const isActive = (url: string) => location.pathname === url;
-  const isGroupActive = (items?: { url: string }[]) => 
-    items?.some(item => location.pathname === item.url);
+  const { user, logout } = useAuthStore()
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar variant="inset">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <FileText className="size-4" />
+              <NavLink to="/dashboard">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Calculator className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Portal Pardis</span>
-                  <span className="truncate text-xs">PCVP</span>
+                  <span className="truncate font-semibold">Sistema Pardis</span>
+                  <span className="truncate text-xs">Cotações</span>
                 </div>
-              </Link>
+              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.items ? (
-                    <SidebarMenuButton
-                      isActive={isGroupActive(item.items)}
-                      className={item.disabled ? 'opacity-50' : ''}
-                    >
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  ) : (
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive(item.url!)}
-                      disabled={item.disabled}
-                      className={item.disabled ? 'opacity-50' : ''}
-                    >
-                      <Link to={item.disabled ? '#' : item.url!}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  )}
-                  {item.items && (
-                    <SidebarMenuSub>
-                      {item.items.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton 
-                            asChild
-                            isActive={isActive(subItem.url)}
-                          >
-                            <Link to={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  )}
+                    </NavLink>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
         <SidebarGroup>
-          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+          <SidebarGroupLabel>Cotações</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {settingsItems.map((item) => (
+              {cpqItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
-                    </Link>
+                    </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -178,34 +125,42 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg">
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">
-                  {user?.name.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{user?.name}</span>
-                <span className="truncate text-xs capitalize">{user?.role}</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start" 
-              onClick={logout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              {state === 'expanded' && 'Sair'}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <User2 className="size-4" />
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">{user?.name}</span>
+                    <span className="truncate text-xs">{user?.email}</span>
+                  </div>
+                  <ChevronUp className="ml-auto size-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={logout}>
+                  <User2 className="mr-2 h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  );
+  )
 }

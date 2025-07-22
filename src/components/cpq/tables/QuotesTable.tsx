@@ -20,12 +20,17 @@ import { Quote } from '@/types/cpq';
 import { QuoteStatusBadge } from '@/components/cpq/display/QuoteStatusBadge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Link } from 'react-router-dom';
+import { QuoteService } from '@/services/quoteService';
+import { useToast } from '@/hooks/use-toast';
 
 interface QuotesTableProps {
   quotes: Quote[];
 }
 
 export function QuotesTable({ quotes }: QuotesTableProps) {
+  const { toast } = useToast();
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -38,24 +43,34 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
     return format(dateObj, 'dd/MM/yyyy', { locale: ptBR });
   };
 
-  const handleViewQuote = (quoteId: string) => {
-    console.log('Visualizar cotação:', quoteId);
-    // TODO: Implementar navegação para visualização
-  };
+  const handleDuplicateQuote = (quote: Quote) => {
+    const duplicatedQuote = QuoteService.createQuote({
+      customer: quote.customer,
+      destinationUF: quote.destinationUF,
+      items: quote.items,
+      subtotal: quote.subtotal,
+      totalTaxes: quote.totalTaxes,
+      totalFreight: quote.totalFreight,
+      discount: quote.discount,
+      total: quote.total,
+      status: 'draft',
+      paymentConditions: quote.paymentConditions,
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      createdBy: 'current-user',
+      notes: quote.notes
+    });
 
-  const handleEditQuote = (quoteId: string) => {
-    console.log('Editar cotação:', quoteId);
-    // TODO: Implementar navegação para edição
-  };
-
-  const handleDuplicateQuote = (quoteId: string) => {
-    console.log('Duplicar cotação:', quoteId);
-    // TODO: Implementar duplicação
+    toast({
+      title: "Cotação Duplicada",
+      description: `Nova cotação ${duplicatedQuote.number} criada com sucesso!`
+    });
   };
 
   const handleSendQuote = (quoteId: string) => {
-    console.log('Enviar cotação:', quoteId);
-    // TODO: Implementar envio por email
+    toast({
+      title: "Funcionalidade em desenvolvimento",
+      description: "O envio por email será implementado em breve."
+    });
   };
 
   if (quotes.length === 0) {
@@ -86,7 +101,12 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
           {quotes.map((quote) => (
             <TableRow key={quote.id}>
               <TableCell className="font-medium">
-                {quote.number}
+                <Link 
+                  to={`/cpq/cotacao/${quote.id}`}
+                  className="text-primary hover:underline"
+                >
+                  {quote.number}
+                </Link>
               </TableCell>
               <TableCell>
                 <div>
@@ -128,17 +148,21 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewQuote(quote.id)}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      Visualizar
+                    <DropdownMenuItem asChild>
+                      <Link to={`/cpq/cotacao/${quote.id}`}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Visualizar
+                      </Link>
                     </DropdownMenuItem>
                     {quote.status === 'draft' && (
-                      <DropdownMenuItem onClick={() => handleEditQuote(quote.id)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar
+                      <DropdownMenuItem asChild>
+                        <Link to={`/cpq/editar/${quote.id}`}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </Link>
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={() => handleDuplicateQuote(quote.id)}>
+                    <DropdownMenuItem onClick={() => handleDuplicateQuote(quote)}>
                       <Copy className="mr-2 h-4 w-4" />
                       Duplicar
                     </DropdownMenuItem>
