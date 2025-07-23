@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +9,7 @@ import CategoryChart from "@/components/dashboard/CategoryChart";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import ForecastDashboard from "@/components/dashboard/ForecastDashboard";
 import AdvancedMetrics from "@/components/dashboard/AdvancedMetrics";
+import MLDashboard from "@/components/dashboard/MLDashboard";
 
 export default function Dashboard() {
   return (
@@ -28,6 +28,10 @@ export default function Dashboard() {
           <TabsTrigger value="metrics">
             <Activity className="h-4 w-4 mr-2" />
             Métricas Avançadas
+          </TabsTrigger>
+          <TabsTrigger value="ml">
+            <Brain className="h-4 w-4 mr-2" />
+            Machine Learning
           </TabsTrigger>
         </TabsList>
 
@@ -137,6 +141,10 @@ export default function Dashboard() {
 
         <TabsContent value="metrics">
           <AdvancedMetrics />
+        </TabsContent>
+
+        <TabsContent value="ml">
+          <MLDashboard />
         </TabsContent>
       </Tabs>
     </div>
