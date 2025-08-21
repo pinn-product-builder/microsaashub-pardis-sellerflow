@@ -31,6 +31,13 @@ import PricingAnalytics from '@/pages/pricing/Analytics';
 import MarketResearch from '@/pages/pricing/MarketResearch';
 import Taxes from '@/pages/pricing/Taxes';
 
+// Estoque Pages
+import EstoqueDashboard from '@/pages/estoque/Dashboard';
+import EstoqueProdutos from '@/pages/estoque/Produtos';
+import EstoqueMovimentacoes from '@/pages/estoque/Movimentacoes';
+import EstoqueEntrada from '@/pages/estoque/Entrada';
+import EstoqueSaida from '@/pages/estoque/Saida';
+
 function App() {
   return (
     <Router>
@@ -67,6 +74,14 @@ function App() {
             <Route path="/pricing/analytics" element={<AppLayout><PricingAnalytics /></AppLayout>} />
             <Route path="/pricing/market-research" element={<AppLayout><MarketResearch /></AppLayout>} />
             <Route path="/pricing/taxes" element={<AppLayout><Taxes /></AppLayout>} />
+
+            {/* Estoque Routes */}
+            <Route path="/estoque" element={<Navigate to="/estoque/dashboard" replace />} />
+            <Route path="/estoque/dashboard" element={<AppLayout><EstoqueDashboard /></AppLayout>} />
+            <Route path="/estoque/produtos" element={<AppLayout><EstoqueProdutos /></AppLayout>} />
+            <Route path="/estoque/movimentacoes" element={<AppLayout><EstoqueMovimentacoes /></AppLayout>} />
+            <Route path="/estoque/entrada" element={<AppLayout><EstoqueEntrada /></AppLayout>} />
+            <Route path="/estoque/saida" element={<AppLayout><EstoqueSaida /></AppLayout>} />
 
             {/* Legacy redirects */}
             <Route path="/cpq" element={<Navigate to="/cpq/dashboard" replace />} />

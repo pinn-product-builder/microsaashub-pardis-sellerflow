@@ -18,6 +18,11 @@ import {
   Plug,
   Search,
   Receipt,
+  Boxes,
+  Package,
+  List,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react"
 
 import {
@@ -111,6 +116,35 @@ const pricingItems = [
   },
 ]
 
+// Módulo de Estoque
+const estoqueItems = [
+  {
+    title: "Dashboard Estoque",
+    url: "/estoque/dashboard",
+    icon: Boxes,
+  },
+  {
+    title: "Produtos",
+    url: "/estoque/produtos",
+    icon: Package,
+  },
+  {
+    title: "Movimentações",
+    url: "/estoque/movimentacoes",  
+    icon: List,
+  },
+  {
+    title: "Entrada",
+    url: "/estoque/entrada",
+    icon: ArrowDown,
+  },
+  {
+    title: "Saída",
+    url: "/estoque/saida",
+    icon: ArrowUp,
+  },
+]
+
 // Módulo de Configurações
 const configItems = [
   {
@@ -184,6 +218,24 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {pricingItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Estoque</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {estoqueItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url}>
