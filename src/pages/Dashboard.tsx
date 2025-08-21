@@ -10,118 +10,120 @@ import RecentActivity from "@/components/dashboard/RecentActivity";
 import ForecastDashboard from "@/components/dashboard/ForecastDashboard";
 import AdvancedMetrics from "@/components/dashboard/AdvancedMetrics";
 import MLDashboard from "@/components/dashboard/MLDashboard";
+import { PageContainer, PageHeader, PageContent } from "@/components/layout/Page";
 
 export default function Dashboard() {
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-      </div>
+    <PageContainer>
+      <PageHeader 
+        title="Dashboard Principal" 
+        description="Visão geral completa do sistema de cotações e precificação"
+      />
       
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="forecast">
-            <Brain className="h-4 w-4 mr-2" />
-            Forecast
-          </TabsTrigger>
-          <TabsTrigger value="metrics">
-            <Activity className="h-4 w-4 mr-2" />
-            Métricas Avançadas
-          </TabsTrigger>
-          <TabsTrigger value="ml">
-            <Brain className="h-4 w-4 mr-2" />
-            Machine Learning
-          </TabsTrigger>
-        </TabsList>
+      <PageContent>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="forecast" className="flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">Forecast</span>
+            </TabsTrigger>
+            <TabsTrigger value="metrics" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Métricas</span>
+            </TabsTrigger>
+            <TabsTrigger value="ml" className="flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">ML</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <DashboardStats />
+          <TabsContent value="overview" className="space-y-6">
+            <DashboardStats />
 
-          {/* Quick Actions */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Nova Cotação</CardTitle>
-                <Plus className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <Link to="/cpq/nova-cotacao">
-                  <Button className="w-full">
-                    <Calculator className="mr-2 h-4 w-4" />
-                    Criar Cotação
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+            {/* Quick Actions */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card className="hover-scale transition-all duration-200 hover:shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Nova Cotação</CardTitle>
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <Link to="/cpq/nova-cotacao">
+                    <Button className="w-full">
+                      <Calculator className="mr-2 h-4 w-4" />
+                      Criar Cotação
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Histórico</CardTitle>
-                <History className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <Link to="/cpq/historico">
-                  <Button variant="outline" className="w-full">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Ver Cotações
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+              <Card className="hover-scale transition-all duration-200 hover:shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Histórico</CardTitle>
+                  <History className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <Link to="/cpq/historico">
+                    <Button variant="outline" className="w-full">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Ver Cotações
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Precificação</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <Link to="/pricing/dashboard">
-                  <Button variant="outline" className="w-full">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Gerenciar Preços
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+              <Card className="hover-scale transition-all duration-200 hover:shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Precificação</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <Link to="/pricing/dashboard">
+                    <Button variant="outline" className="w-full">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      <span className="hidden sm:inline">Gerenciar </span>Preços
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Analytics</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <Link to="/pricing/analytics">
-                  <Button variant="outline" className="w-full">
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Ver Analytics
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
+              <Card className="hover-scale transition-all duration-200 hover:shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Analytics</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <Link to="/pricing/analytics">
+                    <Button variant="outline" className="w-full">
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Ver Analytics
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Vendas por Período</CardTitle>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <SalesChart />
-              </CardContent>
-            </Card>
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Vendas por Categoria</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CategoryChart />
-              </CardContent>
-            </Card>
-          </div>
+            <div className="grid gap-6 lg:grid-cols-7">
+              <Card className="lg:col-span-4">
+                <CardHeader>
+                  <CardTitle>Vendas por Período</CardTitle>
+                </CardHeader>
+                <CardContent className="pl-2">
+                  <SalesChart />
+                </CardContent>
+              </Card>
+              <Card className="lg:col-span-3">
+                <CardHeader>
+                  <CardTitle>Vendas por Categoria</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CategoryChart />
+                </CardContent>
+              </Card>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-7">
+            <Card>
               <CardHeader>
                 <CardTitle>Atividade Recente</CardTitle>
                 <CardDescription>
@@ -132,21 +134,21 @@ export default function Dashboard() {
                 <RecentActivity />
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="forecast">
-          <ForecastDashboard />
-        </TabsContent>
+          <TabsContent value="forecast">
+            <ForecastDashboard />
+          </TabsContent>
 
-        <TabsContent value="metrics">
-          <AdvancedMetrics />
-        </TabsContent>
+          <TabsContent value="metrics">
+            <AdvancedMetrics />
+          </TabsContent>
 
-        <TabsContent value="ml">
-          <MLDashboard />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="ml">
+            <MLDashboard />
+          </TabsContent>
+        </Tabs>
+      </PageContent>
+    </PageContainer>
   );
 }

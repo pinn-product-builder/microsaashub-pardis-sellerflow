@@ -2,9 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Design System - All colors, gradients, fonts, animations, and spacing */
+
+/* Custom CSS Variables for enhanced design system */
+:root {
+  /* Transitions and animations */
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: all 0.15s ease-out;
+  
+  /* Shadows */
+  --shadow-elegant: 0 4px 20px -2px hsl(var(--primary) / 0.08);
+  --shadow-soft: 0 2px 8px -2px hsl(var(--muted-foreground) / 0.1);
+  
+  /* Spacing scale */
+  --space-page: 1.5rem;
+  --space-section: 2rem;
+  --space-component: 1rem;
+}
 
 @layer base {
   :root {
@@ -100,6 +114,41 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-inter antialiased;
+  }
+
+  /* Enhanced focus states for accessibility */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+}
+
+@layer components {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+  
+  /* Focus utilities for icons */
+  .icon-focus {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm;
+  }
+}
+
+@layer utilities {
+  /* Custom keyframes */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
