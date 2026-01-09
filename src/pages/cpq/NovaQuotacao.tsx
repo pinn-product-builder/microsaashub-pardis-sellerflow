@@ -1,19 +1,21 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Save, Send, ArrowLeft } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Save, Send, ArrowLeft, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { CustomerSelector } from '@/components/cpq/forms/CustomerSelector';
 import { ProductSelector } from '@/components/cpq/forms/ProductSelector';
 import { QuoteItemsTable } from '@/components/cpq/tables/QuoteItemsTable';
 import { PriceSummary } from '@/components/cpq/display/PriceSummary';
 import { PaymentConditions } from '@/components/cpq/forms/PaymentConditions';
+import { AuthorizationBadge } from '@/components/cpq/display/AuthorizationBadge';
 import { useCPQStore } from '@/stores/cpqStore';
 import { QuoteService } from '@/services/quoteService';
 import { VTEXService } from '@/services/vtexService';
 import { useToast } from '@/hooks/use-toast';
+import { usePardisQuote, getApproverLabel } from '@/hooks/usePardisQuote';
 import { Customer } from '@/types/cpq';
 
 export default function NovaQuotacao() {
@@ -41,6 +43,9 @@ export default function NovaQuotacao() {
   } = useCPQStore();
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
+  
+  // Pardis margin calculations
+  const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer);
 
   // Debug logs
   useEffect(() => {
@@ -48,9 +53,11 @@ export default function NovaQuotacao() {
       selectedCustomer: selectedCustomer?.companyName,
       destinationUF,
       itemsCount: items.length,
-      currentStep
+      currentStep,
+      pardisAuthorized: pardisSummary.isAuthorized,
+      pardisMargin: pardisSummary.totalMarginPercent
     });
-  }, [selectedCustomer, destinationUF, items.length, currentStep]);
+  }, [selectedCustomer, destinationUF, items.length, currentStep, pardisSummary]);
 
   // Carregar cotação para edição
   useEffect(() => {
@@ -335,7 +342,7 @@ export default function NovaQuotacao() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" asChild>
             <Link to="/cpq">
@@ -344,32 +351,77 @@ export default function NovaQuotacao() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
               {isEditing ? 'Editar Cotação' : 'Nova Cotação'}
+              {/* Authorization status badge in header */}
+              {items.length > 0 && !isPardisLoading && (
+                <AuthorizationBadge 
+                  isAuthorized={pardisSummary.isAuthorized}
+                  requiresApproval={pardisSummary.requiresApproval}
+                  requiredRole={pardisSummary.requiredApproverRole}
+                  size="sm"
+                />
+              )}
             </h1>
             <p className="text-muted-foreground">
               {isEditing ? 'Edite os dados da cotação' : 'Crie uma nova cotação para seu cliente'}
             </p>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleSaveDraft} disabled={isLoading || !canProceedToStep3}>
             <Save className="h-4 w-4 mr-2" />
             {isEditing ? 'Salvar Alterações' : 'Salvar Rascunho'}
           </Button>
-          <Button onClick={handleFinalize} disabled={isLoading || !canProceedToStep3}>
-            <Send className="h-4 w-4 mr-2" />
-            Finalizar Cotação
+          <Button 
+            onClick={handleFinalize} 
+            disabled={isLoading || !canProceedToStep3}
+            variant={pardisSummary.requiresApproval ? "outline" : "default"}
+          >
+            {pardisSummary.requiresApproval ? (
+              <>
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Enviar para Aprovação
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Finalizar Cotação
+              </>
+            )}
           </Button>
           <Button 
             onClick={handleSendToVTEX} 
-            disabled={isSendingToVTEX || !canProceedToStep3}
+            disabled={isSendingToVTEX || !canProceedToStep3 || pardisSummary.requiresApproval}
             className="bg-orange-600 hover:bg-orange-700"
+            title={pardisSummary.requiresApproval ? "Requer aprovação antes de enviar para VTEX" : undefined}
           >
             {isSendingToVTEX ? 'Enviando...' : 'Enviar para VTEX'}
           </Button>
         </div>
       </div>
+
+      {/* Approval Warning Banner */}
+      {items.length > 0 && pardisSummary.requiresApproval && (
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-yellow-800 dark:text-yellow-200">
+                Cotação requer aprovação
+              </h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                A margem de {pardisSummary.totalMarginPercent.toFixed(2)}% está abaixo do limite autorizado. 
+                Esta cotação precisará ser aprovada por um(a) <strong>{getApproverLabel(pardisSummary.requiredApproverRole!)}</strong> antes de ser enviada ao cliente.
+              </p>
+              <div className="flex gap-4 mt-2 text-xs">
+                <span className="text-green-600">{pardisSummary.authorizedCount} itens autorizados</span>
+                <span className="text-red-600">{pardisSummary.unauthorizedCount} itens pendentes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Progress Steps */}
       <Card>
