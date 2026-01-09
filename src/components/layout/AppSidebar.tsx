@@ -10,6 +10,7 @@ import {
   Users,
   Package,
   Settings,
+  Upload,
   // === ÍCONES COMENTADOS (MÓDULOS FORA DO ESCOPO) ===
   // Home,
   // FileText,
@@ -88,6 +89,11 @@ const cpqItems = [
     title: "Configurações",
     url: "/cpq/configuracoes",
     icon: Settings,
+  },
+  {
+    title: "Importação CSV",
+    url: "/cpq/importacao",
+    icon: Upload,
   },
 ]
 

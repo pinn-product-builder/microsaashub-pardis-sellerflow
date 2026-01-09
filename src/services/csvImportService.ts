@@ -237,7 +237,7 @@ export class CSVImportService {
                 is_active: true,
                 last_sync_at: new Date().toISOString(),
               })
-              .eq('id', existing.id);
+              .eq('id', existingId);
             if (error) throw error;
           } else {
             const { error } = await supabase
@@ -247,11 +247,11 @@ export class CSVImportService {
                 is_active: true,
                 last_sync_at: new Date().toISOString(),
               })
-              .eq('id', existing.id);
+              .eq('id', existingId);
             if (error) throw error;
           }
           updated++;
-        } else if (!existing) {
+        } else if (!existingId) {
           // Insert new record
           if (config.entityType === 'products') {
             const { error } = await supabase.from('products').insert({
