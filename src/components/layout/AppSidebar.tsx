@@ -6,13 +6,13 @@ import {
   User2,
   Plus,
   Activity,
+  CheckCircle,
   // === ÍCONES COMENTADOS (MÓDULOS FORA DO ESCOPO) ===
   // Home,
   // FileText,
   // BarChart3,
   // DollarSign,
   // Table,
-  // CheckCircle,
   // Zap,
   // TrendingUp,
   // Settings,
@@ -77,6 +77,11 @@ const cpqItems = [
     title: "Histórico",
     url: "/cpq/historico",
     icon: History,
+  },
+  {
+    title: "Aprovações",
+    url: "/cpq/aprovacoes",
+    icon: CheckCircle,
   },
 ]
 

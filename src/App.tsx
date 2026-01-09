@@ -21,6 +21,7 @@ import CPQDashboard from '@/pages/cpq/Dashboard';
 import NovaQuotacao from '@/pages/cpq/NovaQuotacao';
 import Historico from '@/pages/cpq/Historico';
 import VisualizarCotacao from '@/pages/cpq/VisualizarCotacao';
+import Aprovacoes from '@/pages/cpq/Aprovacoes';
 
 // === CPQ PAGES FORA DO ESCOPO ===
 // import Integracoes from '@/pages/cpq/Integracoes';
@@ -71,6 +72,7 @@ function App() {
             <Route path="/cpq/historico" element={<AppLayout><Historico /></AppLayout>} />
             <Route path="/cpq/cotacao/:id" element={<AppLayout><VisualizarCotacao /></AppLayout>} />
             <Route path="/cpq/editar/:id" element={<AppLayout><NovaQuotacao /></AppLayout>} />
+            <Route path="/cpq/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
 
             {/* === CPQ ROUTES FORA DO ESCOPO ===
             <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />

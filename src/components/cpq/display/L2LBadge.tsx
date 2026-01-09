@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/tooltip';
 
 interface L2LBadgeProps {
-  isLabToLab: boolean;
+  isLabToLab?: boolean;
   discountPercent?: number;
   showLabel?: boolean;
   size?: 'sm' | 'md' | 'lg';
@@ -16,9 +16,9 @@ interface L2LBadgeProps {
 }
 
 export function L2LBadge({
-  isLabToLab,
+  isLabToLab = true,
   discountPercent = 1,
-  showLabel = true,
+  showLabel = false,
   size = 'md',
   className,
 }: L2LBadgeProps) {

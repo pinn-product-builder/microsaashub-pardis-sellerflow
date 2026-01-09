@@ -7,8 +7,9 @@ import { Plus, Search, Filter, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QuotesTable } from '@/components/cpq/tables/QuotesTable';
 import { QuoteFilters } from '@/components/cpq/tables/QuoteFilters';
-import { QuoteService } from '@/services/quoteService';
-import { Quote } from '@/types/cpq';
+import { useQuotes } from '@/hooks/useQuotes';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 export default function Historico() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,14 +17,15 @@ export default function Historico() {
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  const quotes = QuoteService.getAllQuotes();
+  const { data: quotes = [], isLoading } = useQuotes();
 
   const filteredQuotes = useMemo(() => {
-    return quotes.filter((quote: Quote) => {
+    return quotes.filter((quote) => {
       // Search filter
+      const customerName = (quote as any).customers?.company_name || '';
       const matchesSearch = searchTerm === '' || 
-        quote.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        quote.customer.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+        quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customerName.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Status filter
       const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
@@ -31,7 +33,7 @@ export default function Historico() {
       // Date filter
       let matchesDate = true;
       if (dateFilter !== 'all') {
-        const quoteDate = new Date(quote.createdAt);
+        const quoteDate = new Date(quote.created_at);
         const now = new Date();
         
         switch (dateFilter) {
@@ -59,9 +61,41 @@ export default function Historico() {
     const calculated = quotes.filter(q => q.status === 'calculated').length;
     const approved = quotes.filter(q => q.status === 'approved').length;
     const sent = quotes.filter(q => q.status === 'sent').length;
+    const pendingApproval = quotes.filter(q => q.status === 'pending_approval').length;
 
-    return { total, draft, calculated, approved, sent };
+    return { total, draft, calculated, approved, sent, pendingApproval };
   }, [quotes]);
+
+  // Transform quotes to match the expected format for QuotesTable
+  const tableQuotes = useMemo(() => {
+    return filteredQuotes.map(quote => ({
+      id: quote.id,
+      number: quote.quote_number,
+      customer: {
+        id: quote.customer_id,
+        companyName: (quote as any).customers?.company_name || 'Cliente',
+        cnpj: (quote as any).customers?.cnpj || '',
+        uf: (quote as any).customers?.uf || '',
+        city: (quote as any).customers?.city || '',
+        creditLimit: 0,
+        paymentTerms: []
+      },
+      destinationUF: (quote as any).customers?.uf || '',
+      items: [],
+      subtotal: quote.subtotal || 0,
+      totalTaxes: 0,
+      totalFreight: 0,
+      discount: quote.total_discount || 0,
+      total: quote.total_offered || 0,
+      status: quote.status as any,
+      paymentConditions: '',
+      validUntil: new Date(quote.valid_until),
+      createdAt: new Date(quote.created_at),
+      updatedAt: new Date(quote.updated_at),
+      createdBy: quote.created_by,
+      marginPercent: quote.total_margin_percent || 0
+    }));
+  }, [filteredQuotes]);
 
   return (
     <div className="space-y-6">
@@ -82,7 +116,7 @@ export default function Historico() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -90,7 +124,11 @@ export default function Historico() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{stats.total}</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <div className="text-2xl font-bold">{stats.total}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -100,7 +138,11 @@ export default function Historico() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-orange-600">{stats.draft}</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <div className="text-2xl font-bold text-orange-600">{stats.draft}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -110,7 +152,25 @@ export default function Historico() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-blue-600">{stats.calculated}</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <div className="text-2xl font-bold text-blue-600">{stats.calculated}</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pend. Aprovação
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <div className="text-2xl font-bold text-amber-600">{stats.pendingApproval}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -120,7 +180,11 @@ export default function Historico() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -130,7 +194,11 @@ export default function Historico() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-2xl font-bold text-purple-600">{stats.sent}</div>
+            {isLoading ? (
+              <Skeleton className="h-8 w-12" />
+            ) : (
+              <div className="text-2xl font-bold text-purple-600">{stats.sent}</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -157,6 +225,11 @@ export default function Historico() {
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filtros
+                {(statusFilter !== 'all' || dateFilter !== 'all') && (
+                  <Badge variant="secondary" className="ml-2">
+                    {[statusFilter !== 'all', dateFilter !== 'all'].filter(Boolean).length}
+                  </Badge>
+                )}
               </Button>
               <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-2" />
@@ -177,7 +250,15 @@ export default function Historico() {
             </div>
           )}
           
-          <QuotesTable quotes={filteredQuotes} />
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : (
+            <QuotesTable quotes={tableQuotes} />
+          )}
         </CardContent>
       </Card>
     </div>

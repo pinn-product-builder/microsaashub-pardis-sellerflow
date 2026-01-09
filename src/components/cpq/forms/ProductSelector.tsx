@@ -22,10 +22,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { mockProducts } from '@/data/mockData';
+import { useProducts } from '@/hooks/useProducts';
+import { StockIndicator } from '@/components/cpq/display/StockIndicator';
+import { MarginIndicator } from '@/components/cpq/display/MarginIndicator';
 import { Product, QuoteItem, Customer } from '@/types/cpq';
 import { PricingService } from '@/services/pricingService';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProductSelectorProps {
   destinationUF: string;
@@ -42,17 +45,36 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
   const [isAdding, setIsAdding] = useState(false);
   const { toast } = useToast();
 
+  const { data: productsData = [], isLoading } = useProducts({ status: 'active' });
+
+  // Transform Supabase data to CPQ Product type
+  const products: (Product & { stockQuantity?: number; stockMinExpiry?: string })[] = useMemo(() => {
+    return productsData.map(p => ({
+      id: p.id,
+      sku: p.sku,
+      name: p.name,
+      category: p.category || 'Geral',
+      weight: 0.5, // Default weight
+      dimensions: { length: 10, width: 10, height: 10 },
+      baseCost: p.base_cost,
+      description: p.description || undefined,
+      ncm: p.ncm || undefined,
+      stockQuantity: p.stock_quantity || 0,
+      stockMinExpiry: p.stock_min_expiry || undefined
+    }));
+  }, [productsData]);
+
   console.log('ProductSelector props:', { destinationUF, selectedCustomer: selectedCustomer?.companyName });
 
   const filteredProducts = useMemo(() => {
-    if (!searchTerm) return mockProducts;
+    if (!searchTerm) return products;
     
-    return mockProducts.filter(product =>
+    return products.filter(product =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [products, searchTerm]);
 
   const handleAddProduct = async () => {
     if (!selectedProduct || !destinationUF || !selectedCustomer) {
@@ -164,37 +186,49 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
                     <CardTitle className="text-sm">Produtos Disponíveis</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0 overflow-y-auto max-h-96">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Produto</TableHead>
-                          <TableHead>Categoria</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProducts.map((product) => (
-                          <TableRow
-                            key={product.id}
-                            className={`cursor-pointer ${
-                              selectedProduct?.id === product.id ? 'bg-muted' : ''
-                            }`}
-                            onClick={() => handleProductSelect(product)}
-                          >
-                            <TableCell>
-                              <div>
-                                <div className="font-medium text-sm">{product.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  SKU: {product.sku}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className="text-xs">{product.category}</Badge>
-                            </TableCell>
-                          </TableRow>
+                    {isLoading ? (
+                      <div className="p-4 space-y-2">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Skeleton key={i} className="h-12 w-full" />
                         ))}
-                      </TableBody>
-                    </Table>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Produto</TableHead>
+                            <TableHead>Estoque</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredProducts.map((product) => (
+                            <TableRow
+                              key={product.id}
+                              className={`cursor-pointer ${
+                                selectedProduct?.id === product.id ? 'bg-muted' : ''
+                              }`}
+                              onClick={() => handleProductSelect(product)}
+                            >
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium text-sm">{product.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    SKU: {product.sku}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <StockIndicator 
+                                  quantity={product.stockQuantity || 0}
+                                  minExpiry={product.stockMinExpiry}
+                                  requestedQuantity={selectedProduct?.id === product.id ? quantity : undefined}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -222,8 +256,14 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
                             <p className="text-sm">{selectedProduct.category}</p>
                           </div>
                           <div>
-                            <Label className="text-xs text-muted-foreground">Peso</Label>
-                            <p className="text-sm">{selectedProduct.weight}kg</p>
+                            <Label className="text-xs text-muted-foreground">Estoque</Label>
+                            <div className="mt-1">
+                              <StockIndicator 
+                                quantity={(selectedProduct as any).stockQuantity || 0}
+                                minExpiry={(selectedProduct as any).stockMinExpiry}
+                                requestedQuantity={quantity}
+                              />
+                            </div>
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Custo Base</Label>
@@ -298,11 +338,12 @@ export function ProductSelector({ destinationUF, selectedCustomer, onAddProduct 
                                   }).format(previewPrice.totalPrice)}
                                 </span>
                               </div>
-                              <div className="flex justify-between">
+                              <div className="flex justify-between items-center">
                                 <span>Margem:</span>
-                                <Badge variant={previewPrice.margin >= 20 ? "default" : "secondary"}>
-                                  {previewPrice.margin.toFixed(1)}%
-                                </Badge>
+                                <MarginIndicator 
+                                  marginPercent={previewPrice.margin}
+                                  size="sm"
+                                />
                               </div>
                             </div>
 
