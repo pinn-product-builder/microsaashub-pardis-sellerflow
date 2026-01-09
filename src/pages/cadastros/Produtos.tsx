@@ -45,12 +45,15 @@ import {
   ChevronsRight,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Download
 } from 'lucide-react';
 import { useProducts, useProductCategories, useUpdateProduct } from '@/hooks/useProducts';
 import { StockIndicator } from '@/components/cpq/display/StockIndicator';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { exportProductsToExcel } from '@/utils/productExport';
+import { toast } from 'sonner';
 
 // Pagination options
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -292,6 +295,16 @@ export default function Produtos() {
     }
   };
 
+  // Handle export to Excel
+  const handleExportExcel = () => {
+    if (filteredProducts.length === 0) {
+      toast.error('Nenhum produto para exportar');
+      return;
+    }
+    exportProductsToExcel(filteredProducts);
+    toast.success(`${filteredProducts.length} produtos exportados com sucesso`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -305,10 +318,20 @@ export default function Produtos() {
             Gerencie os produtos sincronizados do sistema
           </p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleExportExcel}
+            disabled={filteredProducts.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar Excel
+          </Button>
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
