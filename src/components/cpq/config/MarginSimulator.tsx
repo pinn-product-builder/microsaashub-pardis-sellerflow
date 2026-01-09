@@ -136,7 +136,7 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
                 <div>
                   <p className="font-semibold">{calculation.authorization.status}</p>
                   {calculation.authorization.approver && <p className="text-sm text-muted-foreground">Aprovador: <strong>{calculation.authorization.approver}</strong></p>}
-                  {calculation.authorization.ruleName && <p className="text-xs text-muted-foreground mt-1">Regra: {calculation.authorization.ruleName}</p>}
+                  {calculation.authorization.ruleName && <p className="text-xs text-muted-foreground mt-1">Regra: {String(calculation.authorization.ruleName)}</p>}
                 </div>
               </div>
             </div>
