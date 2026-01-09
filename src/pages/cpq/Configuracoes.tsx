@@ -5,8 +5,31 @@ import { PricingConfigTab } from '@/components/cpq/config/PricingConfigTab';
 import { ApprovalRulesTab } from '@/components/cpq/config/ApprovalRulesTab';
 import { PaymentConditionsTab } from '@/components/cpq/config/PaymentConditionsTab';
 import { ValidityConfigTab } from '@/components/cpq/config/ValidityConfigTab';
+import { PricingFormulaCard } from '@/components/cpq/config/PricingFormulaCard';
+import { MarginSimulator } from '@/components/cpq/config/MarginSimulator';
+import { AuthRequiredCard } from '@/components/cpq/config/AuthRequiredCard';
+import { usePricingConfigs } from '@/hooks/usePricingConfig';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function Configuracoes() {
+  const { isAuthenticated } = useAuthStore();
+  const { data: configs } = usePricingConfigs();
+  
+  // Se não autenticado, mostrar card de autenticação
+  if (!isAuthenticated) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Configurações do Sistema"
+          description="Gerencie os parâmetros de precificação, aprovação e validade de cotações"
+        />
+        <PageContent>
+          <AuthRequiredCard />
+        </PageContent>
+      </PageContainer>
+    );
+  }
+
   return (
     <PageContainer>
       <PageHeader
@@ -34,7 +57,14 @@ export default function Configuracoes() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pricing">
+          <TabsContent value="pricing" className="space-y-6">
+            {/* Fórmula explicativa */}
+            <PricingFormulaCard config={configs?.[0]} />
+            
+            {/* Simulador de margem */}
+            <MarginSimulator configs={configs} />
+            
+            {/* Tabela de configuração */}
             <PricingConfigTab />
           </TabsContent>
 

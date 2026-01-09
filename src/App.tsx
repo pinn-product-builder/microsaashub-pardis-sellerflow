@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 
 // Layout Components
 import AppLayout from '@/components/layout/AppLayout';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 // Page Components
 import Login from '@/pages/Login';
@@ -79,8 +80,8 @@ function App() {
             <Route path="/cpq/cotacao/:id" element={<AppLayout><VisualizarCotacao /></AppLayout>} />
             <Route path="/cpq/editar/:id" element={<AppLayout><NovaQuotacao /></AppLayout>} />
             <Route path="/cpq/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
-            <Route path="/cpq/configuracoes" element={<AppLayout><Configuracoes /></AppLayout>} />
-            <Route path="/cpq/importacao" element={<AppLayout><Importacao /></AppLayout>} />
+            <Route path="/cpq/configuracoes" element={<AppLayout><ProtectedRoute><Configuracoes /></ProtectedRoute></AppLayout>} />
+            <Route path="/cpq/importacao" element={<AppLayout><ProtectedRoute><Importacao /></ProtectedRoute></AppLayout>} />
 
             {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
             <Route path="/cadastros/clientes" element={<AppLayout><Clientes /></AppLayout>} />
