@@ -579,7 +579,7 @@ export type Database = {
           is_authorized?: boolean | null
           notes?: string | null
           payment_condition_id?: string | null
-          quote_number: string
+          quote_number?: string
           requires_approval?: boolean | null
           status?: Database["public"]["Enums"]["quote_status"]
           subtotal?: number | null
