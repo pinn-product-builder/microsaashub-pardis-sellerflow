@@ -1,9 +1,10 @@
 // Hook para cálculos Pardis em tempo real na cotação
 import { useMemo } from 'react';
 import { QuoteItem } from '@/types/cpq';
-import { Customer as PardisCustomer, PricingConfig, MarginCalculation, QuoteSummary, AppRole } from '@/types/pardis';
+import { Customer as PardisCustomer, PricingConfig, MarginCalculation, QuoteSummary, AppRole, PricingEngineConfig, ApprovalRule } from '@/types/pardis';
 import { PardisMarginEngine } from '@/services/pardisMarginEngine';
 import { usePricingConfig } from '@/hooks/usePricingConfig';
+import { usePricingEngineConfig, useActiveApprovalRulesForEngine } from '@/hooks/usePricingEngineConfig';
 
 interface PardisItemCalculation extends MarginCalculation {
   itemId: string;
@@ -16,6 +17,8 @@ interface UsePardisQuoteResult {
   summary: QuoteSummary;
   isLoading: boolean;
   pricingConfig: PricingConfig | undefined;
+  engineConfig: PricingEngineConfig | undefined;
+  approvalRules: ApprovalRule[] | undefined;
 }
 
 // Default pricing config when loading or unavailable
@@ -79,8 +82,11 @@ export function usePardisQuote(
   } | null
 ): UsePardisQuoteResult {
   const region = customer?.uf === 'MG' ? 'MG' : 'BR';
-  const { data: pricingConfigData, isLoading } = usePricingConfig(region as 'MG' | 'BR');
+  const { data: pricingConfigData, isLoading: isLoadingPricing } = usePricingConfig(region as 'MG' | 'BR');
+  const { data: engineConfigData, isLoading: isLoadingEngine } = usePricingEngineConfig();
+  const { data: approvalRulesData, isLoading: isLoadingRules } = useActiveApprovalRulesForEngine();
   
+  const isLoading = isLoadingPricing || isLoadingEngine || isLoadingRules;
   const pricingConfig = pricingConfigData || DEFAULT_PRICING_CONFIG;
   const pardisCustomer = convertToPardisCustomer(customer);
 
@@ -88,14 +94,17 @@ export function usePardisQuote(
     if (!pardisCustomer || items.length === 0) return [];
 
     return items.map(item => {
-      // Converter produto do tipo cpq para pardis
+      // Converter produto do tipo cpq para pardis - usando markups dinâmicos
+      const defaultMarkupMg = engineConfigData?.default_markup_mg ?? 1.5;
+      const defaultMarkupBr = engineConfigData?.default_markup_br ?? 1.6;
+      
       const pardisProduct = {
         id: item.product.id,
         sku: item.product.sku,
         name: item.product.name,
         base_cost: item.product.baseCost,
-        price_mg: item.product.baseCost * 1.5,
-        price_br: item.product.baseCost * 1.6,
+        price_mg: item.product.baseCost * defaultMarkupMg,
+        price_br: item.product.baseCost * defaultMarkupBr,
         price_minimum: item.minimumPrice,
         stock_quantity: 100,
         campaign_discount: 0,
@@ -119,7 +128,9 @@ export function usePardisQuote(
         item.quantity,
         item.unitPrice,
         pardisCustomer,
-        pricingConfig
+        pricingConfig,
+        engineConfigData,
+        approvalRulesData
       );
 
       return {
@@ -129,7 +140,7 @@ export function usePardisQuote(
         quantity: item.quantity,
       };
     });
-  }, [items, pardisCustomer, pricingConfig]);
+  }, [items, pardisCustomer, pricingConfig, engineConfigData, approvalRulesData]);
 
   const summary = useMemo((): QuoteSummary => {
     if (itemCalculations.length === 0) {
@@ -151,7 +162,12 @@ export function usePardisQuote(
     const quantities = itemCalculations.map(c => c.quantity);
     const pardisCalcs = itemCalculations as MarginCalculation[];
     
-    const baseResult = PardisMarginEngine.calculateQuoteSummary(pardisCalcs, quantities);
+    const baseResult = PardisMarginEngine.calculateQuoteSummary(
+      pardisCalcs, 
+      quantities,
+      engineConfigData,
+      approvalRulesData
+    );
     
     const authorizedCount = itemCalculations.filter(c => c.isAuthorized).length;
     const unauthorizedCount = itemCalculations.filter(c => !c.isAuthorized).length;
@@ -162,13 +178,15 @@ export function usePardisQuote(
       authorizedCount,
       unauthorizedCount,
     };
-  }, [itemCalculations]);
+  }, [itemCalculations, engineConfigData, approvalRulesData]);
 
   return {
     itemCalculations,
     summary,
     isLoading,
     pricingConfig,
+    engineConfig: engineConfigData,
+    approvalRules: approvalRulesData,
   };
 }
 

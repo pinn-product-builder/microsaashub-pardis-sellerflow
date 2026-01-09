@@ -122,6 +122,21 @@ export interface QuoteValidityConfig {
   updated_at: string;
 }
 
+// Configuração do Motor de Pricing (parâmetros globais dinâmicos)
+export interface PricingEngineConfig {
+  id: string;
+  default_markup_mg: number;
+  default_markup_br: number;
+  margin_green_threshold: number;
+  margin_yellow_threshold: number;
+  margin_orange_threshold: number;
+  margin_authorized_threshold: number;
+  minimum_price_margin_target: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Cotação
 export interface Quote {
   id: string;

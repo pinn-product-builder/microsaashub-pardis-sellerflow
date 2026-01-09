@@ -332,6 +332,48 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_engine_config: {
+        Row: {
+          created_at: string | null
+          default_markup_br: number
+          default_markup_mg: number
+          id: string
+          is_active: boolean | null
+          margin_authorized_threshold: number
+          margin_green_threshold: number
+          margin_orange_threshold: number
+          margin_yellow_threshold: number
+          minimum_price_margin_target: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_markup_br?: number
+          default_markup_mg?: number
+          id?: string
+          is_active?: boolean | null
+          margin_authorized_threshold?: number
+          margin_green_threshold?: number
+          margin_orange_threshold?: number
+          margin_yellow_threshold?: number
+          minimum_price_margin_target?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_markup_br?: number
+          default_markup_mg?: number
+          id?: string
+          is_active?: boolean | null
+          margin_authorized_threshold?: number
+          margin_green_threshold?: number
+          margin_orange_threshold?: number
+          margin_yellow_threshold?: number
+          minimum_price_margin_target?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           base_cost: number
