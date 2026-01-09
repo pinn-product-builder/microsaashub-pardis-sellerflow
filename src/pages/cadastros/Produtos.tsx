@@ -38,12 +38,19 @@ import {
   Tag,
   AlertTriangle,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import { useProducts, useProductCategories, useUpdateProduct } from '@/hooks/useProducts';
 import { StockIndicator } from '@/components/cpq/display/StockIndicator';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+// Pagination options
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 // Status options
 const STATUS_OPTIONS = [
@@ -61,6 +68,10 @@ export default function Produtos() {
   const [showFilters, setShowFilters] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [editValues, setEditValues] = useState<any>({});
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const { data: products, isLoading, refetch } = useProducts();
   const { data: categories } = useProductCategories();
@@ -98,6 +109,22 @@ export default function Produtos() {
       return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesCampaign;
     });
   }, [products, searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter]);
+
+  // Pagination calculations
+  const totalItems = filteredProducts.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  
+  // Paginated products
+  const paginatedProducts = useMemo(() => {
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, startIndex, endIndex]);
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter, pageSize]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -325,7 +352,23 @@ export default function Produtos() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Lista de Produtos ({filteredProducts.length})</span>
+            <span>Lista de Produtos ({totalItems})</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-normal text-muted-foreground">Itens por página:</span>
+              <Select 
+                value={pageSize.toString()} 
+                onValueChange={(value) => setPageSize(parseInt(value))}
+              >
+                <SelectTrigger className="w-20 h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map(size => (
+                    <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -342,90 +385,152 @@ export default function Produtos() {
               <p className="text-sm">Tente ajustar os filtros de busca</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead className="text-center">Estoque</TableHead>
-                    <TableHead className="text-right">Preço Base</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead>Campanha</TableHead>
-                    <TableHead className="w-16"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-mono text-sm">
-                        {product.sku}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          {product.ncm && (
-                            <div className="text-xs text-muted-foreground">
-                              NCM: {product.ncm}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {product.category ? (
-                          <Badge variant="outline">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {product.category}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <StockIndicator
-                          quantity={product.stock_quantity ?? 0}
-                          minExpiry={product.stock_min_expiry ?? undefined}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(product.base_cost)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getStatusBadge(product.status)}
-                      </TableCell>
-                      <TableCell>
-                        {product.campaign_name ? (
-                          <div className="space-y-1">
-                            <Badge className="bg-purple-500 flex items-center gap-1 w-fit">
-                              <Sparkles className="h-3 w-3" />
-                              {product.campaign_name}
-                            </Badge>
-                            {product.campaign_discount && (
-                              <div className="text-xs text-green-600 font-medium flex items-center gap-1">
-                                <TrendingUp className="h-3 w-3" />
-                                -{product.campaign_discount}%
+            <>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-center">Estoque</TableHead>
+                      <TableHead className="text-right">Preço Base</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead>Campanha</TableHead>
+                      <TableHead className="w-16"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedProducts.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-mono text-sm">
+                          {product.sku}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            {product.ncm && (
+                              <div className="text-xs text-muted-foreground">
+                                NCM: {product.ncm}
                               </div>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleStartEdit(product)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        </TableCell>
+                        <TableCell>
+                          {product.category ? (
+                            <Badge variant="outline">
+                              <Tag className="h-3 w-3 mr-1" />
+                              {product.category}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <StockIndicator
+                            quantity={product.stock_quantity ?? 0}
+                            minExpiry={product.stock_min_expiry ?? undefined}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(product.base_cost)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {getStatusBadge(product.status)}
+                        </TableCell>
+                        <TableCell>
+                          {product.campaign_name ? (
+                            <div className="space-y-1">
+                              <Badge className="bg-purple-500 flex items-center gap-1 w-fit">
+                                <Sparkles className="h-3 w-3" />
+                                {product.campaign_name}
+                              </Badge>
+                              {product.campaign_discount && (
+                                <div className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                  <TrendingUp className="h-3 w-3" />
+                                  -{product.campaign_discount}%
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleStartEdit(product)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Exibindo {startIndex + 1} a {endIndex} de {totalItems} produtos
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1 mx-2">
+                    <span className="text-sm">Página</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={currentPage}
+                      onChange={(e) => {
+                        const page = parseInt(e.target.value);
+                        if (page >= 1 && page <= totalPages) {
+                          setCurrentPage(page);
+                        }
+                      }}
+                      className="w-16 h-8 text-center"
+                    />
+                    <span className="text-sm">de {totalPages}</span>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
