@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -48,8 +49,9 @@ import {
   ArrowDown,
   Download
 } from 'lucide-react';
-import { useProducts, useProductCategories, useUpdateProduct } from '@/hooks/useProducts';
+import { useProducts, useProductCategories, useUpdateProduct, useBatchUpdateProducts } from '@/hooks/useProducts';
 import { StockIndicator } from '@/components/cpq/display/StockIndicator';
+import { BatchActionsBar } from '@/components/products/BatchActionsBar';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { exportProductsToExcel } from '@/utils/productExport';
@@ -87,10 +89,14 @@ export default function Produtos() {
   // Sorting state
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: products, isLoading, refetch } = useProducts();
   const { data: categories } = useProductCategories();
   const updateProduct = useUpdateProduct();
+  const batchUpdateProducts = useBatchUpdateProducts();
 
   // Handle column sort
   const handleSort = (column: SortColumn) => {
@@ -304,6 +310,74 @@ export default function Produtos() {
     exportProductsToExcel(filteredProducts);
     toast.success(`${filteredProducts.length} produtos exportados com sucesso`);
   };
+
+  // Selection handlers
+  const handleSelectAll = useCallback((checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(paginatedProducts.map(p => p.id));
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds(new Set());
+    }
+  }, [paginatedProducts]);
+
+  const handleSelectProduct = useCallback((productId: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(productId);
+      } else {
+        newSet.delete(productId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  // Batch actions
+  const handleBatchActivate = async () => {
+    const ids = Array.from(selectedIds);
+    await batchUpdateProducts.mutateAsync({
+      ids,
+      updates: { is_active: true, status: 'active' }
+    });
+    handleClearSelection();
+  };
+
+  const handleBatchDeactivate = async () => {
+    const ids = Array.from(selectedIds);
+    await batchUpdateProducts.mutateAsync({
+      ids,
+      updates: { is_active: false, status: 'blocked' }
+    });
+    handleClearSelection();
+  };
+
+  const handleBatchApplyCampaign = async (campaignName: string, campaignDiscount: number) => {
+    const ids = Array.from(selectedIds);
+    await batchUpdateProducts.mutateAsync({
+      ids,
+      updates: { campaign_name: campaignName, campaign_discount: campaignDiscount }
+    });
+    handleClearSelection();
+  };
+
+  const handleBatchRemoveCampaign = async () => {
+    const ids = Array.from(selectedIds);
+    await batchUpdateProducts.mutateAsync({
+      ids,
+      updates: { campaign_name: null, campaign_discount: null }
+    });
+    handleClearSelection();
+  };
+
+  // Check if all items on current page are selected
+  const allSelectedOnPage = paginatedProducts.length > 0 && 
+    paginatedProducts.every(p => selectedIds.has(p.id));
+  const someSelectedOnPage = paginatedProducts.some(p => selectedIds.has(p.id)) && !allSelectedOnPage;
 
   return (
     <div className="space-y-6">
@@ -533,6 +607,18 @@ export default function Produtos() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={allSelectedOnPage}
+                          ref={(el) => {
+                            if (el) {
+                              (el as any).indeterminate = someSelectedOnPage;
+                            }
+                          }}
+                          onCheckedChange={handleSelectAll}
+                          aria-label="Selecionar todos"
+                        />
+                      </TableHead>
                       <TableHead 
                         className="cursor-pointer hover:bg-muted/50 select-none"
                         onClick={() => handleSort('sku')}
@@ -577,7 +663,17 @@ export default function Produtos() {
                   </TableHeader>
                   <TableBody>
                     {paginatedProducts.map((product) => (
-                      <TableRow key={product.id}>
+                      <TableRow 
+                        key={product.id}
+                        className={selectedIds.has(product.id) ? 'bg-muted/50' : ''}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                            aria-label={`Selecionar ${product.name}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono text-sm">
                           {product.sku}
                         </TableCell>
@@ -808,6 +904,17 @@ export default function Produtos() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Batch Actions Bar */}
+      <BatchActionsBar
+        selectedCount={selectedIds.size}
+        onClearSelection={handleClearSelection}
+        onActivate={handleBatchActivate}
+        onDeactivate={handleBatchDeactivate}
+        onApplyCampaign={handleBatchApplyCampaign}
+        onRemoveCampaign={handleBatchRemoveCampaign}
+        isLoading={batchUpdateProducts.isPending}
+      />
     </div>
   );
 }
