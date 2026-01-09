@@ -27,9 +27,26 @@ export function usePricingConfig(region: RegionType) {
         .from('pricing_config')
         .select('*')
         .eq('region', region)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      
+      // Fallback to default values if no config found
+      if (!data) {
+        return {
+          id: '',
+          region,
+          admin_percent: 8,
+          logistics_percent: region === 'MG' ? 5 : 12,
+          icms_percent: region === 'MG' ? 18 : 20,
+          pis_cofins_percent: 3.65,
+          lab_to_lab_discount: 5,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as PricingConfig;
+      }
+      
       return data as PricingConfig;
     },
   });
