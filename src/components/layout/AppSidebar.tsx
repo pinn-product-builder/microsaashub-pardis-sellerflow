@@ -1,28 +1,30 @@
 
 import {
   ChevronUp,
-  Home,
   Calculator,
-  FileText,
   History,
-  BarChart3,
-  DollarSign,
-  Table,
-  CheckCircle,
-  Zap,
-  TrendingUp,
   User2,
-  Settings,
   Plus,
   Activity,
-  Plug,
-  Search,
-  Receipt,
-  Boxes,
-  Package,
-  List,
-  ArrowDown,
-  ArrowUp,
+  // === ÍCONES COMENTADOS (MÓDULOS FORA DO ESCOPO) ===
+  // Home,
+  // FileText,
+  // BarChart3,
+  // DollarSign,
+  // Table,
+  // CheckCircle,
+  // Zap,
+  // TrendingUp,
+  // Settings,
+  // Plug,
+  // Search,
+  // Receipt,
+  // Boxes,
+  // Package,
+  // List,
+  // ArrowDown,
+  // ArrowUp,
+  // === FIM ÍCONES COMENTADOS ===
 } from "lucide-react"
 
 import {
@@ -36,9 +38,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
+  // SidebarMenuSub,
+  // SidebarMenuSubItem,
+  // SidebarMenuSubButton,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -49,19 +51,20 @@ import {
 import { NavLink } from "react-router-dom"
 import { useAuthStore } from "@/stores/authStore"
 
-// Menu principal
-const mainItems = [
-  {
-    title: "Dashboard Principal",
-    url: "/dashboard",
-    icon: Home,
-  },
-]
+// === MÓDULO PRINCIPAL (FORA DO ESCOPO ATUAL - COTAÇÕES) ===
+// const mainItems = [
+//   {
+//     title: "Dashboard Principal",
+//     url: "/dashboard",
+//     icon: Home,
+//   },
+// ]
+// === FIM MÓDULO PRINCIPAL ===
 
-// Módulo de Cotações
+// Módulo de Cotações (ATIVO)
 const cpqItems = [
   {
-    title: "Dashboard Cotações",
+    title: "Dashboard",
     url: "/cpq/dashboard",
     icon: Activity,
   },
@@ -77,82 +80,85 @@ const cpqItems = [
   },
 ]
 
-// Módulo de Precificação
-const pricingItems = [
-  {
-    title: "Dashboard Pricing",
-    url: "/pricing/dashboard",
-    icon: BarChart3,
-  },
-  {
-    title: "Tabelas de Preço",
-    url: "/pricing/tables",
-    icon: Table,
-  },
-  {
-    title: "Aprovações",
-    url: "/pricing/approvals",
-    icon: CheckCircle,
-  },
-  {
-    title: "Regras",
-    url: "/pricing/rules",
-    icon: Zap,
-  },
-  {
-    title: "Analytics",
-    url: "/pricing/analytics",
-    icon: TrendingUp,
-  },
-  {
-    title: "Pesquisa de Mercado",
-    url: "/pricing/market-research",
-    icon: Search,
-  },
-  {
-    title: "Impostos",
-    url: "/pricing/taxes",
-    icon: Receipt,
-  },
-]
+// === MÓDULO DE PRECIFICAÇÃO (FORA DO ESCOPO ATUAL) ===
+// const pricingItems = [
+//   {
+//     title: "Dashboard Pricing",
+//     url: "/pricing/dashboard",
+//     icon: BarChart3,
+//   },
+//   {
+//     title: "Tabelas de Preço",
+//     url: "/pricing/tables",
+//     icon: Table,
+//   },
+//   {
+//     title: "Aprovações",
+//     url: "/pricing/approvals",
+//     icon: CheckCircle,
+//   },
+//   {
+//     title: "Regras",
+//     url: "/pricing/rules",
+//     icon: Zap,
+//   },
+//   {
+//     title: "Analytics",
+//     url: "/pricing/analytics",
+//     icon: TrendingUp,
+//   },
+//   {
+//     title: "Pesquisa de Mercado",
+//     url: "/pricing/market-research",
+//     icon: Search,
+//   },
+//   {
+//     title: "Impostos",
+//     url: "/pricing/taxes",
+//     icon: Receipt,
+//   },
+// ]
+// === FIM MÓDULO DE PRECIFICAÇÃO ===
 
-// Módulo de Estoque
-const estoqueItems = [
-  {
-    title: "Dashboard Estoque",
-    url: "/estoque/dashboard",
-    icon: Boxes,
-  },
-  {
-    title: "Produtos",
-    url: "/estoque/produtos",
-    icon: Package,
-  },
-  {
-    title: "Movimentações",
-    url: "/estoque/movimentacoes",  
-    icon: List,
-  },
-  {
-    title: "Entrada",
-    url: "/estoque/entrada",
-    icon: ArrowDown,
-  },
-  {
-    title: "Saída",
-    url: "/estoque/saida",
-    icon: ArrowUp,
-  },
-]
+// === MÓDULO DE ESTOQUE (FORA DO ESCOPO ATUAL) ===
+// const estoqueItems = [
+//   {
+//     title: "Dashboard Estoque",
+//     url: "/estoque/dashboard",
+//     icon: Boxes,
+//   },
+//   {
+//     title: "Produtos",
+//     url: "/estoque/produtos",
+//     icon: Package,
+//   },
+//   {
+//     title: "Movimentações",
+//     url: "/estoque/movimentacoes",  
+//     icon: List,
+//   },
+//   {
+//     title: "Entrada",
+//     url: "/estoque/entrada",
+//     icon: ArrowDown,
+//   },
+//   {
+//     title: "Saída",
+//     url: "/estoque/saida",
+//     icon: ArrowUp,
+//   },
+// ]
+// === FIM MÓDULO DE ESTOQUE ===
 
-// Módulo de Configurações
-const configItems = [
-  {
-    title: "Integrações",
-    url: "/cpq/integracoes",
-    icon: Plug,
-  },
-]
+// === MÓDULO DE CONFIGURAÇÕES (FORA DO ESCOPO ATUAL) ===
+// const configItems = [
+//   {
+//     title: "Integrações",
+//     url: "/cpq/integracoes",
+//     icon: Plug,
+//   },
+// ]
+// === FIM MÓDULO DE CONFIGURAÇÕES ===
 
 export function AppSidebar() {
   const { user, logout } = useAuthStore()
@@ -169,7 +175,7 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Sistema Pardis</span>
-                  <span className="truncate text-xs">Cotações & Precificação</span>
+                  <span className="truncate text-xs">Módulo de Cotações</span>
                 </div>
               </NavLink>
             </SidebarMenuButton>
@@ -177,6 +183,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        {/* === MÓDULO PRINCIPAL (FORA DO ESCOPO ATUAL) ===
         <SidebarGroup>
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -194,6 +201,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        === FIM MÓDULO PRINCIPAL === */}
         
         <SidebarGroup>
           <SidebarGroupLabel>Cotações</SidebarGroupLabel>
@@ -213,6 +221,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         
+        {/* === MÓDULO DE PRECIFICAÇÃO (FORA DO ESCOPO ATUAL) ===
         <SidebarGroup>
           <SidebarGroupLabel>Precificação</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -230,7 +239,9 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        === FIM MÓDULO DE PRECIFICAÇÃO === */}
 
+        {/* === MÓDULO DE ESTOQUE (FORA DO ESCOPO ATUAL) ===
         <SidebarGroup>
           <SidebarGroupLabel>Estoque</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -248,7 +259,9 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        === FIM MÓDULO DE ESTOQUE === */}
 
+        {/* === MÓDULO DE CONFIGURAÇÕES (FORA DO ESCOPO ATUAL) ===
         <SidebarGroup>
           <SidebarGroupLabel>Configurações</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -274,6 +287,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        === FIM MÓDULO DE CONFIGURAÇÕES === */}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
