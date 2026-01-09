@@ -1,10 +1,11 @@
 import { PageContainer, PageHeader, PageContent } from '@/components/layout/Page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calculator, Shield, CreditCard, Clock } from 'lucide-react';
+import { Calculator, Shield, CreditCard, Clock, Settings } from 'lucide-react';
 import { PricingConfigTab } from '@/components/cpq/config/PricingConfigTab';
 import { ApprovalRulesTab } from '@/components/cpq/config/ApprovalRulesTab';
 import { PaymentConditionsTab } from '@/components/cpq/config/PaymentConditionsTab';
 import { ValidityConfigTab } from '@/components/cpq/config/ValidityConfigTab';
+import { EngineConfigTab } from '@/components/cpq/config/EngineConfigTab';
 import { PricingFormulaCard } from '@/components/cpq/config/PricingFormulaCard';
 import { MarginSimulator } from '@/components/cpq/config/MarginSimulator';
 import { AuthRequiredCard } from '@/components/cpq/config/AuthRequiredCard';
@@ -38,10 +39,14 @@ export default function Configuracoes() {
       />
       <PageContent>
         <Tabs defaultValue="pricing" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               <span className="hidden sm:inline">Pricing</span>
+            </TabsTrigger>
+            <TabsTrigger value="engine" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Motor</span>
             </TabsTrigger>
             <TabsTrigger value="approval" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -66,6 +71,10 @@ export default function Configuracoes() {
             
             {/* Tabela de configuração */}
             <PricingConfigTab />
+          </TabsContent>
+
+          <TabsContent value="engine" className="space-y-6">
+            <EngineConfigTab />
           </TabsContent>
 
           <TabsContent value="approval">
