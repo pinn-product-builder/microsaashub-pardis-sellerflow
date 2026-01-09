@@ -111,3 +111,27 @@ export function useProductCategories() {
     },
   });
 }
+
+export function useBatchUpdateProducts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, updates }: { ids: string[]; updates: Partial<Product> }) => {
+      const { data, error } = await supabase
+        .from('products')
+        .update(updates)
+        .in('id', ids)
+        .select();
+
+      if (error) throw error;
+      return data as Product[];
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(`${data.length} produtos atualizados com sucesso`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Erro ao atualizar produtos: ${error.message}`);
+    },
+  });
+}
