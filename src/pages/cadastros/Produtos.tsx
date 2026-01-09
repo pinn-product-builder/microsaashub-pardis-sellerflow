@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { useProducts, useProductCategories, useUpdateProduct } from '@/hooks/useProducts';
 import { StockIndicator } from '@/components/cpq/display/StockIndicator';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // Pagination options
@@ -72,6 +72,7 @@ export default function Produtos() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<string>('all');
   const [campaignFilter, setCampaignFilter] = useState<string>('all');
+  const [expiryFilter, setExpiryFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [editValues, setEditValues] = useState<any>({});
@@ -144,7 +145,35 @@ export default function Produtos() {
         (campaignFilter === 'yes' && product.campaign_name) ||
         (campaignFilter === 'no' && !product.campaign_name);
       
-      return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesCampaign;
+      // Expiry filter
+      let matchesExpiry = true;
+      if (expiryFilter !== 'all') {
+        const expiryDate = product.stock_min_expiry ? new Date(product.stock_min_expiry) : null;
+        const daysUntilExpiry = expiryDate ? differenceInDays(expiryDate, new Date()) : null;
+        
+        switch (expiryFilter) {
+          case 'expired':
+            matchesExpiry = daysUntilExpiry !== null && daysUntilExpiry < 0;
+            break;
+          case 'expiring_7':
+            matchesExpiry = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
+            break;
+          case 'expiring_30':
+            matchesExpiry = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+            break;
+          case 'expiring_90':
+            matchesExpiry = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 90;
+            break;
+          case 'ok':
+            matchesExpiry = daysUntilExpiry === null || daysUntilExpiry > 90;
+            break;
+          case 'no_expiry':
+            matchesExpiry = !product.stock_min_expiry;
+            break;
+        }
+      }
+      
+      return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesCampaign && matchesExpiry;
     });
 
     // Apply sorting
@@ -181,7 +210,7 @@ export default function Produtos() {
     }
 
     return filtered;
-  }, [products, searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter, sortColumn, sortDirection]);
+  }, [products, searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter, expiryFilter, sortColumn, sortDirection]);
 
   // Pagination calculations
   const totalItems = filteredProducts.length;
@@ -197,7 +226,7 @@ export default function Produtos() {
   // Reset to page 1 when filters change
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter, pageSize]);
+  }, [searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter, expiryFilter, pageSize]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -346,7 +375,7 @@ export default function Produtos() {
 
           {/* Expanded Filters */}
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4 pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-4 pt-4 border-t">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Categoria</label>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -402,6 +431,23 @@ export default function Produtos() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Validade</label>
+                <Select value={expiryFilter} onValueChange={setExpiryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="expired">Vencidos</SelectItem>
+                    <SelectItem value="expiring_7">Vence em 7 dias</SelectItem>
+                    <SelectItem value="expiring_30">Vence em 30 dias</SelectItem>
+                    <SelectItem value="expiring_90">Vence em 90 dias</SelectItem>
+                    <SelectItem value="ok">Validade OK (+90 dias)</SelectItem>
+                    <SelectItem value="no_expiry">Sem data de validade</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex items-end">
                 <Button 
                   variant="ghost" 
@@ -411,6 +457,7 @@ export default function Produtos() {
                     setStatusFilter('all');
                     setStockFilter('all');
                     setCampaignFilter('all');
+                    setExpiryFilter('all');
                   }}
                 >
                   Limpar Filtros
