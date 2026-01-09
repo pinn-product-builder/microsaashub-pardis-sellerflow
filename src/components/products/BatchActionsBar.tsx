@@ -2,13 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,13 +9,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   X, 
   Power, 
   PowerOff, 
   Sparkles, 
   Trash2,
-  CheckSquare
+  CheckSquare,
+  AlertTriangle
 } from 'lucide-react';
 
 interface BatchActionsBarProps {
@@ -34,6 +38,8 @@ interface BatchActionsBarProps {
   onRemoveCampaign: () => void;
   isLoading?: boolean;
 }
+
+type ConfirmAction = 'activate' | 'deactivate' | 'removeCampaign' | null;
 
 export function BatchActionsBar({
   selectedCount,
@@ -47,6 +53,7 @@ export function BatchActionsBar({
   const [showCampaignDialog, setShowCampaignDialog] = useState(false);
   const [campaignName, setCampaignName] = useState('');
   const [campaignDiscount, setCampaignDiscount] = useState<number>(0);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
   const handleApplyCampaign = () => {
     if (!campaignName.trim()) return;
@@ -55,6 +62,51 @@ export function BatchActionsBar({
     setCampaignName('');
     setCampaignDiscount(0);
   };
+
+  const handleConfirmAction = () => {
+    switch (confirmAction) {
+      case 'activate':
+        onActivate();
+        break;
+      case 'deactivate':
+        onDeactivate();
+        break;
+      case 'removeCampaign':
+        onRemoveCampaign();
+        break;
+    }
+    setConfirmAction(null);
+  };
+
+  const getConfirmationDetails = () => {
+    switch (confirmAction) {
+      case 'activate':
+        return {
+          title: 'Ativar Produtos',
+          description: `Tem certeza que deseja ativar ${selectedCount} produto${selectedCount > 1 ? 's' : ''}? Esta ação tornará os produtos disponíveis para venda.`,
+          actionLabel: 'Ativar',
+          actionClass: 'bg-green-600 hover:bg-green-700'
+        };
+      case 'deactivate':
+        return {
+          title: 'Desativar Produtos',
+          description: `Tem certeza que deseja desativar ${selectedCount} produto${selectedCount > 1 ? 's' : ''}? Esta ação bloqueará os produtos para venda.`,
+          actionLabel: 'Desativar',
+          actionClass: 'bg-orange-600 hover:bg-orange-700'
+        };
+      case 'removeCampaign':
+        return {
+          title: 'Remover Campanha',
+          description: `Tem certeza que deseja remover a campanha de ${selectedCount} produto${selectedCount > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`,
+          actionLabel: 'Remover Campanha',
+          actionClass: 'bg-red-600 hover:bg-red-700'
+        };
+      default:
+        return null;
+    }
+  };
+
+  const confirmDetails = getConfirmationDetails();
 
   if (selectedCount === 0) return null;
 
@@ -72,7 +124,7 @@ export function BatchActionsBar({
           <Button
             variant="outline"
             size="sm"
-            onClick={onActivate}
+            onClick={() => setConfirmAction('activate')}
             disabled={isLoading}
             className="text-green-600 hover:text-green-700 hover:bg-green-50"
           >
@@ -83,7 +135,7 @@ export function BatchActionsBar({
           <Button
             variant="outline"
             size="sm"
-            onClick={onDeactivate}
+            onClick={() => setConfirmAction('deactivate')}
             disabled={isLoading}
             className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
           >
@@ -105,7 +157,7 @@ export function BatchActionsBar({
           <Button
             variant="outline"
             size="sm"
-            onClick={onRemoveCampaign}
+            onClick={() => setConfirmAction('removeCampaign')}
             disabled={isLoading}
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
           >
@@ -126,6 +178,30 @@ export function BatchActionsBar({
           Limpar
         </Button>
       </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {confirmDetails?.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDetails?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAction}
+              className={confirmDetails?.actionClass}
+            >
+              {confirmDetails?.actionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Campaign Dialog */}
       <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>
