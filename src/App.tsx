@@ -23,6 +23,10 @@ import Historico from '@/pages/cpq/Historico';
 import VisualizarCotacao from '@/pages/cpq/VisualizarCotacao';
 import Aprovacoes from '@/pages/cpq/Aprovacoes';
 
+// Cadastros Pages (MÓDULO ATIVO)
+import Clientes from '@/pages/cadastros/Clientes';
+// import Produtos from '@/pages/cadastros/Produtos';
+
 // === CPQ PAGES FORA DO ESCOPO ===
 // import Integracoes from '@/pages/cpq/Integracoes';
 // import ConversionDashboardPage from '@/pages/cpq/ConversionDashboard';
@@ -73,6 +77,10 @@ function App() {
             <Route path="/cpq/cotacao/:id" element={<AppLayout><VisualizarCotacao /></AppLayout>} />
             <Route path="/cpq/editar/:id" element={<AppLayout><NovaQuotacao /></AppLayout>} />
             <Route path="/cpq/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
+
+            {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
+            <Route path="/cadastros/clientes" element={<AppLayout><Clientes /></AppLayout>} />
+            {/* <Route path="/cadastros/produtos" element={<AppLayout><Produtos /></AppLayout>} /> */}
 
             {/* === CPQ ROUTES FORA DO ESCOPO ===
             <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
