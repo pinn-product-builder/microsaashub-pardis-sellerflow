@@ -7,6 +7,8 @@ import {
   Plus,
   Activity,
   CheckCircle,
+  Users,
+  Package,
   // === ÍCONES COMENTADOS (MÓDULOS FORA DO ESCOPO) ===
   // Home,
   // FileText,
@@ -20,7 +22,6 @@ import {
   // Search,
   // Receipt,
   // Boxes,
-  // Package,
   // List,
   // ArrowDown,
   // ArrowUp,
@@ -82,6 +83,20 @@ const cpqItems = [
     title: "Aprovações",
     url: "/cpq/aprovacoes",
     icon: CheckCircle,
+  },
+]
+
+// Módulo de Cadastros (ATIVO)
+const cadastrosItems = [
+  {
+    title: "Clientes",
+    url: "/cadastros/clientes",
+    icon: Users,
+  },
+  {
+    title: "Produtos",
+    url: "/cadastros/produtos",
+    icon: Package,
   },
 ]
 
@@ -213,6 +228,25 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {cpqItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Módulo de Cadastros (ATIVO) */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Cadastros</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {cadastrosItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url}>
