@@ -42,7 +42,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { useProducts, useProductCategories, useUpdateProduct } from '@/hooks/useProducts';
 import { StockIndicator } from '@/components/cpq/display/StockIndicator';
@@ -59,6 +62,10 @@ const STATUS_OPTIONS = [
   { value: 'discontinued', label: 'Descontinuado', color: 'bg-red-500' },
 ];
 
+// Sort column type
+type SortColumn = 'sku' | 'name' | 'stock_quantity' | 'base_cost' | null;
+type SortDirection = 'asc' | 'desc';
+
 export default function Produtos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -72,16 +79,47 @@ export default function Produtos() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: products, isLoading, refetch } = useProducts();
   const { data: categories } = useProductCategories();
   const updateProduct = useUpdateProduct();
 
+  // Handle column sort
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction or clear sort
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortColumn(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  // Get sort icon for column
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   // Filter products
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     
-    return products.filter(product => {
+    let filtered = products.filter(product => {
       // Search filter
       const matchesSearch = !searchTerm || 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -108,7 +146,42 @@ export default function Produtos() {
       
       return matchesSearch && matchesCategory && matchesStatus && matchesStock && matchesCampaign;
     });
-  }, [products, searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter]);
+
+    // Apply sorting
+    if (sortColumn) {
+      filtered = [...filtered].sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+
+        switch (sortColumn) {
+          case 'sku':
+            aValue = a.sku.toLowerCase();
+            bValue = b.sku.toLowerCase();
+            break;
+          case 'name':
+            aValue = a.name.toLowerCase();
+            bValue = b.name.toLowerCase();
+            break;
+          case 'stock_quantity':
+            aValue = a.stock_quantity ?? 0;
+            bValue = b.stock_quantity ?? 0;
+            break;
+          case 'base_cost':
+            aValue = a.base_cost;
+            bValue = b.base_cost;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [products, searchTerm, categoryFilter, statusFilter, stockFilter, campaignFilter, sortColumn, sortDirection]);
 
   // Pagination calculations
   const totalItems = filteredProducts.length;
@@ -390,11 +463,43 @@ export default function Produtos() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Produto</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('sku')}
+                      >
+                        <div className="flex items-center">
+                          SKU
+                          {getSortIcon('sku')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center">
+                          Produto
+                          {getSortIcon('name')}
+                        </div>
+                      </TableHead>
                       <TableHead>Categoria</TableHead>
-                      <TableHead className="text-center">Estoque</TableHead>
-                      <TableHead className="text-right">Preço Base</TableHead>
+                      <TableHead 
+                        className="text-center cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('stock_quantity')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Estoque
+                          {getSortIcon('stock_quantity')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort('base_cost')}
+                      >
+                        <div className="flex items-center justify-end">
+                          Preço Base
+                          {getSortIcon('base_cost')}
+                        </div>
+                      </TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead>Campanha</TableHead>
                       <TableHead className="w-16"></TableHead>
