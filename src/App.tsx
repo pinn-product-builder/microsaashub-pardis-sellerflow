@@ -25,7 +25,7 @@ import Aprovacoes from '@/pages/cpq/Aprovacoes';
 
 // Cadastros Pages (MÓDULO ATIVO)
 import Clientes from '@/pages/cadastros/Clientes';
-// import Produtos from '@/pages/cadastros/Produtos';
+import Produtos from '@/pages/cadastros/Produtos';
 
 // === CPQ PAGES FORA DO ESCOPO ===
 // import Integracoes from '@/pages/cpq/Integracoes';
@@ -80,7 +80,7 @@ function App() {
 
             {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
             <Route path="/cadastros/clientes" element={<AppLayout><Clientes /></AppLayout>} />
-            {/* <Route path="/cadastros/produtos" element={<AppLayout><Produtos /></AppLayout>} /> */}
+            <Route path="/cadastros/produtos" element={<AppLayout><Produtos /></AppLayout>} />
 
             {/* === CPQ ROUTES FORA DO ESCOPO ===
             <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
