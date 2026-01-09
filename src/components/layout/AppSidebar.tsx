@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Users,
   Package,
+  Settings,
   // === ÍCONES COMENTADOS (MÓDULOS FORA DO ESCOPO) ===
   // Home,
   // FileText,
@@ -17,7 +18,6 @@ import {
   // Table,
   // Zap,
   // TrendingUp,
-  // Settings,
   // Plug,
   // Search,
   // Receipt,
@@ -83,6 +83,11 @@ const cpqItems = [
     title: "Aprovações",
     url: "/cpq/aprovacoes",
     icon: CheckCircle,
+  },
+  {
+    title: "Configurações",
+    url: "/cpq/configuracoes",
+    icon: Settings,
   },
 ]
 
