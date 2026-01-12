@@ -10,6 +10,8 @@ import {
   Package,
   Settings,
   Upload,
+  Shield,
+  UserCog,
 } from "lucide-react"
 
 import {
@@ -32,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { NavLink } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
+import { PermissionGate } from "@/components/auth/PermissionGate"
 
 // Módulo de Cotações (ATIVO)
 const cpqItems = [
@@ -81,8 +84,22 @@ const cadastrosItems = [
   },
 ]
 
+// Módulo de Administração
+const adminItems = [
+  {
+    title: "Usuários",
+    url: "/admin/usuarios",
+    icon: UserCog,
+  },
+  {
+    title: "Grupos",
+    url: "/admin/grupos",
+    icon: Shield,
+  },
+]
+
 export function AppSidebar() {
-  const { profile, user, logout } = useAuth()
+  const { profile, user, logout, role } = useAuth()
 
   const displayName = profile?.full_name || user?.email || 'Usuário'
   const displayEmail = user?.email || 'user@example.com'
@@ -143,6 +160,27 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Módulo de Administração - Apenas para admins */}
+        <PermissionGate permission="users.manage">
+          <SidebarGroup>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </PermissionGate>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
