@@ -30,6 +30,10 @@ import Importacao from '@/pages/cpq/Importacao';
 import Clientes from '@/pages/cadastros/Clientes';
 import Produtos from '@/pages/cadastros/Produtos';
 
+// Admin Pages (MÓDULO ATIVO)
+import Usuarios from '@/pages/admin/Usuarios';
+import Grupos from '@/pages/admin/Grupos';
+
 // === CPQ PAGES FORA DO ESCOPO ===
 // import Integracoes from '@/pages/cpq/Integracoes';
 // import ConversionDashboardPage from '@/pages/cpq/ConversionDashboard';
@@ -86,6 +90,10 @@ function App() {
             {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
             <Route path="/cadastros/clientes" element={<AppLayout><Clientes /></AppLayout>} />
             <Route path="/cadastros/produtos" element={<AppLayout><Produtos /></AppLayout>} />
+
+            {/* Admin Routes - Módulo de Administração (ATIVO) */}
+            <Route path="/admin/usuarios" element={<AppLayout><ProtectedRoute><Usuarios /></ProtectedRoute></AppLayout>} />
+            <Route path="/admin/grupos" element={<AppLayout><ProtectedRoute><Grupos /></ProtectedRoute></AppLayout>} />
 
             {/* === CPQ ROUTES FORA DO ESCOPO ===
             <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
