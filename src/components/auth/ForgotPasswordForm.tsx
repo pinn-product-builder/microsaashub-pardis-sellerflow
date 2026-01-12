@@ -1,4 +1,4 @@
-
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,40 +9,48 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthStore } from '@/stores/authStore';
-import { ForgotPasswordData } from '@/types/auth';
+import { supabase } from '@/integrations/supabase/client';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Email inválido')
 });
 
+type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+
 export default function ForgotPasswordForm() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { forgotPassword, isLoading } = useAuthStore();
 
-  const form = useForm<ForgotPasswordData>({
+  const form = useForm<ForgotPasswordFormData>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: ''
     }
   });
 
-  const onSubmit = async (data: ForgotPasswordData) => {
-    const success = await forgotPassword(data.email);
-    
-    if (success) {
+  const onSubmit = async (data: ForgotPasswordFormData) => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) throw error;
+      
       toast({
         title: 'Email enviado!',
         description: 'Verifique sua caixa de entrada para instruções de recuperação.'
       });
       navigate('/login');
-    } else {
+    } catch (error) {
       toast({
-        title: 'Email não encontrado',
-        description: 'Não encontramos uma conta com este email.',
+        title: 'Erro ao enviar email',
+        description: error instanceof Error ? error.message : 'Não foi possível enviar o email de recuperação.',
         variant: 'destructive'
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -79,9 +87,9 @@ export default function ForgotPasswordForm() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Enviando...

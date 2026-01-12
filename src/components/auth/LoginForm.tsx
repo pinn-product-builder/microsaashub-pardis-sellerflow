@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,21 +9,23 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthStore } from '@/stores/authStore';
-import { LoginData } from '@/types/auth';
+import { useAuth } from '@/hooks/useAuth';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres')
 });
 
+type LoginFormData = z.infer<typeof loginSchema>;
+
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, isLoading } = useAuthStore();
+  const { login } = useAuth();
 
-  const form = useForm<LoginData>({
+  const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: '',
@@ -32,21 +33,23 @@ export default function LoginForm() {
     }
   });
 
-  const onSubmit = async (data: LoginData) => {
-    const success = await login(data.email, data.password);
-    
-    if (success) {
+  const onSubmit = async (data: LoginFormData) => {
+    setIsSubmitting(true);
+    try {
+      await login(data.email, data.password);
       toast({
         title: 'Login realizado com sucesso!',
         description: 'Redirecionando para o dashboard...'
       });
-      navigate('/dashboard');
-    } else {
+      navigate('/cpq/dashboard');
+    } catch (error) {
       toast({
         title: 'Erro no login',
-        description: 'Email ou senha incorretos',
+        description: error instanceof Error ? error.message : 'Email ou senha incorretos',
         variant: 'destructive'
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -116,9 +119,9 @@ export default function LoginForm() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Entrando...
@@ -147,13 +150,6 @@ export default function LoginForm() {
             >
               Cadastre-se
             </Link>
-          </div>
-
-          <div className="mt-6 p-4 bg-muted rounded-lg text-sm">
-            <p className="font-medium mb-2">Contas de teste:</p>
-            <p>Admin: admin@pardis.com / admin123</p>
-            <p>Comercial: comercial@pardis.com / comercial123</p>
-            <p>Vendedor: vendedor@pardis.com / vendedor123</p>
           </div>
         </CardContent>
       </Card>

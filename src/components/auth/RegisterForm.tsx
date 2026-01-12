@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,8 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthStore } from '@/stores/authStore';
-import { RegisterData } from '@/types/auth';
+import { useAuth } from '@/hooks/useAuth';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
@@ -23,14 +21,17 @@ const registerSchema = z.object({
   path: ['confirmPassword']
 });
 
+type RegisterFormData = z.infer<typeof registerSchema>;
+
 export default function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { register, isLoading } = useAuthStore();
+  const { register } = useAuth();
 
-  const form = useForm<RegisterData>({
+  const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '',
@@ -40,21 +41,23 @@ export default function RegisterForm() {
     }
   });
 
-  const onSubmit = async (data: RegisterData) => {
-    const success = await register(data);
-    
-    if (success) {
+  const onSubmit = async (data: RegisterFormData) => {
+    setIsSubmitting(true);
+    try {
+      await register(data.email, data.password, data.name);
       toast({
         title: 'Cadastro realizado com sucesso!',
-        description: 'Redirecionando para o dashboard...'
+        description: 'Verifique seu email para confirmar a conta ou faça login.'
       });
-      navigate('/dashboard');
-    } else {
+      navigate('/cpq/dashboard');
+    } catch (error) {
       toast({
         title: 'Erro no cadastro',
-        description: 'Email já está em uso',
+        description: error instanceof Error ? error.message : 'Não foi possível criar a conta',
         variant: 'destructive'
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -174,9 +177,9 @@ export default function RegisterForm() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Criando conta...
