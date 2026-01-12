@@ -164,7 +164,7 @@ export function AppSidebar() {
         {/* Módulo de Administração - Apenas para admins */}
         <PermissionGate permission="users.manage">
           <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupLabel>Gestão de Usuários</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {adminItems.map((item) => (
