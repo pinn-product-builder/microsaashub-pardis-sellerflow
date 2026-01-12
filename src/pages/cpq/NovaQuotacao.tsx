@@ -61,32 +61,35 @@ export default function NovaQuotacao() {
 
   // Carregar cotação para edição
   useEffect(() => {
-    if (isEditing && id) {
-      const quote = QuoteService.getQuote(id);
-      if (quote) {
-        setCurrentQuote(quote);
-        setSelectedCustomer(quote.customer);
-        setDiscount(quote.discount);
-        setPaymentConditions(quote.paymentConditions);
-        setNotes(quote.notes || '');
-        
-        // Adicionar itens da cotação
-        quote.items.forEach(item => addItem(item));
-        
-        // Se tem cliente e itens, vai para o step 3
-        if (quote.customer && quote.items.length > 0) {
-          setCurrentStep(3);
-        } else if (quote.customer) {
-          setCurrentStep(2);
+    const loadQuote = async () => {
+      if (isEditing && id) {
+        const quote = await QuoteService.getQuote(id);
+        if (quote) {
+          setCurrentQuote(quote);
+          setSelectedCustomer(quote.customer);
+          setDiscount(quote.discount);
+          setPaymentConditions(quote.paymentConditions);
+          setNotes(quote.notes || '');
+          
+          // Adicionar itens da cotação
+          quote.items?.forEach(item => addItem(item));
+          
+          // Se tem cliente e itens, vai para o step 3
+          if (quote.customer && quote.items?.length > 0) {
+            setCurrentStep(3);
+          } else if (quote.customer) {
+            setCurrentStep(2);
+          }
+        } else {
+          toast({
+            title: "Erro",
+            description: "Cotação não encontrada.",
+            variant: "destructive"
+          });
         }
-      } else {
-        toast({
-          title: "Erro",
-          description: "Cotação não encontrada.",
-          variant: "destructive"
-        });
       }
-    }
+    };
+    loadQuote();
   }, [isEditing, id]);
 
   const handleCustomerSelect = (customer: Customer) => {
@@ -131,7 +134,7 @@ export default function NovaQuotacao() {
     try {
       if (isEditing && id) {
         // Atualizar cotação existente
-        QuoteService.updateQuote(id, {
+        await QuoteService.updateQuote(id, {
           customer: selectedCustomer,
           destinationUF,
           items,
@@ -150,7 +153,7 @@ export default function NovaQuotacao() {
         });
       } else {
         // Criar nova cotação
-        const quote = QuoteService.createQuote({
+        const quote = await QuoteService.createQuote({
           customer: selectedCustomer,
           destinationUF,
           items,
@@ -168,7 +171,7 @@ export default function NovaQuotacao() {
 
         toast({
           title: "Sucesso",
-          description: `Cotação ${quote.number} salva como rascunho.`
+          description: `Cotação ${quote?.number || ''} salva como rascunho.`
         });
       }
 

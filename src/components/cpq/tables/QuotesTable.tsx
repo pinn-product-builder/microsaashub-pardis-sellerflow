@@ -43,8 +43,8 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
     return format(dateObj, 'dd/MM/yyyy', { locale: ptBR });
   };
 
-  const handleDuplicateQuote = (quote: Quote) => {
-    const duplicatedQuote = QuoteService.createQuote({
+  const handleDuplicateQuote = async (quote: Quote) => {
+    const duplicatedQuote = await QuoteService.createQuote({
       customer: quote.customer,
       destinationUF: quote.destinationUF,
       items: quote.items,
@@ -62,7 +62,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
 
     toast({
       title: "Cotação Duplicada",
-      description: `Nova cotação ${duplicatedQuote.number} criada com sucesso!`
+      description: `Nova cotação ${duplicatedQuote?.number || 'criada'} com sucesso!`
     });
   };
 
