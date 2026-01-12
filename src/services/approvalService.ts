@@ -1,5 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { EdgeFunctions } from "./edgeFunctions";
+import { ApprovalStatus, ApprovalStatusType } from "@/domain/approval/value-objects/ApprovalStatus";
+
+export type ApprovalStatusLegacy = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'ESCALATED';
 
 export interface ApprovalRequest {
   id: string;
@@ -10,7 +13,8 @@ export interface ApprovalRequest {
   value: number;
   margin: number;
   discount: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: ApprovalStatusLegacy;
+  statusVO?: ApprovalStatus;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   approver?: string;
   approvedAt?: Date;
@@ -269,16 +273,32 @@ export class ApprovalService {
     return priorityMap[priority?.toLowerCase() ?? 'medium'] || 'MEDIUM';
   }
 
-  private static mapStatus(status: string): 'PENDING' | 'APPROVED' | 'REJECTED' {
-    const statusMap: Record<string, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
+  private static mapStatus(status: string, isExpired: boolean = false): ApprovalStatusLegacy {
+    if (status === 'pending' && isExpired) {
+      return 'EXPIRED';
+    }
+    const statusMap: Record<string, ApprovalStatusLegacy> = {
       'pending': 'PENDING',
       'approved': 'APPROVED',
-      'rejected': 'REJECTED'
+      'rejected': 'REJECTED',
+      'expired': 'EXPIRED',
+      'escalated': 'ESCALATED'
     };
     return statusMap[status] || 'PENDING';
   }
 
   private static mapToApprovalRequest(row: any): ApprovalRequest {
+    const isExpired = row.expires_at && new Date(row.expires_at) <= new Date();
+    const status = ApprovalService.mapStatus(row.status, isExpired && row.status === 'pending');
+    
+    // Criar Value Object para validação de transições
+    let statusVO: ApprovalStatus | undefined;
+    try {
+      statusVO = ApprovalStatus.create(status.toLowerCase());
+    } catch {
+      statusVO = ApprovalStatus.pending();
+    }
+
     return {
       id: row.id,
       quoteId: row.quote_id,
@@ -288,7 +308,8 @@ export class ApprovalService {
       value: row.quote_total ?? 0,
       margin: row.quote_margin_percent ?? 0,
       discount: 0,
-      status: ApprovalService.mapStatus(row.status),
+      status,
+      statusVO,
       priority: ApprovalService.mapPriority(row.priority),
       approver: row.approved_by,
       approvedAt: row.decided_at ? new Date(row.decided_at) : undefined,
@@ -297,5 +318,18 @@ export class ApprovalService {
       updatedAt: new Date(row.updated_at),
       expiresAt: row.expires_at ? new Date(row.expires_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     };
+  }
+
+  /**
+   * Valida se uma transição de status é permitida
+   */
+  static canTransition(from: ApprovalStatusLegacy, to: ApprovalStatusLegacy): boolean {
+    try {
+      const fromStatus = ApprovalStatus.create(from.toLowerCase());
+      const toStatus = ApprovalStatus.create(to.toLowerCase());
+      return fromStatus.canTransitionTo(toStatus);
+    } catch {
+      return false;
+    }
   }
 }
