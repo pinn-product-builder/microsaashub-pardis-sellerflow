@@ -10,10 +10,10 @@ import { PricingFormulaCard } from '@/components/cpq/config/PricingFormulaCard';
 import { MarginSimulator } from '@/components/cpq/config/MarginSimulator';
 import { AuthRequiredCard } from '@/components/cpq/config/AuthRequiredCard';
 import { usePricingConfigs } from '@/hooks/usePricingConfig';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Configuracoes() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuth();
   const { data: configs } = usePricingConfigs();
   
   // Se não autenticado, mostrar card de autenticação
