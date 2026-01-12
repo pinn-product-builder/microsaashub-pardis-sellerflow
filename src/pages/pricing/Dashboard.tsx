@@ -1,14 +1,40 @@
-
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
-import { ApprovalService } from '@/services/approvalService';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { ApprovalService, ApprovalRequest } from '@/services/approvalService';
 import { PriceTableService } from '@/services/priceTableService';
 
 export default function PricingDashboard() {
-  const approvalStats = ApprovalService.getApprovalStats();
+  const [approvalStats, setApprovalStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    expired: 0,
+    averageTime: 0
+  });
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const priceTables = PriceTableService.getAllTables();
-  const pendingApprovals = ApprovalService.getPendingRequests();
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [stats, pending] = await Promise.all([
+          ApprovalService.getApprovalStats(),
+          ApprovalService.getPendingRequests()
+        ]);
+        setApprovalStats(stats);
+        setPendingApprovals(pending);
+      } catch (error) {
+        console.error('Erro ao carregar dados de aprovação:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -108,7 +134,11 @@ export default function PricingDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {pendingApprovals.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : pendingApprovals.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
                 Nenhuma aprovação pendente
               </p>
@@ -148,31 +178,39 @@ export default function PricingDashboard() {
             <CardTitle>Estatísticas de Aprovação</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Pendentes:</span>
-                <Badge variant="secondary">{approvalStats.pending}</Badge>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-              <div className="flex justify-between">
-                <span>Aprovadas:</span>
-                <Badge variant="default">{approvalStats.approved}</Badge>
-              </div>
-              <div className="flex justify-between">
-                <span>Rejeitadas:</span>
-                <Badge variant="destructive">{approvalStats.rejected}</Badge>
-              </div>
-              <div className="flex justify-between">
-                <span>Expiradas:</span>
-                <Badge variant="outline">{approvalStats.expired}</Badge>
-              </div>
-            </div>
-            
-            <div className="pt-4 border-t">
-              <p className="text-sm text-muted-foreground">Tempo Médio de Aprovação</p>
-              <p className="text-2xl font-bold">
-                {approvalStats.averageTime.toFixed(1)}h
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Pendentes:</span>
+                    <Badge variant="secondary">{approvalStats.pending}</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Aprovadas:</span>
+                    <Badge variant="default">{approvalStats.approved}</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Rejeitadas:</span>
+                    <Badge variant="destructive">{approvalStats.rejected}</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Expiradas:</span>
+                    <Badge variant="outline">{approvalStats.expired}</Badge>
+                  </div>
+                </div>
+                
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">Tempo Médio de Aprovação</p>
+                  <p className="text-2xl font-bold">
+                    {approvalStats.averageTime.toFixed(1)}h
+                  </p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

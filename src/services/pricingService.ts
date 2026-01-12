@@ -176,11 +176,11 @@ export class PricingService {
     return AdvancedPricingEngine.simulateScenario(context, scenarios);
   }
 
-  static checkApprovalRequired(
+  static async checkApprovalRequired(
     value: number,
     margin: number,
     discount: number
-  ): boolean {
+  ): Promise<boolean> {
     return ApprovalService.isApprovalRequired(value, margin, discount);
   }
 

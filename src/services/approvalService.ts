@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+import { EdgeFunctions } from "./edgeFunctions";
 
 export interface ApprovalRequest {
   id: string;
@@ -36,81 +38,15 @@ export interface ApprovalRule {
   isActive: boolean;
 }
 
-const STORAGE_KEY = 'cpq_approval_requests';
-const RULES_STORAGE_KEY = 'cpq_approval_rules';
-
+/**
+ * Serviço de aprovações - agora usa Edge Functions e Supabase
+ * Removido o uso de localStorage para segurança
+ */
 export class ApprovalService {
-  private static getRequests(): ApprovalRequest[] {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  }
-
-  private static saveRequests(requests: ApprovalRequest[]): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
-  }
-
-  private static getRules(): ApprovalRule[] {
-    const stored = localStorage.getItem(RULES_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : this.getDefaultRules();
-  }
-
-  private static getDefaultRules(): ApprovalRule[] {
-    const defaultRules: ApprovalRule[] = [
-      {
-        id: '1',
-        name: 'Aprovação por Valor Alto',
-        description: 'Cotações acima de R$ 50.000 precisam de aprovação',
-        condition: {
-          type: 'VALUE',
-          operator: 'GT',
-          value: 50000
-        },
-        approver: {
-          role: 'MANAGER',
-          department: 'SALES'
-        },
-        priority: 'HIGH',
-        isActive: true
-      },
-      {
-        id: '2',
-        name: 'Aprovação por Margem Baixa',
-        description: 'Margens abaixo de 10% precisam de aprovação',
-        condition: {
-          type: 'MARGIN',
-          operator: 'LT',
-          value: 10
-        },
-        approver: {
-          role: 'DIRECTOR',
-          department: 'COMMERCIAL'
-        },
-        priority: 'MEDIUM',
-        isActive: true
-      },
-      {
-        id: '3',
-        name: 'Aprovação por Desconto Alto',
-        description: 'Descontos acima de 15% precisam de aprovação',
-        condition: {
-          type: 'DISCOUNT',
-          operator: 'GT',
-          value: 15
-        },
-        approver: {
-          role: 'MANAGER',
-          department: 'SALES'
-        },
-        priority: 'MEDIUM',
-        isActive: true
-      }
-    ];
-
-    localStorage.setItem(RULES_STORAGE_KEY, JSON.stringify(defaultRules));
-    return defaultRules;
-  }
-
-  static createApprovalRequest(
+  /**
+   * Cria solicitação de aprovação via Edge Function
+   */
+  static async createApprovalRequest(
     quoteId: string,
     quoteNumber: string,
     requestedBy: string,
@@ -118,185 +54,248 @@ export class ApprovalService {
     value: number,
     margin: number,
     discount: number
-  ): ApprovalRequest {
-    const requests = this.getRequests();
-    const priority = this.calculatePriority(value, margin, discount);
-    
-    const newRequest: ApprovalRequest = {
-      id: crypto.randomUUID(),
-      quoteId,
-      quoteNumber,
-      requestedBy,
-      reason,
-      value,
-      margin,
-      discount,
-      status: 'PENDING',
-      priority,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
-    };
+  ): Promise<ApprovalRequest | null> {
+    try {
+      const result = await EdgeFunctions.createApprovalRequest(
+        quoteId,
+        margin,
+        value,
+        reason
+      );
 
-    requests.push(newRequest);
-    this.saveRequests(requests);
-    
-    // Notificar aprovador
-    this.notifyApprover(newRequest);
-    
-    return newRequest;
+      if (result.success && result.approvalRequest) {
+        // Notificar aprovador (console por enquanto)
+        console.log(`Notificação: Nova aprovação pendente - ${quoteNumber}`);
+        console.log(`Valor: R$ ${value.toLocaleString('pt-BR')}`);
+        console.log(`Aprovador necessário: ${result.requiredRole}`);
+
+        return {
+          id: result.approvalRequest.id,
+          quoteId,
+          quoteNumber,
+          requestedBy,
+          reason,
+          value,
+          margin,
+          discount,
+          status: 'PENDING',
+          priority: this.mapPriority(result.approvalRequest.priority),
+          createdAt: new Date(result.approvalRequest.created_at),
+          updatedAt: new Date(result.approvalRequest.updated_at),
+          expiresAt: result.expiresAt ? new Date(result.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao criar solicitação de aprovação:', error);
+      throw error;
+    }
   }
 
-  static approveRequest(
+  /**
+   * Aprova uma solicitação via Edge Function
+   */
+  static async approveRequest(
     requestId: string,
     approver: string,
     comments?: string
-  ): ApprovalRequest | null {
-    const requests = this.getRequests();
-    const request = requests.find(r => r.id === requestId);
-    
-    if (!request || request.status !== 'PENDING') return null;
-    
-    request.status = 'APPROVED';
-    request.approver = approver;
-    request.approvedAt = new Date();
-    request.updatedAt = new Date();
-    request.comments = comments;
-    
-    this.saveRequests(requests);
-    return request;
+  ): Promise<boolean> {
+    try {
+      const result = await EdgeFunctions.approveRequest(requestId, comments);
+      return result.success;
+    } catch (error) {
+      console.error('Erro ao aprovar solicitação:', error);
+      throw error;
+    }
   }
 
-  static rejectRequest(
+  /**
+   * Rejeita uma solicitação via Edge Function
+   */
+  static async rejectRequest(
     requestId: string,
     approver: string,
     comments: string
-  ): ApprovalRequest | null {
-    const requests = this.getRequests();
-    const request = requests.find(r => r.id === requestId);
-    
-    if (!request || request.status !== 'PENDING') return null;
-    
-    request.status = 'REJECTED';
-    request.approver = approver;
-    request.approvedAt = new Date();
-    request.updatedAt = new Date();
-    request.comments = comments;
-    
-    this.saveRequests(requests);
-    return request;
+  ): Promise<boolean> {
+    try {
+      const result = await EdgeFunctions.rejectRequest(requestId, comments);
+      return result.success;
+    } catch (error) {
+      console.error('Erro ao rejeitar solicitação:', error);
+      throw error;
+    }
   }
 
-  static getPendingRequests(): ApprovalRequest[] {
-    return this.getRequests()
-      .filter(r => r.status === 'PENDING' && new Date() < new Date(r.expiresAt))
-      .sort((a, b) => {
-        const priorityOrder = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-        return priorityOrder[b.priority] - priorityOrder[a.priority];
-      });
+  /**
+   * Busca solicitações pendentes do Supabase
+   */
+  static async getPendingRequests(): Promise<ApprovalRequest[]> {
+    const { data, error } = await supabase
+      .from('approval_requests')
+      .select(`
+        *,
+        quotes(quote_number, total_offered, total_margin_percent)
+      `)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .order('priority', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar solicitações pendentes:', error);
+      return [];
+    }
+
+    return (data || []).map(this.mapToApprovalRequest);
   }
 
-  static getAllApprovals(): ApprovalRequest[] {
-    return this.getRequests();
+  /**
+   * Busca todas as aprovações do Supabase
+   */
+  static async getAllApprovals(): Promise<ApprovalRequest[]> {
+    const { data, error } = await supabase
+      .from('approval_requests')
+      .select(`
+        *,
+        quotes(quote_number, total_offered, total_margin_percent)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar aprovações:', error);
+      return [];
+    }
+
+    return (data || []).map(this.mapToApprovalRequest);
   }
 
-  static getRequestsByQuote(quoteId: string): ApprovalRequest[] {
-    return this.getRequests().filter(r => r.quoteId === quoteId);
+  /**
+   * Busca solicitações por cotação do Supabase
+   */
+  static async getRequestsByQuote(quoteId: string): Promise<ApprovalRequest[]> {
+    const { data, error } = await supabase
+      .from('approval_requests')
+      .select(`
+        *,
+        quotes(quote_number, total_offered, total_margin_percent)
+      `)
+      .eq('quote_id', quoteId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar solicitações por cotação:', error);
+      return [];
+    }
+
+    return (data || []).map(this.mapToApprovalRequest);
   }
 
-  static isApprovalRequired(value: number, margin: number, discount: number): boolean {
-    const rules = this.getRules().filter(r => r.isActive);
-    
+  /**
+   * Verifica se aprovação é necessária - consulta regras do Supabase
+   */
+  static async isApprovalRequired(value: number, margin: number, discount: number): Promise<boolean> {
+    const { data: rules, error } = await supabase
+      .from('approval_rules')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error || !rules) {
+      console.error('Erro ao buscar regras de aprovação:', error);
+      return false;
+    }
+
     return rules.some(rule => {
-      const { condition } = rule;
-      let checkValue = 0;
-      
-      switch (condition.type) {
-        case 'VALUE':
-          checkValue = value;
-          break;
-        case 'MARGIN':
-          checkValue = margin;
-          break;
-        case 'DISCOUNT':
-          checkValue = discount;
-          break;
-      }
-      
-      switch (condition.operator) {
-        case 'GT':
-          return checkValue > condition.value;
-        case 'LT':
-          return checkValue < condition.value;
-        case 'GTE':
-          return checkValue >= condition.value;
-        case 'LTE':
-          return checkValue <= condition.value;
-        case 'EQ':
-          return checkValue === condition.value;
-        default:
-          return false;
-      }
+      // Verifica se margem está na faixa que requer aprovação
+      const marginMin = rule.margin_min ?? 0;
+      const marginMax = rule.margin_max ?? 100;
+      return margin >= marginMin && margin <= marginMax;
     });
   }
 
-  private static calculatePriority(
-    value: number,
-    margin: number,
-    discount: number
-  ): 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' {
-    if (value > 100000 || margin < 5 || discount > 25) return 'URGENT';
-    if (value > 50000 || margin < 10 || discount > 15) return 'HIGH';
-    if (value > 25000 || margin < 15 || discount > 10) return 'MEDIUM';
-    return 'LOW';
-  }
-
-  private static notifyApprover(request: ApprovalRequest): void {
-    // Mock de notificação - em produção enviaria email/SMS
-    console.log(`Notificação: Nova aprovação pendente - ${request.quoteNumber}`);
-    console.log(`Valor: R$ ${request.value.toLocaleString('pt-BR')}`);
-    console.log(`Prioridade: ${request.priority}`);
-  }
-
-  static getApprovalStats(): {
+  /**
+   * Busca estatísticas de aprovação do Supabase
+   */
+  static async getApprovalStats(): Promise<{
     pending: number;
     approved: number;
     rejected: number;
     expired: number;
     averageTime: number;
-  } {
-    const requests = this.getRequests();
-    const now = new Date();
-    
-    const pending = requests.filter(r => 
-      r.status === 'PENDING' && new Date(r.expiresAt) > now
+  }> {
+    const now = new Date().toISOString();
+
+    // Buscar todas as aprovações
+    const { data, error } = await supabase
+      .from('approval_requests')
+      .select('status, created_at, decided_at, expires_at');
+
+    if (error || !data) {
+      return { pending: 0, approved: 0, rejected: 0, expired: 0, averageTime: 0 };
+    }
+
+    const pending = data.filter(r => 
+      r.status === 'pending' && r.expires_at && new Date(r.expires_at) > new Date()
     ).length;
-    
-    const approved = requests.filter(r => r.status === 'APPROVED').length;
-    const rejected = requests.filter(r => r.status === 'REJECTED').length;
-    
-    const expired = requests.filter(r => 
-      r.status === 'PENDING' && new Date(r.expiresAt) <= now
+
+    const approved = data.filter(r => r.status === 'approved').length;
+    const rejected = data.filter(r => r.status === 'rejected').length;
+
+    const expired = data.filter(r => 
+      r.status === 'pending' && r.expires_at && new Date(r.expires_at) <= new Date()
     ).length;
-    
+
     // Calcular tempo médio de aprovação (em horas)
-    const processedRequests = requests.filter(r => 
-      r.status !== 'PENDING' && r.approvedAt
+    const processedRequests = data.filter(r => 
+      r.status !== 'pending' && r.decided_at
     );
-    
+
     const averageTime = processedRequests.length > 0
       ? processedRequests.reduce((sum, r) => {
-          const diff = new Date(r.approvedAt!).getTime() - new Date(r.createdAt).getTime();
-          return sum + (diff / (1000 * 60 * 60)); // converter para horas
+          const diff = new Date(r.decided_at!).getTime() - new Date(r.created_at).getTime();
+          return sum + (diff / (1000 * 60 * 60));
         }, 0) / processedRequests.length
       : 0;
-    
+
+    return { pending, approved, rejected, expired, averageTime };
+  }
+
+  // Helpers privados
+  private static mapPriority(priority: string | null): 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' {
+    const priorityMap: Record<string, 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'> = {
+      'low': 'LOW',
+      'medium': 'MEDIUM',
+      'high': 'HIGH',
+      'critical': 'URGENT'
+    };
+    return priorityMap[priority?.toLowerCase() ?? 'medium'] || 'MEDIUM';
+  }
+
+  private static mapStatus(status: string): 'PENDING' | 'APPROVED' | 'REJECTED' {
+    const statusMap: Record<string, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
+      'pending': 'PENDING',
+      'approved': 'APPROVED',
+      'rejected': 'REJECTED'
+    };
+    return statusMap[status] || 'PENDING';
+  }
+
+  private static mapToApprovalRequest(row: any): ApprovalRequest {
     return {
-      pending,
-      approved,
-      rejected,
-      expired,
-      averageTime
+      id: row.id,
+      quoteId: row.quote_id,
+      quoteNumber: row.quotes?.quote_number ?? '',
+      requestedBy: row.requested_by,
+      reason: row.reason ?? '',
+      value: row.quote_total ?? 0,
+      margin: row.quote_margin_percent ?? 0,
+      discount: 0,
+      status: ApprovalService.mapStatus(row.status),
+      priority: ApprovalService.mapPriority(row.priority),
+      approver: row.approved_by,
+      approvedAt: row.decided_at ? new Date(row.decided_at) : undefined,
+      comments: row.comments,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      expiresAt: row.expires_at ? new Date(row.expires_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     };
   }
 }
