@@ -1,11 +1,10 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
-import { ApprovalService } from '@/services/approvalService';
+import { CheckCircle, XCircle, Clock, Eye, Loader2 } from 'lucide-react';
+import { ApprovalService, ApprovalRequest } from '@/services/approvalService';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,7 +15,22 @@ import {
 } from "@/components/ui/breadcrumb";
 
 export default function PricingApprovals() {
-  const [approvals] = useState(() => ApprovalService.getAllApprovals());
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadApprovals = async () => {
+      try {
+        const data = await ApprovalService.getAllApprovals();
+        setApprovals(data);
+      } catch (error) {
+        console.error('Erro ao carregar aprovações:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadApprovals();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -47,6 +61,14 @@ export default function PricingApprovals() {
   const pendingApprovals = approvals.filter(a => a.status === 'PENDING');
   const approvedToday = approvals.filter(a => a.status === 'APPROVED' && 
     new Date(a.updatedAt).toDateString() === new Date().toDateString()).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -106,7 +128,9 @@ export default function PricingApprovals() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {(approvals.reduce((acc, a) => acc + a.value, 0) / approvals.length || 0).toLocaleString('pt-BR')}
+              R$ {(approvals.length > 0 
+                ? approvals.reduce((acc, a) => acc + a.value, 0) / approvals.length 
+                : 0).toLocaleString('pt-BR')}
             </div>
             <p className="text-xs text-muted-foreground">Por aprovação</p>
           </CardContent>
@@ -148,35 +172,43 @@ export default function PricingApprovals() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {approvals.map((approval) => (
-                <TableRow key={approval.id}>
-                  <TableCell className="font-medium">{approval.quoteNumber}</TableCell>
-                  <TableCell>{approval.requestedBy}</TableCell>
-                  <TableCell>R$ {approval.value.toLocaleString('pt-BR')}</TableCell>
-                  <TableCell>{approval.margin.toFixed(1)}%</TableCell>
-                  <TableCell>{approval.discount.toFixed(1)}%</TableCell>
-                  <TableCell>{getPriorityBadge(approval.priority)}</TableCell>
-                  <TableCell>{getStatusBadge(approval.status)}</TableCell>
-                  <TableCell>{new Date(approval.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {approval.status === 'PENDING' && (
-                        <>
-                          <Button variant="ghost" size="sm" className="text-green-600">
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600">
-                            <XCircle className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
+              {approvals.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    Nenhuma aprovação encontrada
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                approvals.map((approval) => (
+                  <TableRow key={approval.id}>
+                    <TableCell className="font-medium">{approval.quoteNumber}</TableCell>
+                    <TableCell>{approval.requestedBy}</TableCell>
+                    <TableCell>R$ {approval.value.toLocaleString('pt-BR')}</TableCell>
+                    <TableCell>{approval.margin.toFixed(1)}%</TableCell>
+                    <TableCell>{approval.discount.toFixed(1)}%</TableCell>
+                    <TableCell>{getPriorityBadge(approval.priority)}</TableCell>
+                    <TableCell>{getStatusBadge(approval.status)}</TableCell>
+                    <TableCell>{new Date(approval.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {approval.status === 'PENDING' && (
+                          <>
+                            <Button variant="ghost" size="sm" className="text-green-600">
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-red-600">
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
