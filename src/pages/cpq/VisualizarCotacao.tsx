@@ -49,11 +49,14 @@ export default function VisualizarCotacao() {
   const [showTimeline, setShowTimeline] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      const foundQuote = QuoteService.getQuote(id);
-      setQuote(foundQuote);
-      setIsLoading(false);
-    }
+    const loadQuote = async () => {
+      if (id) {
+        const foundQuote = await QuoteService.getQuote(id);
+        setQuote(foundQuote);
+        setIsLoading(false);
+      }
+    };
+    loadQuote();
   }, [id]);
 
   const formatCurrency = (value: number) => {
@@ -68,10 +71,10 @@ export default function VisualizarCotacao() {
     return format(dateObj, 'dd/MM/yyyy', { locale: ptBR });
   };
 
-  const handleDuplicate = () => {
+  const handleDuplicate = async () => {
     if (!quote) return;
 
-    const duplicatedQuote = QuoteService.createQuote({
+    const duplicatedQuote = await QuoteService.createQuote({
       customer: quote.customer,
       destinationUF: quote.destinationUF,
       items: quote.items,
@@ -89,17 +92,18 @@ export default function VisualizarCotacao() {
 
     toast({
       title: "Cotação Duplicada",
-      description: `Nova cotação ${duplicatedQuote.number} criada com sucesso!`
+      description: `Nova cotação ${duplicatedQuote?.number || 'criada'} com sucesso!`
     });
 
-    navigate(`/cpq/cotacao/${duplicatedQuote.id}`);
+    if (duplicatedQuote?.id) {
+      navigate(`/cpq/cotacao/${duplicatedQuote.id}`);
+    }
   };
 
-  const handleConvertToOrder = () => {
+  const handleConvertToOrder = async () => {
     if (!quote) return;
 
-    QuoteService.updateQuote(quote.id, { 
-      status: 'approved',
+    await QuoteService.updateQuote(quote.id, { 
       notes: `${quote.notes}\n\nConvertido em pedido em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`
     });
 
@@ -147,12 +151,11 @@ export default function VisualizarCotacao() {
           ? 'pending'
           : 'processing';
 
-        QuoteService.updateQuote(quote.id, { 
-          status: newStatus,
+        await QuoteService.updateQuote(quote.id, { 
           notes: `${quote.notes}\n\nProcessamento iniciado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`
         });
         
-        setQuote(prev => prev ? { ...prev, status: newStatus } : null);
+        setQuote(prev => prev ? { ...prev, status: newStatus as any } : null);
         setShowTimeline(true);
       } else {
         toast({
