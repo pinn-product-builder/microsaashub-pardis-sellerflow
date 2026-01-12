@@ -40,12 +40,11 @@ const ROLES = [
 ];
 
 const REGIONS = [
-  { value: 'sul', label: 'Sul' },
-  { value: 'sudeste', label: 'Sudeste' },
-  { value: 'centro-oeste', label: 'Centro-Oeste' },
-  { value: 'nordeste', label: 'Nordeste' },
-  { value: 'norte', label: 'Norte' },
-];
+  { value: 'BR', label: 'Brasil' },
+  { value: 'MG', label: 'Minas Gerais' },
+] as const;
+
+type RegionValue = typeof REGIONS[number]['value'] | '';
 
 export function UserManagementDialog({
   open,
@@ -83,11 +82,12 @@ export function UserManagementDialog({
       setIsLoading(true);
 
       // Atualizar perfil - region pode ser null
+      const regionValue = formData.region === '' ? null : formData.region as "BR" | "MG";
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           full_name: formData.full_name,
-          region: formData.region || null,
+          region: regionValue,
           is_active: formData.is_active,
         })
         .eq('user_id', user.id);
