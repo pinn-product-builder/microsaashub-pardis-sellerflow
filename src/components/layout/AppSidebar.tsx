@@ -12,6 +12,7 @@ import {
   Upload,
   Shield,
   UserCog,
+  FileText,
 } from "lucide-react"
 
 import {
@@ -95,6 +96,11 @@ const adminItems = [
     title: "Grupos",
     url: "/admin/grupos",
     icon: Shield,
+  },
+  {
+    title: "Logs",
+    url: "/admin/logs",
+    icon: FileText,
   },
 ]
 

@@ -1,5 +1,6 @@
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PermissionGateProps {
   permission?: string;
@@ -7,6 +8,7 @@ interface PermissionGateProps {
   requireAll?: boolean;
   children: ReactNode;
   fallback?: ReactNode;
+  showLoading?: boolean;
 }
 
 export function PermissionGate({
@@ -15,23 +17,27 @@ export function PermissionGate({
   requireAll = false,
   children,
   fallback = null,
+  showLoading = false,
 }: PermissionGateProps) {
   const { hasPermission, hasAnyPermission, hasAllPermissions, isLoading } = usePermissions();
 
+  const hasAccess = useMemo(() => {
+    if (permission) {
+      return hasPermission(permission);
+    }
+    if (permissions) {
+      return requireAll 
+        ? hasAllPermissions(permissions) 
+        : hasAnyPermission(permissions);
+    }
+    return true;
+  }, [permission, permissions, requireAll, hasPermission, hasAnyPermission, hasAllPermissions]);
+
   if (isLoading) {
+    if (showLoading) {
+      return <Skeleton className="h-8 w-full" />;
+    }
     return null;
-  }
-
-  let hasAccess = false;
-
-  if (permission) {
-    hasAccess = hasPermission(permission);
-  } else if (permissions) {
-    hasAccess = requireAll 
-      ? hasAllPermissions(permissions) 
-      : hasAnyPermission(permissions);
-  } else {
-    hasAccess = true;
   }
 
   if (!hasAccess) {
