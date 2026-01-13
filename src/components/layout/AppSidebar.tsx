@@ -60,14 +60,14 @@ const cpqItems = [
     icon: CheckCircle,
   },
   {
-    title: "Configurações",
-    url: "/cpq/configuracoes",
-    icon: Settings,
-  },
-  {
     title: "Importação CSV",
     url: "/cpq/importacao",
     icon: Upload,
+  },
+  {
+    title: "Configurações",
+    url: "/cpq/configuracoes",
+    icon: Settings,
   },
 ]
 
