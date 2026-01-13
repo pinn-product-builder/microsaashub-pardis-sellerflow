@@ -78,24 +78,24 @@ function App() {
             === FIM DASHBOARD PRINCIPAL === */}
 
             {/* CPQ Routes - Módulo de Cotações (ATIVO) */}
-            <Route path="/cpq/dashboard" element={<AppLayout><CPQDashboard /></AppLayout>} />
-            <Route path="/cpq/nova" element={<AppLayout><NovaQuotacao /></AppLayout>} />
-            <Route path="/cpq/nova-cotacao" element={<AppLayout><NovaQuotacao /></AppLayout>} />
-            <Route path="/cpq/historico" element={<AppLayout><Historico /></AppLayout>} />
-            <Route path="/cpq/cotacao/:id" element={<AppLayout><VisualizarCotacao /></AppLayout>} />
-            <Route path="/cpq/editar/:id" element={<AppLayout><NovaQuotacao /></AppLayout>} />
-            <Route path="/cpq/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
-            <Route path="/cpq/configuracoes" element={<AppLayout><ProtectedRoute><Configuracoes /></ProtectedRoute></AppLayout>} />
-            <Route path="/cpq/importacao" element={<AppLayout><ProtectedRoute><Importacao /></ProtectedRoute></AppLayout>} />
+            <Route path="/cpq/dashboard" element={<ProtectedRoute><AppLayout><CPQDashboard /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/nova" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/nova-cotacao" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/historico" element={<ProtectedRoute><AppLayout><Historico /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/cotacao/:id" element={<ProtectedRoute><AppLayout><VisualizarCotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/editar/:id" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/aprovacoes" element={<ProtectedRoute><AppLayout><Aprovacoes /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/importacao" element={<ProtectedRoute><AppLayout><Importacao /></AppLayout></ProtectedRoute>} />
 
             {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
-            <Route path="/cadastros/clientes" element={<AppLayout><Clientes /></AppLayout>} />
-            <Route path="/cadastros/produtos" element={<AppLayout><Produtos /></AppLayout>} />
+            <Route path="/cadastros/clientes" element={<ProtectedRoute><AppLayout><Clientes /></AppLayout></ProtectedRoute>} />
+            <Route path="/cadastros/produtos" element={<ProtectedRoute><AppLayout><Produtos /></AppLayout></ProtectedRoute>} />
 
             {/* Admin Routes - Módulo de Administração (ATIVO) */}
-            <Route path="/admin/usuarios" element={<AppLayout><ProtectedRoute><Usuarios /></ProtectedRoute></AppLayout>} />
-            <Route path="/admin/grupos" element={<AppLayout><ProtectedRoute><Grupos /></ProtectedRoute></AppLayout>} />
-            <Route path="/admin/logs" element={<AppLayout><ProtectedRoute><Logs /></ProtectedRoute></AppLayout>} />
+            <Route path="/admin/usuarios" element={<ProtectedRoute><AppLayout><Usuarios /></AppLayout></ProtectedRoute>} />
+            <Route path="/admin/grupos" element={<ProtectedRoute><AppLayout><Grupos /></AppLayout></ProtectedRoute>} />
+            <Route path="/admin/logs" element={<ProtectedRoute><AppLayout><Logs /></AppLayout></ProtectedRoute>} />
 
             {/* === CPQ ROUTES FORA DO ESCOPO ===
             <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
