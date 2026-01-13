@@ -16,7 +16,8 @@ interface BreadcrumbsProps {
 
 const routeNames: Record<string, string> = {
   dashboard: 'Dashboard',
-  cpq: 'Cotações',
+  'seller-flow': 'Seller Flow',
+  cpq: 'Seller Flow',
   'nova-cotacao': 'Nova Cotação',
   historico: 'Histórico',
   integracoes: 'Integrações',
@@ -25,6 +26,7 @@ const routeNames: Record<string, string> = {
   rules: 'Regras',
   tables: 'Tabelas',
   approvals: 'Aprovações',
+  aprovacoes: 'Aprovações',
   analytics: 'Analytics',
   'market-research': 'Pesquisa de Mercado',
   taxes: 'Impostos',
@@ -33,6 +35,14 @@ const routeNames: Record<string, string> = {
   movimentacoes: 'Movimentações',
   entrada: 'Entrada',
   saida: 'Saída',
+  configuracoes: 'Configurações',
+  documentacao: 'Documentação',
+  importacao: 'Importação',
+  cadastros: 'Cadastros',
+  clientes: 'Clientes',
+  admin: 'Administração',
+  usuarios: 'Usuários',
+  grupos: 'Grupos',
 };
 
 export function Breadcrumbs({ className }: BreadcrumbsProps) {
@@ -56,7 +66,7 @@ export function Breadcrumbs({ className }: BreadcrumbsProps) {
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link to="/dashboard" className="flex items-center gap-1">
+            <Link to="/seller-flow/dashboard" className="flex items-center gap-1">
               <Home className="h-4 w-4" />
               <span className="sr-only">Home</span>
             </Link>

@@ -10,10 +10,10 @@ const Index = () => {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-foreground mb-4">
-            Portal Pardis - PCVP
+            Pardis Seller Flow
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Portal de Compras, Vendas e Precificação - Sua central de cotações e vendas B2B
+            Portal de Cotações e Vendas B2B - Sua central de cotações e precificação inteligente
           </p>
         </div>
 
@@ -22,7 +22,7 @@ const Index = () => {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Calculator className="mr-2 h-5 w-5 text-primary" />
-                CPQ - Cotações
+                Seller Flow
               </CardTitle>
               <CardDescription>
                 Configure, precifique e cote produtos com cálculo automático de impostos e frete
@@ -36,8 +36,8 @@ const Index = () => {
                 <li>• Gestão de margens e descontos</li>
               </ul>
               <Button asChild className="w-full">
-                <Link to="/cpq">
-                  Acessar CPQ
+                <Link to="/seller-flow">
+                  Acessar Seller Flow
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -93,7 +93,7 @@ const Index = () => {
 
         <div className="text-center mt-12">
           <p className="text-sm text-muted-foreground">
-            Sistema integrado para otimização de vendas B2B • Versão MVP 1.0
+            Pardis Seller Flow • Sistema integrado para otimização de vendas B2B • Versão MVP 1.0
           </p>
         </div>
       </div>

@@ -18,15 +18,15 @@ import NotFound from '@/pages/NotFound';
 // import Dashboard from '@/pages/Dashboard';
 // === FIM DASHBOARD PRINCIPAL ===
 
-// CPQ Pages (MÓDULO ATIVO)
-import CPQDashboard from '@/pages/cpq/Dashboard';
-import NovaQuotacao from '@/pages/cpq/NovaQuotacao';
-import Historico from '@/pages/cpq/Historico';
-import VisualizarCotacao from '@/pages/cpq/VisualizarCotacao';
-import Aprovacoes from '@/pages/cpq/Aprovacoes';
-import Configuracoes from '@/pages/cpq/Configuracoes';
-import Importacao from '@/pages/cpq/Importacao';
-import Documentacao from '@/pages/cpq/Documentacao';
+// Seller Flow Pages (MÓDULO ATIVO)
+import SellerFlowDashboard from '@/pages/seller-flow/Dashboard';
+import NovaQuotacao from '@/pages/seller-flow/NovaQuotacao';
+import Historico from '@/pages/seller-flow/Historico';
+import VisualizarCotacao from '@/pages/seller-flow/VisualizarCotacao';
+import Aprovacoes from '@/pages/seller-flow/Aprovacoes';
+import Configuracoes from '@/pages/seller-flow/Configuracoes';
+import Importacao from '@/pages/seller-flow/Importacao';
+import Documentacao from '@/pages/seller-flow/Documentacao';
 
 // Cadastros Pages (MÓDULO ATIVO)
 import Clientes from '@/pages/cadastros/Clientes';
@@ -36,11 +36,11 @@ import Produtos from '@/pages/cadastros/Produtos';
 import Usuarios from '@/pages/admin/Usuarios';
 import Grupos from '@/pages/admin/Grupos';
 
-// === CPQ PAGES FORA DO ESCOPO ===
-// import Integracoes from '@/pages/cpq/Integracoes';
-// import ConversionDashboardPage from '@/pages/cpq/ConversionDashboard';
-// import Testes from '@/pages/cpq/Testes';
-// === FIM CPQ PAGES FORA DO ESCOPO ===
+// === SELLER FLOW PAGES FORA DO ESCOPO ===
+// import Integracoes from '@/pages/seller-flow/Integracoes';
+// import ConversionDashboardPage from '@/pages/seller-flow/ConversionDashboard';
+// import Testes from '@/pages/seller-flow/Testes';
+// === FIM SELLER FLOW PAGES FORA DO ESCOPO ===
 
 // === PRICING PAGES (FORA DO ESCOPO ATUAL) ===
 // import PricingDashboard from '@/pages/pricing/Dashboard';
@@ -72,24 +72,24 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
-            {/* Redirect root to CPQ dashboard */}
-            <Route path="/" element={<Navigate to="/cpq/dashboard" replace />} />
+            {/* Redirect root to Seller Flow dashboard */}
+            <Route path="/" element={<Navigate to="/seller-flow/dashboard" replace />} />
 
             {/* === DASHBOARD PRINCIPAL (FORA DO ESCOPO ATUAL) ===
             <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
             === FIM DASHBOARD PRINCIPAL === */}
 
-            {/* CPQ Routes - Módulo de Cotações (ATIVO) */}
-            <Route path="/cpq/dashboard" element={<ProtectedRoute><AppLayout><CPQDashboard /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/nova" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/nova-cotacao" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/historico" element={<ProtectedRoute><AppLayout><Historico /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/cotacao/:id" element={<ProtectedRoute><AppLayout><VisualizarCotacao /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/editar/:id" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/aprovacoes" element={<ProtectedRoute><AppLayout><Aprovacoes /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/importacao" element={<ProtectedRoute><AppLayout><Importacao /></AppLayout></ProtectedRoute>} />
-            <Route path="/cpq/documentacao" element={<ProtectedRoute><AppLayout><Documentacao /></AppLayout></ProtectedRoute>} />
+            {/* Seller Flow Routes - Módulo de Cotações (ATIVO) */}
+            <Route path="/seller-flow/dashboard" element={<ProtectedRoute><AppLayout><SellerFlowDashboard /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/nova" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/nova-cotacao" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/historico" element={<ProtectedRoute><AppLayout><Historico /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/cotacao/:id" element={<ProtectedRoute><AppLayout><VisualizarCotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/editar/:id" element={<ProtectedRoute><AppLayout><NovaQuotacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/aprovacoes" element={<ProtectedRoute><AppLayout><Aprovacoes /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/importacao" element={<ProtectedRoute><AppLayout><Importacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/seller-flow/documentacao" element={<ProtectedRoute><AppLayout><Documentacao /></AppLayout></ProtectedRoute>} />
 
             {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
             <Route path="/cadastros/clientes" element={<ProtectedRoute><AppLayout><Clientes /></AppLayout></ProtectedRoute>} />
@@ -99,11 +99,11 @@ function App() {
             <Route path="/admin/usuarios" element={<ProtectedRoute><AppLayout><Usuarios /></AppLayout></ProtectedRoute>} />
             <Route path="/admin/grupos" element={<ProtectedRoute><AppLayout><Grupos /></AppLayout></ProtectedRoute>} />
 
-            {/* === CPQ ROUTES FORA DO ESCOPO ===
-            <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
-            <Route path="/cpq/integracoes/conversao" element={<AppLayout><ConversionDashboardPage /></AppLayout>} />
-            <Route path="/cpq/testes" element={<AppLayout><Testes /></AppLayout>} />
-            === FIM CPQ ROUTES FORA DO ESCOPO === */}
+            {/* === SELLER FLOW ROUTES FORA DO ESCOPO ===
+            <Route path="/seller-flow/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
+            <Route path="/seller-flow/integracoes/conversao" element={<AppLayout><ConversionDashboardPage /></AppLayout>} />
+            <Route path="/seller-flow/testes" element={<AppLayout><Testes /></AppLayout>} />
+            === FIM SELLER FLOW ROUTES FORA DO ESCOPO === */}
 
             {/* === PRICING ROUTES (FORA DO ESCOPO ATUAL) ===
             <Route path="/pricing/dashboard" element={<AppLayout><PricingDashboard /></AppLayout>} />
@@ -125,7 +125,9 @@ function App() {
             === FIM ESTOQUE ROUTES === */}
 
             {/* Legacy redirects */}
-            <Route path="/cpq" element={<Navigate to="/cpq/dashboard" replace />} />
+            <Route path="/seller-flow" element={<Navigate to="/seller-flow/dashboard" replace />} />
+            <Route path="/cpq" element={<Navigate to="/seller-flow/dashboard" replace />} />
+            <Route path="/cpq/*" element={<Navigate to="/seller-flow/dashboard" replace />} />
 
             {/* Fallback Route */}
             <Route path="*" element={<NotFound />} />
