@@ -105,10 +105,10 @@ const adminItems = [
 ]
 
 export function AppSidebar() {
-  const { profile, user, logout, role } = useAuth()
+  const { profile, user, logout, role, isLoading } = useAuth()
 
-  const displayName = profile?.full_name || user?.email || 'Usuário'
-  const displayEmail = user?.email || 'user@example.com'
+  const displayName = profile?.full_name || user?.email || (isLoading ? 'Carregando...' : 'Usuário')
+  const displayEmail = user?.email || (isLoading ? '' : 'Sem email')
 
   return (
     <Sidebar variant="inset">
