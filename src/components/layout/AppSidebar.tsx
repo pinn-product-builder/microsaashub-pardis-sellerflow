@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { NavLink } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import { PermissionGate } from "@/components/auth/PermissionGate"
 
@@ -105,10 +105,16 @@ const adminItems = [
 ]
 
 export function AppSidebar() {
+  const navigate = useNavigate()
   const { profile, user, logout, role, isLoading } = useAuth()
 
   const displayName = profile?.full_name || user?.email || (isLoading ? 'Carregando...' : 'Usuário')
   const displayEmail = user?.email || (isLoading ? '' : 'Sem email')
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
   return (
     <Sidebar variant="inset">
@@ -211,7 +217,7 @@ export function AppSidebar() {
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem onClick={logout}>
+                <DropdownMenuItem onClick={handleLogout}>
                   <User2 className="mr-2 h-4 w-4" />
                   Sair
                 </DropdownMenuItem>
