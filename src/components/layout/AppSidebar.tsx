@@ -38,36 +38,36 @@ import { NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import { PermissionGate } from "@/components/auth/PermissionGate"
 
-// Módulo de Cotações (ATIVO)
-const cpqItems = [
+// Módulo de Cotações (ATIVO) - Pardis Seller Flow
+const sellerFlowItems = [
   {
     title: "Dashboard",
-    url: "/cpq/dashboard",
+    url: "/seller-flow/dashboard",
     icon: Activity,
   },
   {
     title: "Nova Cotação",
-    url: "/cpq/nova-cotacao",
+    url: "/seller-flow/nova-cotacao",
     icon: Plus,
   },
   {
     title: "Histórico",
-    url: "/cpq/historico",
+    url: "/seller-flow/historico",
     icon: History,
   },
   {
     title: "Aprovações",
-    url: "/cpq/aprovacoes",
+    url: "/seller-flow/aprovacoes",
     icon: CheckCircle,
   },
   {
     title: "Importação CSV",
-    url: "/cpq/importacao",
+    url: "/seller-flow/importacao",
     icon: Upload,
   },
   {
     title: "Configurações",
-    url: "/cpq/configuracoes",
+    url: "/seller-flow/configuracoes",
     icon: Settings,
   },
 ]
@@ -118,13 +118,13 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <NavLink to="/cpq/dashboard">
+              <NavLink to="/seller-flow/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <Calculator className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Sistema Pardis</span>
-                  <span className="truncate text-xs">Módulo de Cotações</span>
+                  <span className="truncate font-semibold">Pardis Seller Flow</span>
+                  <span className="truncate text-xs">Portal de Cotações B2B</span>
                 </div>
               </NavLink>
             </SidebarMenuButton>
@@ -133,10 +133,10 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Cotações</SidebarGroupLabel>
+          <SidebarGroupLabel>Seller Flow</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {cpqItems.map((item) => (
+              {sellerFlowItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url}>
@@ -216,7 +216,7 @@ export function AppSidebar() {
                 <DropdownMenuItem 
                   onSelect={(e) => {
                     e.preventDefault();
-                    navigate('/cpq/documentacao');
+                    navigate('/seller-flow/documentacao');
                   }}
                 >
                   <FileText className="mr-2 h-4 w-4" />
