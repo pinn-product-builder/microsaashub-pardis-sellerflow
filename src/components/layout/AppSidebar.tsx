@@ -31,6 +31,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NavLink, useNavigate } from "react-router-dom"
@@ -63,11 +64,6 @@ const cpqItems = [
     title: "Importação CSV",
     url: "/cpq/importacao",
     icon: Upload,
-  },
-  {
-    title: "Documentação",
-    url: "/cpq/documentacao",
-    icon: FileText,
   },
   {
     title: "Configurações",
@@ -217,6 +213,11 @@ export function AppSidebar() {
                 align="end"
                 sideOffset={4}
               >
+                <DropdownMenuItem onClick={() => navigate('/cpq/documentacao')}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Documentação
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <User2 className="mr-2 h-4 w-4" />
                   Sair
