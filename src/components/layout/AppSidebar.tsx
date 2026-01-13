@@ -12,6 +12,7 @@ import {
   Upload,
   Shield,
   UserCog,
+  FileText,
 } from "lucide-react"
 
 import {
@@ -62,6 +63,11 @@ const cpqItems = [
     title: "Importação CSV",
     url: "/cpq/importacao",
     icon: Upload,
+  },
+  {
+    title: "Documentação",
+    url: "/cpq/documentacao",
+    icon: FileText,
   },
   {
     title: "Configurações",
