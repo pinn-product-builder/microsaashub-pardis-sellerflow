@@ -34,7 +34,6 @@ import Produtos from '@/pages/cadastros/Produtos';
 // Admin Pages (MÓDULO ATIVO)
 import Usuarios from '@/pages/admin/Usuarios';
 import Grupos from '@/pages/admin/Grupos';
-import Logs from '@/pages/admin/Logs';
 
 // === CPQ PAGES FORA DO ESCOPO ===
 // import Integracoes from '@/pages/cpq/Integracoes';
@@ -97,7 +96,6 @@ function App() {
             {/* Admin Routes - Módulo de Administração (ATIVO) */}
             <Route path="/admin/usuarios" element={<ProtectedRoute><AppLayout><Usuarios /></AppLayout></ProtectedRoute>} />
             <Route path="/admin/grupos" element={<ProtectedRoute><AppLayout><Grupos /></AppLayout></ProtectedRoute>} />
-            <Route path="/admin/logs" element={<ProtectedRoute><AppLayout><Logs /></AppLayout></ProtectedRoute>} />
 
             {/* === CPQ ROUTES FORA DO ESCOPO ===
             <Route path="/cpq/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
