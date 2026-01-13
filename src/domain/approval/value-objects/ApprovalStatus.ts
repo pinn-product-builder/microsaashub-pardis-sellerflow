@@ -1,18 +1,15 @@
 import { ValueObject } from '@/domain/shared/ValueObject';
 import { DomainError } from '@/domain/shared/DomainError';
+import { ApprovalStatusExtended } from '@/types/domain';
 
-export type ApprovalStatusType = 
-  | 'pending' 
-  | 'approved' 
-  | 'rejected' 
-  | 'expired'
-  | 'escalated';
+// Re-export para uso externo
+export type { ApprovalStatusExtended as ApprovalStatusType };
 
-const VALID_STATUSES: ApprovalStatusType[] = [
+const VALID_STATUSES: ApprovalStatusExtended[] = [
   'pending', 'approved', 'rejected', 'expired', 'escalated'
 ];
 
-const STATUS_TRANSITIONS: Record<ApprovalStatusType, ApprovalStatusType[]> = {
+const STATUS_TRANSITIONS: Record<ApprovalStatusExtended, ApprovalStatusExtended[]> = {
   pending: ['approved', 'rejected', 'expired', 'escalated'],
   escalated: ['approved', 'rejected', 'expired'],
   approved: [],
@@ -21,7 +18,7 @@ const STATUS_TRANSITIONS: Record<ApprovalStatusType, ApprovalStatusType[]> = {
 };
 
 interface ApprovalStatusProps {
-  value: ApprovalStatusType;
+  value: ApprovalStatusExtended;
 }
 
 export class ApprovalStatus extends ValueObject<ApprovalStatusProps> {
@@ -29,12 +26,12 @@ export class ApprovalStatus extends ValueObject<ApprovalStatusProps> {
     super(props);
   }
 
-  get value(): ApprovalStatusType {
+  get value(): ApprovalStatusExtended {
     return this.props.value;
   }
 
   static create(status: string): ApprovalStatus {
-    const normalized = status.toLowerCase() as ApprovalStatusType;
+    const normalized = status.toLowerCase() as ApprovalStatusExtended;
     if (!VALID_STATUSES.includes(normalized)) {
       throw new DomainError(`Status de aprovação inválido: ${status}`);
     }

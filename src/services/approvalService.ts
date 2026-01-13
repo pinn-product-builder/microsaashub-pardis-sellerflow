@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { EdgeFunctions } from "./edgeFunctions";
 import { ApprovalStatus, ApprovalStatusType } from "@/domain/approval/value-objects/ApprovalStatus";
+import { ApprovalStatusExtended } from "@/types/domain";
 
 export type ApprovalStatusLegacy = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'ESCALATED';
 

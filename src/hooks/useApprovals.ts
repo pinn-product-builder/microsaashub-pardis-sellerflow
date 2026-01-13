@@ -65,9 +65,13 @@ export function useCreateApprovalRequest() {
       const { data, error } = await supabase
         .from('approval_requests')
         .insert({
-          ...input,
+          quote_id: input.quote_id,
+          rule_id: input.rule_id,
+          quote_total: input.quote_total,
+          quote_margin_percent: input.quote_margin_percent,
+          reason: input.reason,
           requested_by: user.id,
-          status: 'pending' as ApprovalStatus,
+          status: 'pending',
         })
         .select()
         .single();
@@ -107,11 +111,11 @@ export function useApproveRequest() {
       const { data, error } = await supabase
         .from('approval_requests')
         .update({
-          status: 'approved' as ApprovalStatus,
+          status: 'approved',
           approved_by: user.id,
           comments,
           decided_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', id)
         .select('*, quote:quotes(*)')
         .single();
@@ -155,11 +159,11 @@ export function useRejectRequest() {
       const { data, error } = await supabase
         .from('approval_requests')
         .update({
-          status: 'rejected' as ApprovalStatus,
+          status: 'rejected',
           approved_by: user.id,
           comments,
           decided_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', id)
         .select('*, quote:quotes(*)')
         .single();
