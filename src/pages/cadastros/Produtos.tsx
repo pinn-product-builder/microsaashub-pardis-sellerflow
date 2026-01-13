@@ -50,7 +50,7 @@ import {
   Download
 } from 'lucide-react';
 import { useProducts, useProductCategories, useUpdateProduct, useBatchUpdateProducts } from '@/hooks/useProducts';
-import { StockIndicator } from '@/components/cpq/display/StockIndicator';
+import { StockIndicator } from '@/components/seller-flow/display/StockIndicator';
 import { BatchActionsBar } from '@/components/products/BatchActionsBar';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

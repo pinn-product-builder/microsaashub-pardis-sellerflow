@@ -1,5 +1,5 @@
 
-import { Product, Customer, QuoteItem } from '@/types/cpq';
+import { Product, Customer, QuoteItem } from '@/types/seller-flow';
 import { PricingService } from './pricingService';
 import { PriceTableService, PriceTableItem } from './priceTableService';
 

@@ -1,7 +1,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { VTEXConfig } from '@/components/cpq/integrations/VTEXConfig';
-import { VTEXMonitor } from '@/components/cpq/integrations/VTEXMonitor';
+import { VTEXConfig } from '@/components/seller-flow/integrations/VTEXConfig';
+import { VTEXMonitor } from '@/components/seller-flow/integrations/VTEXMonitor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Calculator, AlertCircle, CheckCircle, TrendingDown } from 'lucide-react';
 import { TaxService } from '@/services/taxService';
-import { TaxCalculationContext, TaxCalculationResult } from '@/types/cpq';
+import { TaxCalculationContext, TaxCalculationResult } from '@/types/seller-flow';
 import { mockProducts, mockCustomers } from '@/data/mockData';
 
 export function TaxCalculator() {

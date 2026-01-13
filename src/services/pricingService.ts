@@ -1,4 +1,4 @@
-import { Product, Customer, QuoteItem, TaxRule, FreightRate, PricingRule } from '@/types/cpq';
+import { Product, Customer, QuoteItem, TaxRule, FreightRate, PricingRule } from '@/types/seller-flow';
 import { taxRules, freightRates, pricingRules } from '@/data/mockData';
 import { AdvancedPricingEngine, PricingContext } from './advancedPricingEngine';
 import { ApprovalService } from './approvalService';
