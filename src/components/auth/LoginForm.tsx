@@ -41,7 +41,10 @@ export default function LoginForm() {
         title: 'Login realizado com sucesso!',
         description: 'Redirecionando para o dashboard...'
       });
-      navigate('/cpq/dashboard');
+      // Aguardar o estado de autenticação ser atualizado antes de navegar
+      setTimeout(() => {
+        navigate('/cpq/dashboard');
+      }, 100);
     } catch (error) {
       toast({
         title: 'Erro no login',
