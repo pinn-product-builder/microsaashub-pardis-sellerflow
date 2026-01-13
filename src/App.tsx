@@ -26,6 +26,7 @@ import VisualizarCotacao from '@/pages/cpq/VisualizarCotacao';
 import Aprovacoes from '@/pages/cpq/Aprovacoes';
 import Configuracoes from '@/pages/cpq/Configuracoes';
 import Importacao from '@/pages/cpq/Importacao';
+import Documentacao from '@/pages/cpq/Documentacao';
 
 // Cadastros Pages (MÓDULO ATIVO)
 import Clientes from '@/pages/cadastros/Clientes';
@@ -88,6 +89,7 @@ function App() {
             <Route path="/cpq/aprovacoes" element={<ProtectedRoute><AppLayout><Aprovacoes /></AppLayout></ProtectedRoute>} />
             <Route path="/cpq/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
             <Route path="/cpq/importacao" element={<ProtectedRoute><AppLayout><Importacao /></AppLayout></ProtectedRoute>} />
+            <Route path="/cpq/documentacao" element={<ProtectedRoute><AppLayout><Documentacao /></AppLayout></ProtectedRoute>} />
 
             {/* Cadastros Routes - Módulo de Cadastros (ATIVO) */}
             <Route path="/cadastros/clientes" element={<ProtectedRoute><AppLayout><Clientes /></AppLayout></ProtectedRoute>} />
