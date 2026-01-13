@@ -69,7 +69,7 @@ export default function CPQDashboard() {
         description="Visão geral das cotações do sistema"
       >
         <Button asChild>
-          <Link to="/cpq/nova-cotacao">
+          <Link to="/seller-flow/nova-cotacao">
             <Plus className="h-4 w-4 mr-2" />
             Nova Cotação
           </Link>
@@ -181,7 +181,7 @@ export default function CPQDashboard() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {stats.pendingApprovals > 0 ? (
-                      <Link to="/cpq/aprovacoes" className="text-amber-600 hover:underline">
+                      <Link to="/seller-flow/aprovacoes" className="text-amber-600 hover:underline">
                         Ver aprovações →
                       </Link>
                     ) : (
@@ -218,7 +218,7 @@ export default function CPQDashboard() {
                       <div key={quote.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                         <div className="min-w-0 flex-1">
                           <Link 
-                            to={`/cpq/cotacao/${quote.id}`}
+                            to={`/seller-flow/cotacao/${quote.id}`}
                             className="font-medium text-primary hover:underline block"
                           >
                             {quote.quote_number}
@@ -247,20 +247,20 @@ export default function CPQDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Button asChild className="w-full justify-start">
-                <Link to="/cpq/nova-cotacao">
+                <Link to="/seller-flow/nova-cotacao">
                   <Plus className="mr-2 h-4 w-4" />
                   Nova Cotação
                 </Link>
               </Button>
               <Button asChild variant="outline" className="w-full justify-start">
-                <Link to="/cpq/historico">
+                <Link to="/seller-flow/historico">
                   <FileText className="mr-2 h-4 w-4" />
                   Ver Todas as Cotações
                 </Link>
               </Button>
               {stats.pendingApprovals > 0 && (
                 <Button asChild variant="outline" className="w-full justify-start border-amber-500/50 text-amber-700 hover:bg-amber-50">
-                  <Link to="/cpq/aprovacoes">
+                  <Link to="/seller-flow/aprovacoes">
                     <Clock className="mr-2 h-4 w-4" />
                     Ver Aprovações Pendentes ({stats.pendingApprovals})
                   </Link>

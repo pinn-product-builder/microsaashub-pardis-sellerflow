@@ -1,5 +1,5 @@
 
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -178,7 +178,7 @@ export class PDFGenerator {
 
           <div style="margin-top: 50px; text-align: center; font-size: 12px; color: #666;">
             <p>Esta é uma cotação válida até ${formatDate(quote.validUntil)}</p>
-            <p>Sistema Pardis - Cotações</p>
+            <p>Pardis Seller Flow - Cotações</p>
           </div>
         </body>
       </html>

@@ -102,7 +102,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
             <TableRow key={quote.id}>
               <TableCell className="font-medium">
                 <Link 
-                  to={`/cpq/cotacao/${quote.id}`}
+                  to={`/seller-flow/cotacao/${quote.id}`}
                   className="text-primary hover:underline"
                 >
                   {quote.number}
@@ -149,14 +149,14 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                      <Link to={`/cpq/cotacao/${quote.id}`}>
+                      <Link to={`/seller-flow/cotacao/${quote.id}`}>
                         <Eye className="mr-2 h-4 w-4" />
                         Visualizar
                       </Link>
                     </DropdownMenuItem>
                     {quote.status === 'draft' && (
                       <DropdownMenuItem asChild>
-                        <Link to={`/cpq/editar/${quote.id}`}>
+                        <Link to={`/seller-flow/editar/${quote.id}`}>
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </Link>

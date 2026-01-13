@@ -12,7 +12,7 @@ import {
   Shield
 } from 'lucide-react';
 import { ValidationResult } from '@/types/vtex';
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { ConversionService } from '@/services/conversionService';
 
 interface PreSendValidationProps {

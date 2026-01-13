@@ -42,7 +42,7 @@ export default function LoginForm() {
         description: 'Redirecionando para o dashboard...'
       });
       // Navegar diretamente - login() agora aguarda autenticação completa
-      navigate('/cpq/dashboard');
+      navigate('/seller-flow/dashboard');
     } catch (error) {
       toast({
         title: 'Erro no login',

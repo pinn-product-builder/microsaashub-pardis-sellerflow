@@ -5,18 +5,18 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Save, Send, ArrowLeft, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
-import { CustomerSelector } from '@/components/cpq/forms/CustomerSelector';
-import { ProductSelector } from '@/components/cpq/forms/ProductSelector';
-import { QuoteItemsTable } from '@/components/cpq/tables/QuoteItemsTable';
-import { PriceSummary } from '@/components/cpq/display/PriceSummary';
-import { PaymentConditions } from '@/components/cpq/forms/PaymentConditions';
-import { AuthorizationBadge } from '@/components/cpq/display/AuthorizationBadge';
-import { useCPQStore } from '@/stores/cpqStore';
+import { CustomerSelector } from '@/components/seller-flow/forms/CustomerSelector';
+import { ProductSelector } from '@/components/seller-flow/forms/ProductSelector';
+import { QuoteItemsTable } from '@/components/seller-flow/tables/QuoteItemsTable';
+import { PriceSummary } from '@/components/seller-flow/display/PriceSummary';
+import { PaymentConditions } from '@/components/seller-flow/forms/PaymentConditions';
+import { AuthorizationBadge } from '@/components/seller-flow/display/AuthorizationBadge';
+import { useSellerFlowStore } from '@/stores/sellerFlowStore';
 import { QuoteService } from '@/services/quoteService';
 import { VTEXService } from '@/services/vtexService';
 import { useToast } from '@/hooks/use-toast';
 import { usePardisQuote, getApproverLabel } from '@/hooks/usePardisQuote';
-import { Customer } from '@/types/cpq';
+import { Customer } from '@/types/seller-flow';
 
 export default function NovaQuotacao() {
   const { id } = useParams();
@@ -40,7 +40,7 @@ export default function NovaQuotacao() {
     setNotes,
     clearQuote,
     setCurrentQuote
-  } = useCPQStore();
+  } = useSellerFlowStore();
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
   
@@ -348,9 +348,9 @@ export default function NovaQuotacao() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/cpq">
+            <Link to="/seller-flow">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar ao CPQ
+              Voltar ao Seller Flow
             </Link>
           </Button>
           <div>

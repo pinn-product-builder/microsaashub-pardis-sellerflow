@@ -33,7 +33,7 @@ export interface TierPrice {
   discount: number;
 }
 
-const STORAGE_KEY = 'cpq_price_tables';
+const STORAGE_KEY = 'seller_flow_price_tables';
 
 export class PriceTableService {
   private static getTables(): PriceTable[] {

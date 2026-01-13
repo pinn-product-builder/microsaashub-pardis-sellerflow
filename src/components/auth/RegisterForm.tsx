@@ -49,7 +49,7 @@ export default function RegisterForm() {
         title: 'Cadastro realizado com sucesso!',
         description: 'Verifique seu email para confirmar a conta ou faça login.'
       });
-      navigate('/cpq/dashboard');
+      navigate('/seller-flow/dashboard');
     } catch (error) {
       toast({
         title: 'Erro no cadastro',

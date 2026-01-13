@@ -112,7 +112,7 @@ export default function Documentacao() {
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">Regras de Negócio - Sistema CPQ Pardis</CardTitle>
+                  <CardTitle className="text-xl">Regras de Negócio - Pardis Seller Flow</CardTitle>
                   <CardDescription>
                     Documentação completa dos módulos focais desta etapa do projeto
                   </CardDescription>

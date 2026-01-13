@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Filter, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { QuotesTable } from '@/components/cpq/tables/QuotesTable';
-import { QuoteFilters } from '@/components/cpq/tables/QuoteFilters';
+import { QuotesTable } from '@/components/seller-flow/tables/QuotesTable';
+import { QuoteFilters } from '@/components/seller-flow/tables/QuoteFilters';
 import { useQuotes } from '@/hooks/useQuotes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -108,7 +108,7 @@ export default function Historico() {
           </p>
         </div>
         <Button asChild>
-          <Link to="/cpq/nova-cotacao">
+          <Link to="/seller-flow/nova-cotacao">
             <Plus className="h-4 w-4 mr-2" />
             Nova Cotação
           </Link>
