@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PageContainer, PageHeader, PageContent } from '@/components/layout/Page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calculator, Shield, CreditCard, Clock, Settings } from 'lucide-react';
@@ -10,11 +11,15 @@ import { PricingFormulaCard } from '@/components/cpq/config/PricingFormulaCard';
 import { MarginSimulator } from '@/components/cpq/config/MarginSimulator';
 import { AuthRequiredCard } from '@/components/cpq/config/AuthRequiredCard';
 import { usePricingConfigs } from '@/hooks/usePricingConfig';
+import { usePricingEngineConfig, useActiveApprovalRulesForEngine } from '@/hooks/usePricingEngineConfig';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Configuracoes() {
   const { isAuthenticated } = useAuth();
   const { data: configs } = usePricingConfigs();
+  const { data: engineConfig } = usePricingEngineConfig();
+  const { data: approvalRules } = useActiveApprovalRulesForEngine();
+  const [activeTab, setActiveTab] = useState('pricing');
   
   // Se não autenticado, mostrar card de autenticação
   if (!isAuthenticated) {
@@ -31,6 +36,10 @@ export default function Configuracoes() {
     );
   }
 
+  const handleNavigateToTab = (tab: string) => {
+    setActiveTab(tab);
+  };
+
   return (
     <PageContainer>
       <PageHeader
@@ -38,13 +47,13 @@ export default function Configuracoes() {
         description="Gerencie os parâmetros de precificação, aprovação e validade de cotações"
       />
       <PageContent>
-        <Tabs defaultValue="pricing" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               <span className="hidden sm:inline">Pricing</span>
             </TabsTrigger>
-            <TabsTrigger value="engine" className="flex items-center gap-2">
+            <TabsTrigger value="motor" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Motor</span>
             </TabsTrigger>
@@ -64,7 +73,12 @@ export default function Configuracoes() {
 
           <TabsContent value="pricing" className="space-y-6">
             {/* Fórmula explicativa */}
-            <PricingFormulaCard config={configs?.[0]} />
+            <PricingFormulaCard 
+              config={configs?.[0]} 
+              engineConfig={engineConfig}
+              approvalRules={approvalRules}
+              onNavigateToTab={handleNavigateToTab}
+            />
             
             {/* Simulador de margem */}
             <MarginSimulator configs={configs} />
@@ -73,7 +87,7 @@ export default function Configuracoes() {
             <PricingConfigTab />
           </TabsContent>
 
-          <TabsContent value="engine" className="space-y-6">
+          <TabsContent value="motor" className="space-y-6">
             <EngineConfigTab />
           </TabsContent>
 
