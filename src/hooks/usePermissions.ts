@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { LogService } from '@/services/logService';
 
 export function usePermissions() {
   const { user, role, isLoading: authLoading } = useAuth();
@@ -20,13 +19,11 @@ export function usePermissions() {
   const fetchPermissions = useCallback(async () => {
     // Não buscar se auth ainda está carregando
     if (authLoading) {
-      LogService.debug('usePermissions', 'Aguardando auth carregar');
       return;
     }
 
     // Se não há usuário, limpar permissões
     if (!userId) {
-      LogService.debug('usePermissions', 'Sem usuário - limpando permissões');
       setPermissions([]);
       setIsLoading(false);
       return;
@@ -34,33 +31,27 @@ export function usePermissions() {
 
     // Evitar fetch duplicado para o mesmo usuário/role
     if (lastUserIdRef.current === userId && lastRoleRef.current === userRole) {
-      LogService.debug('usePermissions', 'Dados já carregados para este usuário/role');
       return;
     }
 
     // Prevenir chamadas simultâneas
     if (fetchingRef.current) {
-      LogService.debug('usePermissions', 'Fetch já em andamento');
       return;
     }
 
     fetchingRef.current = true;
-    LogService.info('usePermissions', 'Buscando permissões', { userId, role: userRole });
 
     try {
       let perms: string[] = [];
       
       // Admin tem todas as permissões
       if (userRole === 'admin') {
-        LogService.debug('usePermissions', 'Usuário admin - buscando todas as permissões');
         const { data: allPerms, error } = await supabase
           .from('permissions')
           .select('code')
           .eq('is_active', true);
         
-        if (error) {
-          LogService.error('usePermissions', 'Erro ao buscar permissões admin', error);
-        } else {
+        if (!error) {
           perms = allPerms?.map(p => p.code) ?? [];
         }
       } else {
@@ -69,9 +60,7 @@ export function usePermissions() {
           _user_id: userId
         });
 
-        if (error) {
-          LogService.error('usePermissions', 'Erro ao buscar permissões via RPC', error);
-        } else {
+        if (!error) {
           perms = data?.map((p: { permission_code: string }) => p.permission_code) ?? [];
         }
       }
@@ -81,15 +70,14 @@ export function usePermissions() {
       lastRoleRef.current = userRole;
       
       setPermissions(perms);
-      LogService.info('usePermissions', 'Permissões carregadas', { count: perms.length });
     } catch (error) {
-      LogService.error('usePermissions', 'Erro ao buscar permissões', error);
+      console.error('Erro ao buscar permissões:', error);
       setPermissions([]);
     } finally {
       setIsLoading(false);
       fetchingRef.current = false;
     }
-  }, [userId, userRole, authLoading]); // Dependências primitivas apenas
+  }, [userId, userRole, authLoading]);
 
   useEffect(() => {
     fetchPermissions();
