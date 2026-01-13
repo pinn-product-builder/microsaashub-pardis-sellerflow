@@ -1,8 +1,8 @@
 
 import { create } from 'zustand';
-import { Quote, QuoteItem, Customer, Product } from '@/types/cpq';
+import { Quote, QuoteItem, Customer, Product } from '@/types/seller-flow';
 
-interface CPQStore {
+interface SellerFlowStore {
   // Estado da cotação atual
   currentQuote: Partial<Quote> | null;
   selectedCustomer: Customer | null;
@@ -38,7 +38,7 @@ interface CPQStore {
   setIntegrationStatus: (integration: 'vtex', status: { enabled: boolean; configured: boolean }) => void;
 }
 
-export const useCPQStore = create<CPQStore>((set, get) => ({
+export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
   // Estado inicial
   currentQuote: null,
   selectedCustomer: null,
@@ -114,5 +114,5 @@ export const useCPQStore = create<CPQStore>((set, get) => ({
   }))
 }));
 
-// Alias para compatibilidade com novos nomes
-export const useSellerFlowStore = useCPQStore;
+// Alias para compatibilidade com código legado
+export const useCPQStore = useSellerFlowStore;

@@ -1,5 +1,5 @@
 
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -35,7 +35,7 @@ Para aprovação ou esclarecimentos, entre em contato conosco.
 
 Atenciosamente,
 Equipe Comercial
-Sistema Pardis`;
+Pardis Seller Flow`;
   }
 
   static getCustomMessage(quote: Quote, customText: string): string {

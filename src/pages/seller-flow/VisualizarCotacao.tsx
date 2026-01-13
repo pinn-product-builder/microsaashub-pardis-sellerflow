@@ -24,14 +24,14 @@ import {
 import { QuoteService } from '@/services/quoteService';
 import { VTEXService } from '@/services/vtexService';
 import { ConversionService } from '@/services/conversionService';
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { ValidationResult } from '@/types/vtex';
-import { QuoteStatusBadge } from '@/components/cpq/display/QuoteStatusBadge';
-import { QuoteItemsTable } from '@/components/cpq/tables/QuoteItemsTable';
-import { ExportActions } from '@/components/cpq/actions/ExportActions';
-import { EmailDialog } from '@/components/cpq/dialogs/EmailDialog';
-import { ConversionTimeline } from '@/components/cpq/conversion/ConversionTimeline';
-import { PreSendValidation } from '@/components/cpq/conversion/PreSendValidation';
+import { QuoteStatusBadge } from '@/components/seller-flow/display/QuoteStatusBadge';
+import { QuoteItemsTable } from '@/components/seller-flow/tables/QuoteItemsTable';
+import { ExportActions } from '@/components/seller-flow/actions/ExportActions';
+import { EmailDialog } from '@/components/seller-flow/dialogs/EmailDialog';
+import { ConversionTimeline } from '@/components/seller-flow/conversion/ConversionTimeline';
+import { PreSendValidation } from '@/components/seller-flow/conversion/PreSendValidation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -96,7 +96,7 @@ export default function VisualizarCotacao() {
     });
 
     if (duplicatedQuote?.id) {
-      navigate(`/cpq/cotacao/${duplicatedQuote.id}`);
+      navigate(`/seller-flow/cotacao/${duplicatedQuote.id}`);
     }
   };
 
@@ -195,7 +195,7 @@ export default function VisualizarCotacao() {
       <div className="space-y-6">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/cpq/historico">
+            <Link to="/seller-flow/historico">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar ao Histórico
             </Link>
@@ -225,7 +225,7 @@ export default function VisualizarCotacao() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/cpq/historico">
+            <Link to="/seller-flow/historico">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar ao Histórico
             </Link>
@@ -242,7 +242,7 @@ export default function VisualizarCotacao() {
           <ExportActions quote={quote} />
           {quote.status === 'draft' && (
             <Button variant="outline" asChild>
-              <Link to={`/cpq/editar/${quote.id}`}>
+              <Link to={`/seller-flow/editar/${quote.id}`}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </Link>

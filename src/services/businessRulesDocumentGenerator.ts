@@ -1,4 +1,4 @@
-// Gerador de documento PDF de Regras de Negócio - Sistema CPQ Pardis
+// Gerador de documento PDF de Regras de Negócio - Pardis Seller Flow
 // Focado nos módulos: Login/Logout, Cotação, Cadastros e Gestão de Usuários
 
 export interface ApprovalRule {
@@ -111,7 +111,7 @@ export function generateBusinessRulesHTML(data: DocumentData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Regras de Negócio - Sistema CPQ Pardis</title>
+  <title>Regras de Negócio - Pardis Seller Flow</title>
   <style>
     @page {
       size: A4;
@@ -497,7 +497,7 @@ export function generateBusinessRulesHTML(data: DocumentData): string {
     <div class="cover-logo">
       <span>P</span>
     </div>
-    <h1>Sistema CPQ Pardis</h1>
+    <h1>Pardis Seller Flow</h1>
     <h2>Documento de Regras de Negócio</h2>
     <div class="cover-meta">
       <p><strong>Versão:</strong> ${version}</p>
@@ -510,7 +510,7 @@ export function generateBusinessRulesHTML(data: DocumentData): string {
   <div class="page">
     <div class="content">
       <div class="header">
-        <span class="header-title">Sistema CPQ Pardis - Regras de Negócio</span>
+        <span class="header-title">Pardis Seller Flow - Regras de Negócio</span>
         <span class="header-version">v${version}</span>
       </div>
       
@@ -529,7 +529,7 @@ export function generateBusinessRulesHTML(data: DocumentData): string {
       <h2>1. Visão Geral do Sistema</h2>
       
       <div class="intro-box">
-        <p>O Sistema CPQ (Configure, Price, Quote) Pardis é uma solução integrada para gestão de cotações comerciais, desenvolvida para otimizar o processo de precificação e aprovação de propostas comerciais.</p>
+        <p>O Pardis Seller Flow é uma solução integrada para gestão de cotações comerciais, desenvolvida para otimizar o processo de precificação e aprovação de propostas comerciais.</p>
       </div>
 
       <h3>1.1 Escopo desta Documentação</h3>
@@ -593,7 +593,7 @@ export function generateBusinessRulesHTML(data: DocumentData): string {
       </table>
 
       <div class="footer">
-        <span>Sistema CPQ Pardis - Documento Confidencial</span>
+        <span>Pardis Seller Flow - Documento Confidencial</span>
         <span>Página 1</span>
       </div>
     </div>

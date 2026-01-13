@@ -6,22 +6,22 @@ import { cn } from '@/lib/utils';
 const navigation = [
   {
     name: 'Dashboard',
-    href: '/cpq/dashboard',
+    href: '/seller-flow/dashboard',
     icon: BarChart3,
   },
   {
     name: 'Nova Cotação',
-    href: '/cpq/nova',
+    href: '/seller-flow/nova',
     icon: Calculator,
   },
   {
     name: 'Histórico',
-    href: '/cpq/historico',
+    href: '/seller-flow/historico',
     icon: History,
   },
 ];
 
-export default function CPQLayout() {
+export default function SellerFlowLayout() {
   const location = useLocation();
 
   return (
@@ -33,7 +33,7 @@ export default function CPQLayout() {
             <div className="flex items-center flex-shrink-0 px-4">
               <FileText className="h-8 w-8 text-primary" />
               <span className="ml-2 text-xl font-semibold text-foreground">
-                CPQ Pardis
+                Pardis Seller Flow
               </span>
             </div>
             <div className="mt-8 flex-grow flex flex-col">

@@ -1,5 +1,5 @@
 
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

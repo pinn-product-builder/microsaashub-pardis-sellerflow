@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Download, FileText, Table } from 'lucide-react';
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { PDFGenerator } from './PDFGenerator';
 import { ExcelExport } from './ExcelExport';
 import { useToast } from '@/hooks/use-toast';

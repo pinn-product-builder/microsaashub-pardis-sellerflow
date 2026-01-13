@@ -19,7 +19,7 @@ import { Link } from 'react-router-dom';
 import { usePendingApprovals, useApproveRequest, useRejectRequest, useApprovalStats } from '@/hooks/useApprovals';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer, PageHeader, PageContent } from '@/components/layout/Page';
-import { MarginIndicator } from '@/components/cpq/display/MarginIndicator';
+import { MarginIndicator } from '@/components/seller-flow/display/MarginIndicator';
 import {
   Dialog,
   DialogContent,
@@ -119,7 +119,7 @@ export default function Aprovacoes() {
         description="Gerencie as solicitações de aprovação de cotações"
       >
         <Button variant="outline" asChild>
-          <Link to="/cpq/dashboard">
+          <Link to="/seller-flow/dashboard">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar ao Dashboard
           </Link>
@@ -223,7 +223,7 @@ export default function Aprovacoes() {
                         <div className="space-y-2">
                           <div className="flex items-center gap-3">
                             <Link 
-                              to={`/cpq/cotacao/${approval.quote_id}`}
+                              to={`/seller-flow/cotacao/${approval.quote_id}`}
                               className="font-medium text-primary hover:underline"
                             >
                               Ver Cotação

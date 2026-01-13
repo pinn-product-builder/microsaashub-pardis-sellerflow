@@ -1,6 +1,6 @@
 // =============================================================================
 // TIPOS DE DOMÍNIO UNIFICADOS
-// Arquivo consolidado de tipos para o sistema Pardis CPQ
+// Arquivo consolidado de tipos para o Pardis Seller Flow
 // =============================================================================
 
 // -----------------------------------------------------------------------------

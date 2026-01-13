@@ -1,6 +1,6 @@
 
 import { VTEXConfig, VTEXOrder, VTEXIntegrationLog, VTEXIntegrationSettings } from '@/types/vtex';
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 
 const STORAGE_KEY_SETTINGS = 'vtex_integration_settings';
 const STORAGE_KEY_LOGS = 'vtex_integration_logs';
@@ -43,7 +43,7 @@ export class VTEXService {
       isEnabled: true,
       config,
       defaultSalesChannel: '1',
-      defaultAffiliate: 'CPQ',
+      defaultAffiliate: 'SELLER_FLOW',
       defaultSeller: '1',
       productMapping: {},
       approvalRules: [],
@@ -94,7 +94,7 @@ export class VTEXService {
     }
 
     const order: VTEXOrder = {
-      origin: 'CPQ',
+      origin: 'SELLER_FLOW',
       affiliate: settings.defaultAffiliate,
       salesChannel: settings.defaultSalesChannel,
       value: quote.total * 100, // VTEX usa centavos
@@ -163,7 +163,7 @@ export class VTEXService {
         transactions: [{
           isActive: true,
           transactionId: crypto.randomUUID(),
-          merchantName: 'CPQ Store',
+          merchantName: 'Pardis Seller Flow',
           payments: [{
             id: crypto.randomUUID(),
             paymentSystem: '2',

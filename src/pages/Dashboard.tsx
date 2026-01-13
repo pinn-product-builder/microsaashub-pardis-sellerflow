@@ -49,7 +49,7 @@ export default function Dashboard() {
                   <Plus className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <Link to="/cpq/nova-cotacao">
+                  <Link to="/seller-flow/nova-cotacao">
                     <Button className="w-full">
                       <Calculator className="mr-2 h-4 w-4" />
                       Criar Cotação
@@ -64,7 +64,7 @@ export default function Dashboard() {
                   <History className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <Link to="/cpq/historico">
+                  <Link to="/seller-flow/historico">
                     <Button variant="outline" className="w-full">
                       <FileText className="mr-2 h-4 w-4" />
                       Ver Cotações

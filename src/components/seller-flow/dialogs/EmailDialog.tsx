@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { EmailTemplate } from './EmailTemplate';
 import { useToast } from '@/hooks/use-toast';
 import { Send, FileText } from 'lucide-react';
