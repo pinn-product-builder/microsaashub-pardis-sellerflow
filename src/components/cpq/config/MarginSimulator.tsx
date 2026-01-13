@@ -25,14 +25,24 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
   const calculation = useMemo(() => {
     if (!selectedConfig || baseCost <= 0 || offeredPrice <= 0) return null;
 
-    const adminCost = baseCost * (selectedConfig.admin_percent / 100);
-    const logisticsCost = baseCost * (selectedConfig.logistics_percent / 100);
+    // Custos baseados no preço ofertado (conforme JSON Pardis)
+    const adminCost = offeredPrice * (selectedConfig.admin_percent / 100);
+    const logisticsCost = offeredPrice * (selectedConfig.logistics_percent / 100);
     const icmsCost = offeredPrice * (selectedConfig.icms_percent / 100);
     const pisCofins = offeredPrice * (selectedConfig.pis_cofins_percent / 100);
     
     const totalCosts = baseCost + adminCost + logisticsCost + icmsCost + pisCofins;
-    const marginValue = offeredPrice - totalCosts;
-    const marginPercent = ((offeredPrice - totalCosts) / offeredPrice) * 100;
+    
+    // Margem Bruta = (PV / Custo) - 1 (conforme JSON)
+    const marginBrutaPercent = baseCost > 0 ? ((offeredPrice / baseCost) - 1) * 100 : 0;
+    
+    // Margem Técnica = (PV / (Custo + Adm + Log)) - 1 (conforme JSON)
+    const techCosts = baseCost + adminCost + logisticsCost;
+    const marginTecnicaPercent = techCosts > 0 ? ((offeredPrice / techCosts) - 1) * 100 : 0;
+    
+    // Margem Líquida = (PV - Custos) / PV (conforme JSON)
+    const marginLiquidaValue = offeredPrice - totalCosts;
+    const marginLiquidaPercent = offeredPrice > 0 ? ((offeredPrice - totalCosts) / offeredPrice) * 100 : 0;
     
     const totalOverhead = selectedConfig.admin_percent + selectedConfig.logistics_percent + 
                           selectedConfig.icms_percent + selectedConfig.pis_cofins_percent;
@@ -41,16 +51,16 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
 
     const authThreshold = engineConfig?.margin_authorized_threshold ?? 0;
     const authResult = approvalRules && approvalRules.length > 0
-      ? PardisMarginEngine.determineAuthorizationDynamic(marginPercent, approvalRules, authThreshold)
-      : PardisMarginEngine.determineAuthorizationWithThreshold(marginPercent, authThreshold);
+      ? PardisMarginEngine.determineAuthorizationDynamic(marginLiquidaPercent, approvalRules, authThreshold)
+      : PardisMarginEngine.determineAuthorizationWithThreshold(marginLiquidaPercent, authThreshold);
 
     const marginColor = engineConfig
-      ? PardisMarginEngine.getMarginColorDynamic(marginPercent, {
+      ? PardisMarginEngine.getMarginColorDynamic(marginLiquidaPercent, {
           green: engineConfig.margin_green_threshold,
           yellow: engineConfig.margin_yellow_threshold,
           orange: engineConfig.margin_orange_threshold,
         })
-      : (marginPercent > 0 ? 'green' : marginPercent === 0 ? 'yellow' : 'red');
+      : (marginLiquidaPercent > 0 ? 'green' : marginLiquidaPercent === 0 ? 'yellow' : 'red');
 
     const approverLabels: Record<string, string> = {
       vendedor: 'Vendedor', coordenador: 'Coordenador', gerente: 'Gerente', diretor: 'Diretor', admin: 'Administrador',
@@ -59,7 +69,17 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
     const ruleName = 'ruleName' in authResult ? authResult.ruleName : undefined;
 
     return {
-      adminCost, logisticsCost, icmsCost, pisCofins, totalCosts, marginValue, marginPercent, minimumPrice,
+      adminCost, 
+      logisticsCost, 
+      icmsCost, 
+      pisCofins, 
+      totalCosts,
+      // 3 tipos de margem
+      marginBrutaPercent,
+      marginTecnicaPercent,
+      marginLiquidaPercent,
+      marginLiquidaValue,
+      minimumPrice,
       discount: discount > 0 ? discount : 0,
       authorization: {
         status: authResult.isAuthorized ? 'Autorizado' : 'Requer Aprovação',
@@ -72,20 +92,27 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-  const getMarginColor = () => {
-    if (!calculation) return 'text-muted-foreground';
+  const getMarginColor = (marginPercent: number) => {
     const thresholds = engineConfig || { margin_green_threshold: 10, margin_yellow_threshold: 0, margin_orange_threshold: -5 };
-    if (calculation.marginPercent >= thresholds.margin_green_threshold) return 'text-green-600';
-    if (calculation.marginPercent >= thresholds.margin_yellow_threshold) return 'text-green-500';
-    if (calculation.marginPercent >= thresholds.margin_orange_threshold) return 'text-yellow-500';
+    if (marginPercent >= thresholds.margin_green_threshold) return 'text-green-600';
+    if (marginPercent >= thresholds.margin_yellow_threshold) return 'text-green-500';
+    if (marginPercent >= thresholds.margin_orange_threshold) return 'text-yellow-500';
     return 'text-red-500';
+  };
+
+  const getMarginBgColor = (marginPercent: number) => {
+    const thresholds = engineConfig || { margin_green_threshold: 10, margin_yellow_threshold: 0, margin_orange_threshold: -5 };
+    if (marginPercent >= thresholds.margin_green_threshold) return 'bg-green-500/10 border-green-500/30';
+    if (marginPercent >= thresholds.margin_yellow_threshold) return 'bg-green-500/5 border-green-500/20';
+    if (marginPercent >= thresholds.margin_orange_threshold) return 'bg-yellow-500/10 border-yellow-500/30';
+    return 'bg-red-500/10 border-red-500/30';
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" />Simulador de Margem</CardTitle>
-        <CardDescription>Teste diferentes cenários de preço (usando regras dinâmicas)</CardDescription>
+        <CardDescription>Teste diferentes cenários de preço com os 3 tipos de margem</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -111,20 +138,55 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
 
         {calculation && (
           <div className="space-y-4">
-            <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {calculation.marginPercent > 0 ? <TrendingUp className="h-5 w-5 text-green-500" /> : calculation.marginPercent < 0 ? <TrendingDown className="h-5 w-5 text-red-500" /> : <Minus className="h-5 w-5 text-yellow-500" />}
-                <div>
-                  <p className="text-sm text-muted-foreground">Margem Calculada</p>
-                  <p className={`text-2xl font-bold ${getMarginColor()}`}>{calculation.marginPercent.toFixed(2)}%</p>
+            {/* 3 Tipos de Margem */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Margem Bruta */}
+              <div className={`p-4 rounded-lg border ${getMarginBgColor(calculation.marginBrutaPercent)}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Margem Bruta</p>
                 </div>
+                <p className={`text-2xl font-bold ${getMarginColor(calculation.marginBrutaPercent)}`}>
+                  {calculation.marginBrutaPercent >= 0 ? '+' : ''}{calculation.marginBrutaPercent.toFixed(2)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  (PV ÷ Custo) - 1
+                </p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Valor da Margem</p>
-                <p className={`text-xl font-semibold ${getMarginColor()}`}>{formatCurrency(calculation.marginValue)}</p>
+
+              {/* Margem Técnica */}
+              <div className={`p-4 rounded-lg border ${getMarginBgColor(calculation.marginTecnicaPercent)}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Margem Técnica</p>
+                </div>
+                <p className={`text-2xl font-bold ${getMarginColor(calculation.marginTecnicaPercent)}`}>
+                  {calculation.marginTecnicaPercent >= 0 ? '+' : ''}{calculation.marginTecnicaPercent.toFixed(2)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  (PV ÷ (Custo+Adm+Log)) - 1
+                </p>
+              </div>
+
+              {/* Margem Líquida */}
+              <div className={`p-4 rounded-lg border-2 ${getMarginBgColor(calculation.marginLiquidaPercent)}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-primary"></div>
+                  <p className="text-xs font-medium text-primary uppercase tracking-wide">Margem Líquida</p>
+                </div>
+                <p className={`text-2xl font-bold ${getMarginColor(calculation.marginLiquidaPercent)}`}>
+                  {calculation.marginLiquidaPercent >= 0 ? '+' : ''}{calculation.marginLiquidaPercent.toFixed(2)}%
+                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-muted-foreground">(PV - Custos) ÷ PV</p>
+                  <p className={`text-sm font-semibold ${getMarginColor(calculation.marginLiquidaPercent)}`}>
+                    {formatCurrency(calculation.marginLiquidaValue)}
+                  </p>
+                </div>
               </div>
             </div>
 
+            {/* Status de Autorização */}
             <div className={`p-4 rounded-lg border-2 ${
               calculation.authorization.color === 'green' ? 'border-green-500 bg-green-50 dark:bg-green-950/30' :
               calculation.authorization.color === 'yellow' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30' :
@@ -141,6 +203,7 @@ export function MarginSimulator({ configs }: MarginSimulatorProps) {
               </div>
             </div>
 
+            {/* Breakdown de Custos */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-3 bg-background rounded border"><p className="text-xs text-muted-foreground">Custo Admin</p><p className="font-medium">{formatCurrency(calculation.adminCost)}</p></div>
               <div className="p-3 bg-background rounded border"><p className="text-xs text-muted-foreground">Custo Logística</p><p className="font-medium">{formatCurrency(calculation.logisticsCost)}</p></div>
