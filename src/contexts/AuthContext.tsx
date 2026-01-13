@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchingRef = useRef(false);
   const mountedRef = useRef(true);
   const initializedRef = useRef(false);
+  const authCallbackRef = useRef<((success: boolean) => void) | null>(null);
 
   // Buscar perfil e role do usuário
   const fetchUserData = useCallback(async (userId: string) => {
@@ -107,6 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 isLoading: false,
                 isAuthenticated: true,
               });
+              
+              // Notificar callback pendente de login
+              if (authCallbackRef.current) {
+                authCallbackRef.current(true);
+                authCallbackRef.current = null;
+              }
             }
           }, 0);
         } else {
@@ -163,7 +170,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     
-    return data;
+    // Aguardar o estado ser atualizado pelo onAuthStateChange
+    return new Promise<typeof data>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        authCallbackRef.current = null;
+        reject(new Error('Timeout ao aguardar autenticação'));
+      }, 10000); // 10s timeout de segurança
+      
+      authCallbackRef.current = (success) => {
+        clearTimeout(timeout);
+        if (success) {
+          resolve(data);
+        } else {
+          reject(new Error('Falha na autenticação'));
+        }
+      };
+    });
   }, []);
 
   // Registro
