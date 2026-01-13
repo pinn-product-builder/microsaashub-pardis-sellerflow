@@ -167,10 +167,25 @@ serve(async (req) => {
     // Calculate freight (simplified)
     const freight = quantity * 5; // R$5 por unidade (simplificado)
 
-    // Calculate margin
+    // Calculate costs
     const totalCost = baseCost * (1 + totalOverhead / 100);
-    const marginValue = finalOfferedPrice - totalCost;
-    const marginPercent = (marginValue / totalCost) * 100;
+    const adminCost = finalOfferedPrice * (adminPercent / 100);
+    const logisticsCostValue = finalOfferedPrice * (logisticsPercent / 100);
+    const icmsCostValue = finalOfferedPrice * (icmsPercent / 100);
+    const pisCofinsCost = finalOfferedPrice * (pisConfinsPercent / 100);
+    const allCosts = baseCost + adminCost + logisticsCostValue + icmsCostValue + pisCofinsCost;
+    
+    // Calculate margins (aligned with frontend formula)
+    const marginValue = finalOfferedPrice - allCosts;
+    // Margem Líquida = (PV - Custos) / PV (percentage based on price, not cost)
+    const marginPercent = finalOfferedPrice > 0 
+      ? ((finalOfferedPrice - allCosts) / finalOfferedPrice) * 100 
+      : 0;
+    // Margem Bruta = (PV / Custo) - 1
+    const marginBrutaPercent = baseCost > 0 ? ((finalOfferedPrice / baseCost) - 1) * 100 : 0;
+    // Margem Técnica = (PV / (Custo + Adm + Log)) - 1
+    const techCosts = baseCost + adminCost + logisticsCostValue;
+    const marginTecnicaPercent = techCosts > 0 ? ((finalOfferedPrice / techCosts) - 1) * 100 : 0;
 
     // Authorization thresholds
     const greenThreshold = engineConfig?.margin_green_threshold ?? 20;

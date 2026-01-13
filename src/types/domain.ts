@@ -469,9 +469,15 @@ export interface MarginCalculation {
     total: number;
   };
   marginValue: number;
+  /** Margem Líquida % = (PV - Custos) / PV */
   marginPercent: number;
+  /** Margem Bruta % = (PV / Custo) - 1 */
+  marginBrutaPercent?: number;
+  /** Margem Técnica % = (PV / (Custo + Adm + Log)) - 1 */
+  marginTecnicaPercent?: number;
   isAuthorized: boolean;
   requiredApproverRole?: AppRole;
+  ruleName?: string;
 }
 
 export interface QuoteSummary {

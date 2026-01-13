@@ -66,11 +66,21 @@ export class PardisMarginEngine {
 
     const totalCosts = baseCost + adminCost + logisticsCost + icmsCost + pisCofins;
 
-    // Margem
+    // Margem Líquida = (PV - Custos) / PV
     const marginValue = (offeredPrice - totalCosts) * quantity;
     const marginPercent = offeredPrice > 0 
       ? ((offeredPrice - totalCosts) / offeredPrice) * 100 
       : 0;
+
+    // Margem Bruta = (PV / Custo) - 1 (conforme JSON)
+    const marginBrutaPercent = baseCost > 0 ? ((offeredPrice / baseCost) - 1) * 100 : 0;
+
+    // Margem Técnica = (PV / (Custo + Adm + Log)) - 1 (conforme JSON)
+    const techCosts = baseCost + adminCost + logisticsCost;
+    const marginTecnicaPercent = techCosts > 0 ? ((offeredPrice / techCosts) - 1) * 100 : 0;
+
+    // Cap do preço mínimo: nunca maior que preço lista (conforme BR-006)
+    const cappedMinimumPrice = Math.min(minimumPrice, listPrice);
 
     // Determina se está autorizado usando regras dinâmicas
     const { isAuthorized, requiredApproverRole } = approvalRules && approvalRules.length > 0
@@ -80,7 +90,7 @@ export class PardisMarginEngine {
     return {
       listPrice,
       clusterPrice,
-      minimumPrice,
+      minimumPrice: cappedMinimumPrice,
       offeredPrice,
       costs: {
         baseCost,
@@ -92,8 +102,13 @@ export class PardisMarginEngine {
       },
       marginValue,
       marginPercent,
+      marginBrutaPercent,
+      marginTecnicaPercent,
       isAuthorized,
-      requiredApproverRole
+      requiredApproverRole,
+      ruleName: approvalRules && approvalRules.length > 0 
+        ? this.determineAuthorizationDynamic(marginPercent, approvalRules, config.margin_authorized_threshold).ruleName
+        : undefined
     };
   }
 
