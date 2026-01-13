@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PricingConfig, PaymentCondition, ApprovalRule, QuoteValidityConfig, RegionType } from '@/types/pardis';
 import { toast } from 'sonner';
-import { LogService } from '@/services/logService';
 
 // Cache times para otimização
 const STALE_TIME = 5 * 60 * 1000; // 5 minutos
@@ -13,18 +12,15 @@ export function usePricingConfigs() {
   return useQuery({
     queryKey: ['pricing-configs'],
     queryFn: async () => {
-      LogService.debug('usePricingConfigs', 'Buscando configurações de pricing');
       const { data, error } = await supabase
         .from('pricing_config')
         .select('*')
         .order('region');
 
       if (error) {
-        LogService.error('usePricingConfigs', 'Erro ao buscar configs', error);
         throw error;
       }
       
-      LogService.info('usePricingConfigs', 'Configs carregadas', { count: data?.length });
       return data as PricingConfig[];
     },
     staleTime: STALE_TIME,
@@ -36,7 +32,6 @@ export function usePricingConfig(region: RegionType) {
   return useQuery({
     queryKey: ['pricing-config', region],
     queryFn: async () => {
-      LogService.debug('usePricingConfig', 'Buscando config por região', { region });
       const { data, error } = await supabase
         .from('pricing_config')
         .select('*')
@@ -44,13 +39,11 @@ export function usePricingConfig(region: RegionType) {
         .maybeSingle();
 
       if (error) {
-        LogService.error('usePricingConfig', 'Erro ao buscar config', error);
         throw error;
       }
       
       // Fallback to default values if no config found
       if (!data) {
-        LogService.warn('usePricingConfig', 'Config não encontrada, usando default', { region });
         return {
           id: '',
           region,

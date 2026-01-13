@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, u
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile, AppRole } from '@/types/pardis';
-import { LogService } from '@/services/logService';
 
 interface AuthState {
   user: User | null;
@@ -42,49 +41,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = useCallback(async (userId: string) => {
     // Prevenir chamadas duplicadas
     if (fetchingRef.current) {
-      LogService.debug('AuthContext', 'fetchUserData ignorado - já em execução');
       return null;
     }
     
     fetchingRef.current = true;
-    LogService.info('AuthContext', 'Buscando dados do usuário', { userId });
     
     try {
       // Buscar perfil
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (profileError) {
-        LogService.error('AuthContext', 'Erro ao buscar perfil', profileError);
-      }
-
       // Buscar role
-      const { data: roleData, error: roleError } = await supabase
+      const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
         .maybeSingle();
-
-      if (roleError) {
-        LogService.error('AuthContext', 'Erro ao buscar role', roleError);
-      }
 
       const result = {
         profile: profile as Profile | null,
         role: (roleData?.role as AppRole) ?? 'vendedor'
       };
       
-      LogService.info('AuthContext', 'Dados do usuário carregados', { 
-        hasProfile: !!result.profile, 
-        role: result.role 
-      });
-      
       return result;
     } catch (error) {
-      LogService.error('AuthContext', 'Erro ao buscar dados do usuário', error);
+      console.error('Erro ao buscar dados do usuário:', error);
       return { profile: null, role: 'vendedor' as AppRole };
     } finally {
       fetchingRef.current = false;
@@ -94,25 +78,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Inicializar autenticação - APENAS UMA VEZ
   useEffect(() => {
     if (initializedRef.current) {
-      LogService.debug('AuthContext', 'Já inicializado, ignorando');
       return;
     }
     
     initializedRef.current = true;
     mountedRef.current = true;
-    LogService.info('AuthContext', 'Inicializando autenticação (ÚNICA VEZ)');
 
     // Listener de mudanças de auth - ÚNICO para toda a aplicação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mountedRef.current) return;
         
-        LogService.info('AuthContext', 'Auth state change', { event, hasSession: !!session });
-        
         if (session?.user) {
-          // Atualizar userId no LogService
-          LogService.setUserId(session.user.id);
-          
           // Usar setTimeout para evitar deadlock com Supabase
           setTimeout(async () => {
             if (!mountedRef.current) return;
@@ -133,7 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }, 0);
         } else {
-          LogService.setUserId(undefined);
           setState({
             user: null,
             session: null,
@@ -150,10 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mountedRef.current) return;
       
-      LogService.info('AuthContext', 'Sessão existente verificada', { hasSession: !!session });
-      
       if (session?.user) {
-        LogService.setUserId(session.user.id);
         const userData = await fetchUserData(session.user.id);
         
         if (!mountedRef.current) return;
@@ -176,32 +149,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mountedRef.current = false;
       subscription.unsubscribe();
-      LogService.debug('AuthContext', 'Cleanup executado');
     };
   }, [fetchUserData]);
 
   // Login
   const login = useCallback(async (email: string, password: string) => {
-    LogService.info('AuthContext', 'Tentativa de login', { email });
-    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      LogService.error('AuthContext', 'Erro no login', { error: error.message });
       throw error;
     }
     
-    LogService.info('AuthContext', 'Login bem-sucedido', { userId: data.user?.id });
     return data;
   }, []);
 
   // Registro
   const register = useCallback(async (email: string, password: string, fullName: string) => {
-    LogService.info('AuthContext', 'Tentativa de registro', { email, fullName });
-    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -214,25 +180,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      LogService.error('AuthContext', 'Erro no registro', { error: error.message });
       throw error;
     }
     
-    LogService.info('AuthContext', 'Registro bem-sucedido', { userId: data.user?.id });
     return data;
   }, []);
 
   // Logout - SEM navegação automática
   const logout = useCallback(async () => {
-    LogService.info('AuthContext', 'Logout iniciado');
-    
     const { error } = await supabase.auth.signOut();
     if (error) {
-      LogService.error('AuthContext', 'Erro no logout', { error: error.message });
       throw error;
     }
-    
-    LogService.info('AuthContext', 'Logout bem-sucedido');
     // Navegação será feita pelo componente que chama logout
   }, []);
 

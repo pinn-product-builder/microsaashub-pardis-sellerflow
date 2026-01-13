@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PricingEngineConfig, ApprovalRule } from '@/types/pardis';
 import { toast } from 'sonner';
-import { LogService } from '@/services/logService';
 
 // Cache times para otimização
 const STALE_TIME = 5 * 60 * 1000; // 5 minutos
@@ -28,7 +27,6 @@ export function usePricingEngineConfig() {
   return useQuery({
     queryKey: ['pricing-engine-config'],
     queryFn: async () => {
-      LogService.debug('usePricingEngineConfig', 'Buscando configuração do motor');
       const { data, error } = await supabase
         .from('pricing_engine_config')
         .select('*')
@@ -36,16 +34,13 @@ export function usePricingEngineConfig() {
         .maybeSingle();
 
       if (error) {
-        LogService.error('usePricingEngineConfig', 'Erro ao buscar config', error);
         throw error;
       }
       
       if (!data) {
-        LogService.warn('usePricingEngineConfig', 'Config não encontrada, usando default');
         return DEFAULT_ENGINE_CONFIG;
       }
       
-      LogService.info('usePricingEngineConfig', 'Config do motor carregada', { id: data.id });
       return data as PricingEngineConfig;
     },
     staleTime: STALE_TIME,
