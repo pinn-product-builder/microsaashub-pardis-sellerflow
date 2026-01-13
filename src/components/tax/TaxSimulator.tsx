@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2, Play, BarChart3 } from 'lucide-react';
 import { TaxService } from '@/services/taxService';
-import { TaxCalculationContext, TaxSimulationScenario } from '@/types/cpq';
+import { TaxCalculationContext, TaxSimulationScenario } from '@/types/seller-flow';
 import { mockProducts, mockCustomers } from '@/data/mockData';
 
 export function TaxSimulator() {

@@ -1,8 +1,8 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MarketResearchConfig } from '@/components/cpq/integrations/MarketResearchConfig';
-import { MarketResearchMonitor } from '@/components/cpq/integrations/MarketResearchMonitor';
-import { CompetitiveAnalysis } from '@/components/cpq/analysis/CompetitiveAnalysis';
+import { MarketResearchConfig } from '@/components/seller-flow/integrations/MarketResearchConfig';
+import { MarketResearchMonitor } from '@/components/seller-flow/integrations/MarketResearchMonitor';
+import { CompetitiveAnalysis } from '@/components/seller-flow/analysis/CompetitiveAnalysis';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, Settings, Activity, BarChart3 } from 'lucide-react';
 

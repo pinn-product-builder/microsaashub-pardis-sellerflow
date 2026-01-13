@@ -39,7 +39,7 @@ import {
   Users
 } from 'lucide-react';
 import { useCustomers, useUpdateCustomer } from '@/hooks/useCustomers';
-import { L2LBadge } from '@/components/cpq/display/L2LBadge';
+import { L2LBadge } from '@/components/seller-flow/display/L2LBadge';
 import { Customer } from '@/types/pardis';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

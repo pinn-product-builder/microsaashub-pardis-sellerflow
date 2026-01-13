@@ -167,7 +167,7 @@ class PredictiveAnalyticsService {
         actionable: true,
         recommendations: [
           'Criar bundle notebook + mouse com desconto',
-          'Implementar sugestão automática no CPQ',
+          'Implementar sugestão automática no Seller Flow',
           'Treinar equipe comercial para oferecer combo'
         ],
         data: {

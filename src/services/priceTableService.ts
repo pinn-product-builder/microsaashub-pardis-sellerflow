@@ -1,5 +1,5 @@
 
-import { Product, Customer } from '@/types/cpq';
+import { Product, Customer } from '@/types/seller-flow';
 
 export interface PriceTable {
   id: string;

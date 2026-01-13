@@ -1,6 +1,6 @@
 // Hook para cálculos Pardis em tempo real na cotação
 import { useMemo } from 'react';
-import { QuoteItem } from '@/types/cpq';
+import { QuoteItem } from '@/types/seller-flow';
 import { Customer as PardisCustomer, PricingConfig, MarginCalculation, QuoteSummary, AppRole, PricingEngineConfig, ApprovalRule } from '@/types/pardis';
 import { PardisMarginEngine } from '@/services/pardisMarginEngine';
 import { usePricingConfig } from '@/hooks/usePricingConfig';

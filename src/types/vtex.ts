@@ -151,7 +151,7 @@ export interface VTEXIntegrationSettings {
   defaultSalesChannel: string;
   defaultAffiliate: string;
   defaultSeller: string;
-  productMapping: Record<string, string>; // CPQ Product ID -> VTEX SKU ID
+  productMapping: Record<string, string>; // Seller Flow Product ID -> VTEX SKU ID
   approvalRules: ApprovalRule[];
   validationRules: ValidationRule[];
   createdAt: Date;

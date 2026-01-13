@@ -1,5 +1,5 @@
 
-import { Quote } from '@/types/cpq';
+import { Quote } from '@/types/seller-flow';
 import { mockCustomers, mockProducts } from './mockData';
 import { PricingService } from '@/services/pricingService';
 

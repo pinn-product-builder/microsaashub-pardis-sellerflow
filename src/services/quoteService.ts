@@ -2,7 +2,7 @@
 // This file maintains backward compatibility while we migrate components
 
 import { supabase } from '@/integrations/supabase/client';
-import { Quote, QuoteItem } from '@/types/cpq';
+import { Quote, QuoteItem } from '@/types/seller-flow';
 
 export class QuoteService {
   static generateQuoteNumber(): string {

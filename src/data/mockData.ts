@@ -1,5 +1,5 @@
 
-import { Product, Customer, TaxRule, FreightRate, PricingRule } from '@/types/cpq';
+import { Product, Customer, TaxRule, FreightRate, PricingRule } from '@/types/seller-flow';
 
 export const mockProducts: Product[] = [
   {

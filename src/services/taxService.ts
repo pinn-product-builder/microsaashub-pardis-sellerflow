@@ -8,7 +8,7 @@ import {
   TaxSubstitution,
   TaxSimulationScenario,
   TaxRule
-} from '@/types/cpq';
+} from '@/types/seller-flow';
 import { taxRules } from '@/data/mockData';
 
 export class TaxService {
