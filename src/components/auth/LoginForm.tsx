@@ -44,9 +44,28 @@ export default function LoginForm() {
       // Navegar diretamente - login() agora aguarda autenticação completa
       navigate('/seller-flow/dashboard');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '';
+      
+      let title = 'Erro no login';
+      let description = 'Ocorreu um erro ao tentar fazer login. Tente novamente.';
+      
+      if (errorMessage.includes('Invalid login credentials') || errorMessage.includes('invalid_credentials')) {
+        title = 'Credenciais inválidas';
+        description = 'Email ou senha incorretos. Verifique suas credenciais e tente novamente.';
+      } else if (errorMessage.includes('Email not confirmed')) {
+        title = 'Email não confirmado';
+        description = 'Por favor, confirme seu email antes de fazer login. Verifique sua caixa de entrada.';
+      } else if (errorMessage.includes('User not found')) {
+        title = 'Usuário não encontrado';
+        description = 'Não existe uma conta com este email. Deseja criar uma conta?';
+      } else if (errorMessage.includes('Too many requests')) {
+        title = 'Muitas tentativas';
+        description = 'Você excedeu o limite de tentativas. Aguarde alguns minutos e tente novamente.';
+      }
+      
       toast({
-        title: 'Erro no login',
-        description: error instanceof Error ? error.message : 'Email ou senha incorretos',
+        title,
+        description,
         variant: 'destructive'
       });
     } finally {
