@@ -39,8 +39,8 @@ import { NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import { PermissionGate } from "@/components/auth/PermissionGate"
 
-// Módulo de Cotações (ATIVO) - Pardis Seller Flow
-const sellerFlowItems = [
+// Módulo de Cotações (ATIVO)
+const cotacoesItems = [
   {
     title: "Dashboard",
     url: "/seller-flow/dashboard",
@@ -65,6 +65,11 @@ const sellerFlowItems = [
     title: "Importação CSV",
     url: "/seller-flow/importacao",
     icon: Upload,
+  },
+  {
+    title: "Regras Fiscais",
+    url: "/admin/regras-fiscais",
+    icon: Receipt,
   },
   {
     title: "Configurações",
@@ -98,11 +103,6 @@ const adminItems = [
     title: "Grupos",
     url: "/admin/grupos",
     icon: Shield,
-  },
-  {
-    title: "Regras Fiscais",
-    url: "/admin/regras-fiscais",
-    icon: Receipt,
   },
 ]
 
@@ -139,10 +139,10 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Seller Flow</SidebarGroupLabel>
+          <SidebarGroupLabel>Cotações</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {sellerFlowItems.map((item) => (
+              {cotacoesItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url}>
