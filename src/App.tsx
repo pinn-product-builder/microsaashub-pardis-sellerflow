@@ -12,6 +12,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
 import NotFound from '@/pages/NotFound';
 
 // === DASHBOARD PRINCIPAL (FORA DO ESCOPO ATUAL) ===
@@ -70,6 +71,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Redirect root to Seller Flow dashboard */}
