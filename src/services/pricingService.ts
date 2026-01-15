@@ -1,16 +1,31 @@
 import { Product, Customer, QuoteItem, TaxRule, FreightRate, PricingRule } from '@/types/seller-flow';
-import { taxRules, freightRates, pricingRules } from '@/data/mockData';
+import { freightRates, pricingRules } from '@/data/mockData';
 import { AdvancedPricingEngine, PricingContext } from './advancedPricingEngine';
 import { ApprovalService } from './approvalService';
 import { TaxService } from './taxService';
+import { taxRulesCache, DatabaseTaxRule } from './taxRulesCache';
+
+// Variável para armazenar regras carregadas do banco
+let cachedTaxRules: DatabaseTaxRule[] = [];
+
+// Função para inicializar o cache de regras fiscais
+export async function initializePricingService(): Promise<void> {
+  cachedTaxRules = await taxRulesCache.loadRules();
+}
 
 export class PricingService {
   static calculateTaxes(product: Product, destinationUF: string, basePrice: number) {
-    // Buscar regra específica ou usar regra padrão (SP) como fallback
-    const rule = taxRules.find(r => r.uf === destinationUF) || taxRules.find(r => r.uf === 'SP') || taxRules[0];
+    // Buscar regra do cache (síncrono para manter compatibilidade)
+    let rule = cachedTaxRules.find(r => r.uf === destinationUF);
     
+    // Fallback para SP ou primeira regra disponível
     if (!rule) {
-      console.warn(`Regra fiscal não encontrada para UF: ${destinationUF}, usando valores padrão`);
+      rule = cachedTaxRules.find(r => r.uf === 'SP') || cachedTaxRules[0];
+    }
+    
+    // Se ainda não há regra (cache vazio), usar valores padrão
+    if (!rule) {
+      console.warn(`Cache de regras fiscais vazio. Usando valores padrão para UF: ${destinationUF}`);
       return {
         icms: (basePrice * 18) / 100,
         ipi: (basePrice * 5) / 100,
@@ -26,16 +41,25 @@ export class PricingService {
     const ipi = (basePrice * rule.ipi) / 100;
     const pis = (basePrice * rule.pis) / 100;
     const cofins = (basePrice * rule.cofins) / 100;
+    const fcp = rule.fcp ? (basePrice * rule.fcp) / 100 : 0;
 
     return {
       icms,
       ipi,
       pis,
       cofins,
-      total: icms + ipi + pis + cofins,
+      fcp,
+      total: icms + ipi + pis + cofins + fcp,
       taxBasis: basePrice,
-      effectiveRate: ((icms + ipi + pis + cofins) / basePrice) * 100
+      effectiveRate: ((icms + ipi + pis + cofins + fcp) / basePrice) * 100
     };
+  }
+
+  // Versão assíncrona para casos onde precisamos garantir dados atualizados
+  static async calculateTaxesAsync(product: Product, destinationUF: string, basePrice: number) {
+    await taxRulesCache.loadRules();
+    cachedTaxRules = taxRulesCache.getRulesCached();
+    return this.calculateTaxes(product, destinationUF, basePrice);
   }
 
   static calculateFreight(product: Product, quantity: number, destinationUF: string) {
@@ -284,5 +308,16 @@ export class PricingService {
         : 'Redução de margem possível',
       riskLevel: targetMargin < 15 ? 'HIGH' : targetMargin < 20 ? 'MEDIUM' : 'LOW'
     };
+  }
+
+  // Método para recarregar cache de regras fiscais
+  static async refreshTaxRulesCache(): Promise<void> {
+    taxRulesCache.invalidateCache();
+    cachedTaxRules = await taxRulesCache.loadRules();
+  }
+
+  // Getter para regras fiscais atuais (para debug)
+  static getCurrentTaxRules(): DatabaseTaxRule[] {
+    return cachedTaxRules;
   }
 }

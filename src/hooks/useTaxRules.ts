@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { taxRulesCache } from '@/services/taxRulesCache';
+import { PricingService } from '@/services/pricingService';
 
 export interface TaxRule {
   id: string;
@@ -63,11 +65,14 @@ export function useTaxRules() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['tax-rules'] });
+      // Invalidar cache dos serviços de pricing
+      taxRulesCache.invalidateCache();
+      await PricingService.refreshTaxRulesCache();
       toast({
         title: 'Regra fiscal atualizada',
-        description: 'As alterações foram salvas com sucesso.'
+        description: 'As alterações foram salvas e aplicadas ao sistema.'
       });
     },
     onError: (error) => {
