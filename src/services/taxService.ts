@@ -1,4 +1,3 @@
-
 import { 
   Product, 
   Customer, 
@@ -9,7 +8,7 @@ import {
   TaxSimulationScenario,
   TaxRule
 } from '@/types/seller-flow';
-import { taxRules } from '@/data/mockData';
+import { taxRulesCache, DatabaseTaxRule } from './taxRulesCache';
 
 export class TaxService {
   // Dados mock para benefícios fiscais
@@ -66,7 +65,7 @@ export class TaxService {
   static calculateAdvancedTaxes(context: TaxCalculationContext): TaxCalculationResult {
     console.log('Calculando impostos avançados para:', context);
 
-    // Buscar regra fiscal básica
+    // Buscar regra fiscal do banco de dados (via cache)
     const basicRule = this.getBasicTaxRule(context.destinationUF);
     
     // Calcular base de cálculo
@@ -116,7 +115,41 @@ export class TaxService {
   }
 
   private static getBasicTaxRule(uf: string): TaxRule {
-    return taxRules.find(rule => rule.uf === uf) || taxRules[0];
+    // Buscar do cache do banco de dados
+    const cachedRules = taxRulesCache.getRulesCached();
+    const dbRule = cachedRules.find(rule => rule.uf === uf);
+    
+    if (dbRule) {
+      return {
+        uf: dbRule.uf,
+        icms: dbRule.icms,
+        ipi: dbRule.ipi,
+        pis: dbRule.pis,
+        cofins: dbRule.cofins
+      };
+    }
+
+    // Fallback: buscar SP ou usar valores padrão
+    const spRule = cachedRules.find(rule => rule.uf === 'SP');
+    if (spRule) {
+      console.warn(`Regra fiscal não encontrada para UF: ${uf}. Usando SP como fallback.`);
+      return {
+        uf: spRule.uf,
+        icms: spRule.icms,
+        ipi: spRule.ipi,
+        pis: spRule.pis,
+        cofins: spRule.cofins
+      };
+    }
+
+    // Fallback final: valores padrão
+    console.warn(`Cache de regras fiscais vazio. Usando valores padrão para UF: ${uf}`);
+    return { uf: 'SP', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 };
+  }
+
+  // Método assíncrono para garantir que o cache está carregado
+  static async ensureCacheLoaded(): Promise<void> {
+    await taxRulesCache.loadRules();
   }
 
   private static calculateBasicTaxes(rule: TaxRule, taxBasis: number, context: TaxCalculationContext) {
@@ -229,7 +262,12 @@ export class TaxService {
     const interestateRate = context.originUF === 'SP' ? 12 : 7; // Simplificação
     const internalRate = destinationRule.icms;
     const difal = ((internalRate - interestateRate) / 100) * context.unitPrice * context.quantity;
-    const fcp = (2 / 100) * context.unitPrice * context.quantity; // FCP médio de 2%
+    
+    // Buscar FCP do banco de dados
+    const cachedRules = taxRulesCache.getRulesCached();
+    const dbRule = cachedRules.find(rule => rule.uf === context.destinationUF);
+    const fcpRate = dbRule?.fcp || 2; // FCP do banco ou padrão de 2%
+    const fcp = (fcpRate / 100) * context.unitPrice * context.quantity;
 
     return { difal: Math.max(difal, 0), fcp };
   }
@@ -344,10 +382,11 @@ export class TaxService {
     return breakdown.filter(item => item.value > 0);
   }
 
-  static exportTaxRules() {
-    // Função para exportar regras fiscais
+  static async exportTaxRules() {
+    // Função para exportar regras fiscais do banco
+    const rules = await taxRulesCache.loadRules();
     return {
-      taxRules,
+      taxRules: rules,
       taxBenefits: this.taxBenefits,
       taxSubstitutions: this.taxSubstitutions,
       exportedAt: new Date().toISOString()
