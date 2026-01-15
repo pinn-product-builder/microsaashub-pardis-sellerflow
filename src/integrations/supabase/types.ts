@@ -737,6 +737,57 @@ export type Database = {
           },
         ]
       }
+      tax_rules: {
+        Row: {
+          cofins: number
+          created_at: string
+          fcp: number | null
+          icms: number
+          icms_st_margin: number | null
+          id: string
+          ipi: number
+          is_active: boolean
+          notes: string | null
+          pis: number
+          region: string
+          uf: string
+          uf_name: string
+          updated_at: string
+        }
+        Insert: {
+          cofins?: number
+          created_at?: string
+          fcp?: number | null
+          icms?: number
+          icms_st_margin?: number | null
+          id?: string
+          ipi?: number
+          is_active?: boolean
+          notes?: string | null
+          pis?: number
+          region?: string
+          uf: string
+          uf_name: string
+          updated_at?: string
+        }
+        Update: {
+          cofins?: number
+          created_at?: string
+          fcp?: number | null
+          icms?: number
+          icms_st_margin?: number | null
+          id?: string
+          ipi?: number
+          is_active?: boolean
+          notes?: string | null
+          pis?: number
+          region?: string
+          uf?: string
+          uf_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_group_memberships: {
         Row: {
           assigned_at: string

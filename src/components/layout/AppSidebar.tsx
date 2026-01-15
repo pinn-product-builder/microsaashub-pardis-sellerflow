@@ -13,6 +13,7 @@ import {
   Shield,
   UserCog,
   FileText,
+  Receipt,
 } from "lucide-react"
 
 import {
@@ -97,6 +98,11 @@ const adminItems = [
     title: "Grupos",
     url: "/admin/grupos",
     icon: Shield,
+  },
+  {
+    title: "Regras Fiscais",
+    url: "/admin/regras-fiscais",
+    icon: Receipt,
   },
 ]
 
