@@ -6,9 +6,20 @@ import { TaxService } from './taxService';
 
 export class PricingService {
   static calculateTaxes(product: Product, destinationUF: string, basePrice: number) {
-    const rule = taxRules.find(r => r.uf === destinationUF);
+    // Buscar regra específica ou usar regra padrão (SP) como fallback
+    const rule = taxRules.find(r => r.uf === destinationUF) || taxRules.find(r => r.uf === 'SP') || taxRules[0];
+    
     if (!rule) {
-      throw new Error(`Regra fiscal não encontrada para UF: ${destinationUF}`);
+      console.warn(`Regra fiscal não encontrada para UF: ${destinationUF}, usando valores padrão`);
+      return {
+        icms: (basePrice * 18) / 100,
+        ipi: (basePrice * 5) / 100,
+        pis: (basePrice * 1.65) / 100,
+        cofins: (basePrice * 7.6) / 100,
+        total: (basePrice * 32.25) / 100,
+        taxBasis: basePrice,
+        effectiveRate: 32.25
+      };
     }
 
     const icms = (basePrice * rule.icms) / 100;

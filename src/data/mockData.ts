@@ -93,17 +93,40 @@ export const mockCustomers: Customer[] = [
   }
 ];
 
+// Regras fiscais para todos os estados brasileiros
 export const taxRules: TaxRule[] = [
+  // Sudeste
   { uf: 'SP', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
   { uf: 'RJ', icms: 20, ipi: 5, pis: 1.65, cofins: 7.6 },
   { uf: 'MG', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'ES', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
+  // Sul
   { uf: 'RS', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
   { uf: 'SC', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
   { uf: 'PR', icms: 19, ipi: 5, pis: 1.65, cofins: 7.6 },
+  // Nordeste
   { uf: 'BA', icms: 19, ipi: 5, pis: 1.65, cofins: 7.6 },
   { uf: 'PE', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'CE', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'MA', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'PB', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'RN', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'PI', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'AL', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'SE', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  // Centro-Oeste
   { uf: 'GO', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
-  { uf: 'DF', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 }
+  { uf: 'DF', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'MT', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'MS', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
+  // Norte
+  { uf: 'AM', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'PA', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'RO', icms: 17.5, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'AC', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'RR', icms: 17, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'AP', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 },
+  { uf: 'TO', icms: 18, ipi: 5, pis: 1.65, cofins: 7.6 }
 ];
 
 export const freightRates: FreightRate[] = [
