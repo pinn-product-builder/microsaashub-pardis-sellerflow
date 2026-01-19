@@ -1,0 +1,129 @@
+contract:
+  name: "Hermes Pardini | VTEX Sync SKUs"
+  version: "1.0.0"
+  last_updated: "2026-01-17"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Sincronizar detalhes de SKUs da VTEX para o Supabase (tabela vtex_skus),
+    garantindo preenchimento de sku_name e vtex_product_id.
+
+environments:
+  vtex:
+    account: "hermespardini"
+    admin_base: "https://hermespardini.myvtex.com/admin"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+  supabase:
+    local_base: "http://127.0.0.1:65421/functions/v1"
+    cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
+
+interface:
+  edge_function:
+    name: "vtex-sync-skus"
+    method: "GET"
+    path: "/vtex-sync-skus"
+    query_params:
+      page:
+        type: "integer"
+        required: false
+        default: 1
+        min: 1
+      pageSize:
+        type: "integer"
+        required: false
+        default: 200
+        min: 1
+        max: 500
+      missingOnly:
+        type: "boolean"
+        required: false
+        default: true
+        description: "Quando true, busca apenas skus ainda não persistidos (ou incompletos, se aplicável)."
+      concurrency:
+        type: "integer"
+        required: false
+        default: 4
+        min: 1
+        max: 10
+      salesChannelId:
+        type: "integer"
+        required: false
+        default: 1
+        description: "Canal de venda para escopo de SKUs (quando usado na coleta da lista de IDs)."
+
+  response_200:
+    content_type: "application/json"
+    schema:
+      ok: { type: "boolean", example: true }
+      page: { type: "integer", example: 1 }
+      pageSize: { type: "integer", example: 200 }
+      missingOnly: { type: "boolean", example: true }
+      concurrency: { type: "integer", example: 4 }
+      totalSkusInScope: { type: "integer", example: 4281 }
+      batchSize: { type: "integer", example: 200 }
+      upserted: { type: "integer", example: 200 }
+      errorsCount: { type: "integer", example: 0 }
+      errors:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            skuId: { type: "integer" }
+            error: { type: "string" }
+      next:
+        type: "object|null"
+        properties:
+          page: { type: "integer" }
+          pageSize: { type: "integer" }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "List SKU ids by Sales Channel"
+      method: "GET"
+      url: "https://{account}.{env}/api/catalog_system/pvt/sku/stockkeepingunitidsbysaleschannel/{salesChannelId}"
+      notes:
+        - "Usado para determinar o universo (totalSkusInScope)."
+    - name: "Get SKU by id"
+      method: "GET"
+      url: "https://{account}.{env}/api/catalog_system/pvt/sku/stockkeepingunitbyid/{skuId}"
+      notes:
+        - "Fonte principal de sku_name (SkuName) e vtex_product_id (ProductId)."
+
+data_persistence:
+  supabase_tables:
+    - table: "vtex_skus"
+      pk: "vtex_sku_id"
+      upsert_conflict_key: "vtex_sku_id"
+      columns:
+        vtex_sku_id: "number (from Id)"
+        vtex_product_id: "number|null (from ProductId)"
+        sku_name: "string|null (from SkuName)  <<< CAMPO CRÍTICO"
+        name_complete: "string|null (from NameComplete)"
+        product_name: "string|null (from ProductName)"
+        brand_id: "number|null (from BrandId)"
+        brand_name: "string|null (from BrandName)"
+        is_active: "boolean|null (from IsActive)"
+        is_inventoried: "boolean|null (from IsInventoried)"
+        ean: "string|null (from AlternateIds.Ean)"
+        ref_id: "string|null (from AlternateIds.RefId)"
+        detail_url: "string|null (from DetailUrl)"
+        image_url: "string|null (from ImageUrl)"
+        raw: "jsonb (payload completo do SKU)"
+      guarantees:
+        - "Upsert idempotente por vtex_sku_id."
+        - "sku_name não deve ficar null para SKUs válidos retornados pela VTEX."
+
+acceptance_criteria:
+  functional:
+    - "Após rodar até o final, query de validação (sku_name is null) deve retornar 0 (ou justificar exceções)."
+    - "totalSkusInScope deve bater com a VTEX para o salesChannelId validado."
+  observability:
+    - "Resposta sempre inclui next (ou null) e métricas por página."

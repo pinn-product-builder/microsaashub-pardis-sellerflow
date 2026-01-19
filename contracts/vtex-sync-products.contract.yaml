@@ -1,0 +1,134 @@
+contract:
+  name: "Hermes Pardini | VTEX Sync Products"
+  version: "1.0.0"
+  last_updated: "2026-01-17"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Sincronizar detalhes de PRODUTOS da VTEX para o Supabase (tabela vtex_products),
+    com suporte a paginação e modo "missingOnly" (somente faltantes).
+
+environments:
+  vtex:
+    account: "hermespardini"
+    admin_base: "https://hermespardini.myvtex.com/admin"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+  supabase:
+    local_base: "http://127.0.0.1:65421/functions/v1"
+    cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
+    auth:
+      internal_execution: "Service Role (SUPABASE_SERVICE_ROLE_KEY) dentro da Edge Function"
+      note: "O cliente NÃO precisa fornecer JWT para rodar este sync (verify_jwt=false)."
+
+interface:
+  edge_function:
+    name: "vtex-sync-products"
+    method: "GET"
+    path: "/vtex-sync-products"
+    query_params:
+      page:
+        type: "integer"
+        required: false
+        default: 1
+        min: 1
+      pageSize:
+        type: "integer"
+        required: false
+        default: 100
+        min: 1
+        max: 500
+      missingOnly:
+        type: "boolean"
+        required: false
+        default: true
+        description: "Quando true, busca apenas produtos que ainda não existem em vtex_products."
+      concurrency:
+        type: "integer"
+        required: false
+        default: 4
+        min: 1
+        max: 10
+        description: "Quantidade de requisições paralelas para VTEX (controle de throughput)."
+
+  response_200:
+    content_type: "application/json"
+    schema:
+      ok: { type: "boolean", example: true }
+      missingOnly: { type: "boolean", example: true }
+      concurrency: { type: "integer", example: 4 }
+      page: { type: "integer", example: 1 }
+      pageSize: { type: "integer", example: 100 }
+      totalDistinctInSkus:
+        type: "integer"
+        description: "Qtd de productIds distintos vistos na tabela vtex_skus."
+      existingProducts:
+        type: "integer"
+        description: "Qtd de registros existentes em vtex_products (pode ser >= totalDistinctInSkus dependendo do histórico)."
+      totalMissingProducts:
+        type: "integer"
+        description: "Qtd de productIds faltantes (se missingOnly=true)."
+      batchSize: { type: "integer", example: 100 }
+      upserted: { type: "integer", example: 100 }
+      errorsCount: { type: "integer", example: 0 }
+      errors:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            productId: { type: "integer" }
+            error: { type: "string" }
+      next:
+        type: "object|null"
+        properties:
+          page: { type: "integer" }
+          pageSize: { type: "integer" }
+
+  response_4xx_5xx:
+    schema:
+      ok: { type: "boolean", example: false }
+      error: { type: "string" }
+      step: { type: "string", required: false }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "Get product by id"
+      method: "GET"
+      url: "https://{account}.{env}/api/catalog/pvt/product/{productId}"
+      auth: "AppKey/AppToken headers"
+      notes:
+        - "Se VTEX retornar 404/403/429/5xx, o item entra em errors[] e o sync continua."
+
+data_persistence:
+  supabase_tables:
+    - table: "vtex_products"
+      pk: "vtex_product_id"
+      upsert_conflict_key: "vtex_product_id"
+      columns:
+        vtex_product_id: "number (from prod.Id)"
+        name: "string (prod.Name)"
+        brand_id: "number|null (prod.BrandId)"
+        brand_name: "string|null (prod.BrandName)"
+        category_id: "number|null (prod.CategoryId)"
+        is_active: "boolean|null (prod.IsActive)"
+        link_id: "string|null (prod.LinkId)"
+        raw: "jsonb (payload completo do produto)"
+      guarantees:
+        - "Upsert idempotente por vtex_product_id."
+        - "raw sempre guarda o payload para auditoria e evolução de schema."
+
+acceptance_criteria:
+  functional:
+    - "Rodar missingOnly=true deve resultar em totalMissingProducts = 0 ao final (quando tudo estiver sincronizado)."
+    - "Rodar missingOnly=false deve atualizar os produtos existentes (re-sync) sem duplicar."
+  observability:
+    - "Resposta sempre retorna upserted/errorsCount e next (ou null)."
+  security:
+    - "AppKey/AppToken não aparecem em logs nem retornos."

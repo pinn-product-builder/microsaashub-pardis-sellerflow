@@ -1,0 +1,132 @@
+contract:
+  name: "Hermes Pardini | VTEX Create Coupon (Promotions & Taxes)"
+  version: "1.0.0"
+  last_updated: "2026-01-17"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Criar cupom na VTEX (para uso no carrinho/checkout) a partir de uma aprovação de margem/condição comercial,
+    garantindo que o cliente valide previamente o payload (contrato) e regras de negócio.
+
+environments:
+  vtex:
+    account: "hermespardini"
+    admin_base: "https://hermespardini.myvtex.com/admin"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+    notes:
+      - "Cupom é aplicado em checkout via marketingData.coupon (fluxo VTEX)."
+      - "Contrato aqui valida campos e regras ANTES de conectar no endpoint definitivo de criação."
+  supabase:
+    edge_function_base:
+      local: "http://127.0.0.1:65421/functions/v1"
+      cloud: "https://<PROJECT_REF>.supabase.co/functions/v1"
+
+interface:
+  edge_function:
+    name: "vtex-create-coupon"
+    method: "POST"
+    path: "/vtex-create-coupon"
+    headers:
+      content_type: "application/json"
+    request_body:
+      type: "object"
+      required:
+        - couponCode
+        - discountType
+        - discountValue
+      properties:
+        couponCode:
+          type: "string"
+          example: "PARDIS-APROV-12345"
+          description: "Código do cupom (único). Pode ser gerado pelo SellerFlow."
+        discountType:
+          type: "string"
+          enum: ["PERCENT", "ABSOLUTE"]
+          example: "PERCENT"
+        discountValue:
+          type: "number"
+          example: 8
+          description: "Se PERCENT: 0-100. Se ABSOLUTE: valor monetário em BRL."
+        startsAt:
+          type: "string"
+          format: "date-time"
+          required: false
+          example: "2026-01-17T00:00:00-03:00"
+        endsAt:
+          type: "string"
+          format: "date-time"
+          required: false
+          example: "2026-02-25T23:59:59-03:00"
+        maxUsage:
+          type: "integer"
+          required: false
+          example: 1
+          description: "Limite total de uso do cupom."
+        maxUsagePerCustomer:
+          type: "integer"
+          required: false
+          example: 1
+        stackable:
+          type: "boolean"
+          required: false
+          default: false
+          description: "Se pode combinar com outras promoções/cupons (validar regra com o cliente)."
+        reason:
+          type: "string"
+          required: false
+          example: "cupom gerado após aprovação comercial no SellerFlow"
+        metadata:
+          type: "object"
+          required: false
+          description: "Campos de rastreio interno (quote_id, approval_id, seller_id, etc)."
+          example:
+            approval_id: "a1b2c3"
+            quote_id: "q-2026-0001"
+            requested_by: "vendedor@empresa.com"
+            margin_percent: 8
+
+  response_200:
+    schema:
+      ok: { type: "boolean", example: true }
+      couponCode: { type: "string", example: "PARDIS-APROV-12345" }
+      vtex:
+        type: "object"
+        properties:
+          status: { type: "integer", example: 200 }
+          statusText: { type: "string", example: "OK" }
+          promotionId: { type: "string|null" }
+          couponId: { type: "string|null" }
+      createdAt: { type: "string", format: "date-time" }
+
+  response_4xx_5xx:
+    schema:
+      ok: { type: "boolean", example: false }
+      error: { type: "string" }
+      details: { type: "object", required: false }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "Create coupon (Promotions & Taxes API)"
+      method: "POST"
+      url: "https://{account}.{env}/api/<PROMOTIONS_TAXES_COUPON_ENDPOINT>"
+      status: "TBD (validar com o cliente antes de implementar)"
+      note:
+        - "O cliente valida o payload, regras e retorno. Depois fechamos o endpoint exato e mapeamos 1:1."
+
+acceptance_criteria:
+  business_rules_to_confirm_with_client:
+    - "Cupom é por pedido (1 uso) ou pode ser multi-uso?"
+    - "Expiração obrigatória? Padrão: 48h / 7 dias / até 25/02?"
+    - "Pode acumular com outras promoções?"
+    - "Pode restringir por cluster, canal, seller, ou lista de SKUs?"
+  security:
+    - "Nunca retornar AppKey/AppToken em resposta."
+    - "Logar somente IDs e métricas, sem payload sensível."
