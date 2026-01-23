@@ -1,27 +1,24 @@
 ## Pardis SellerFlow (VTEX → Supabase → Frontend)
 
-Portal de **cotações B2B** com:
-- **Catálogo/Preço/Estoque/Clientes** sincronizados da **VTEX**
-- **Banco + Auth + Edge Functions** no **Supabase Cloud**
-- **Frontend** em **Vercel** (Vite + React + TypeScript + shadcn/tailwind)
+Portal de **cotações B2B** com sincronização de dados da **VTEX** e backend no **Supabase**.
 
-### Links
-- **Lovable (builder / histórico do projeto)**: [`lovable.dev/projects/be1ca57f-8a0e-46c7-8606-dd61457efafa`](https://lovable.dev/projects/be1ca57f-8a0e-46c7-8606-dd61457efafa)
-- **Frontend (Vercel)**: `https://microsaashub-pardis-sellerflow.vercel.app`
-- **Backend**: Supabase Cloud (Postgres + Auth + Edge Functions)
+Stack:
+- Frontend: Vite + React + TypeScript (shadcn/tailwind)
+- Backend: Supabase (Postgres + Auth + Edge Functions)
+- Integração: VTEX (Catálogo, Pricing, Master Data, Logistics)
 
 ---
 
-## Fluxo do sistema (até o ponto atual)
+## Visão geral
 
-### 1) Sync VTEX → Supabase (tabelas `vtex_*`)
+### Sync VTEX → Supabase (tabelas `vtex_*`)
 - **Clientes**: `public.vtex_clients` (PK = `md_id`)
 - **Produtos/SKUs**: `public.vtex_products`, `public.vtex_skus`
 - **Preços por policy**: `public.vtex_sku_prices`
 - **Estoque**: `public.vtex_sku_inventory` (+ agregação em `vw_vtex_sku_inventory_agg`)
 - **Busca**: materialized view `public.mv_vtex_catalog` + RPCs de busca/preço
 
-### 2) Seller Flow (cotações / aprovações)
+### Seller Flow (cotações / aprovações)
 O fluxo de cotação opera nas tabelas:
 - `public.vtex_quotes`
 - `public.vtex_quote_items`
@@ -35,7 +32,7 @@ As telas **Nova Cotação / Aprovações / Histórico / Dashboard** estão alinh
 ## Rodar local (frontend)
 
 ### Pré-requisitos
-- Node.js 18+ (recomendado)
+- Node.js 18+
 
 ### Instalar e rodar
 
@@ -44,19 +41,19 @@ npm install
 npm run dev
 ```
 
-### `.env.local` (frontend)
-Crie `./.env.local` (não commitado) com:
-- `VITE_SUPABASE_URL`
+### `.env.local`
+Crie `./.env.local` (não commitar) com:
+- `VITE_SUPABASE_URL` (URL do projeto)
 - `VITE_SUPABASE_PUBLISHABLE_KEY` (anon/public key)
-
-Exemplo (Supabase Cloud):
 
 ```env
 VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="<anon-key>"
 ```
 
-> Importante: **nunca** usar `service_role` no frontend.
+Regras básicas:
+- **Não** colocar chaves/segredos no repositório.
+- **Não** usar `service_role` no frontend.
 
 ---
 
@@ -72,7 +69,7 @@ Em Vercel → Project → Settings → Environment Variables:
 
 ### Supabase Auth (Redirect URLs)
 No Supabase Cloud → Authentication → URL Configuration:
-- **Site URL**: domínio do Vercel (ex.: `https://microsaashub-pardis-sellerflow.vercel.app`)
+- **Site URL**: domínio do Vercel (prod)
 - **Redirect URLs**: incluir o domínio do Vercel e qualquer preview necessário
 
 ---
@@ -85,6 +82,8 @@ No Supabase Cloud → Project Settings → Functions → Secrets:
 - `VTEX_ENV` (ex.: `vtexcommercestable.com.br`)
 - `VTEX_APP_KEY`
 - `VTEX_APP_TOKEN`
+
+> Segredos ficam **somente** no Supabase (Functions → Secrets). Não versionar.
 
 ### Deploy automático (DB + Edge Functions)
 Workflow: `.github/workflows/supabase-cloud-deploy.yml`
