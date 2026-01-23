@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,7 @@ function useDebouncedValue<T>(value: T, delay = 350) {
 }
 
 export default function ClientesVtex() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebouncedValue(searchTerm, 350);
   const [ufFilter, setUfFilter] = useState<string>("all");
@@ -96,6 +98,8 @@ export default function ClientesVtex() {
   const [customers, setCustomers] = useState<VtexClient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -179,6 +183,85 @@ export default function ClientesVtex() {
     setPage(1);
   }, [debouncedSearch, ufFilter, l2lFilter]);
 
+  const getProjectRef = () => {
+    try {
+      const url = String(import.meta.env.VITE_SUPABASE_URL || "");
+      const host = new URL(url).hostname; // <ref>.supabase.co
+      return host.split(".")[0] || host;
+    } catch {
+      return String(import.meta.env.VITE_SUPABASE_URL || "");
+    }
+  };
+
+  const handleSyncClients = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncStatus("Iniciando sync de clientes (VTEX)...");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || "");
+      const anonKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "");
+
+      if (!supabaseUrl || !anonKey) {
+        throw new Error("Env do Supabase não configurada no frontend (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).");
+      }
+
+      let nextToken: string | null = null;
+      let totalUpserted = 0;
+      const maxBatches = 25; // evita travar o browser
+
+      for (let i = 0; i < maxBatches; i++) {
+        const u = new URL(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/vtex-sync-clients`);
+        u.searchParams.set("all", "true");
+        u.searchParams.set("pageSize", "100");
+        u.searchParams.set("withAddress", "true");
+        u.searchParams.set("concurrency", "4");
+        if (nextToken) u.searchParams.set("token", nextToken);
+
+        setSyncStatus(`Sync em andamento... lote ${i + 1}${totalUpserted ? ` (upserted=${totalUpserted})` : ""}`);
+
+        const res = await fetch(u.toString(), {
+          method: "GET",
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${token || anonKey}`,
+            "content-type": "application/json",
+          },
+        });
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(`Falha ao syncar clientes: HTTP ${res.status} ${res.statusText} — ${text.slice(0, 500)}`);
+        }
+        const body = JSON.parse(text);
+        if (!body?.ok) {
+          throw new Error(`Falha ao syncar clientes: ${text.slice(0, 500)}`);
+        }
+
+        totalUpserted += Number(body.upserted ?? 0);
+        nextToken = body.nextToken ?? null;
+        const done = Boolean(body.done);
+        if (done || !nextToken) break;
+      }
+
+      toast({
+        title: "Sync de clientes finalizada",
+        description: `Upserted: ${totalUpserted}. Projeto: ${getProjectRef()}`,
+      });
+
+      setSyncStatus(`Finalizado. Upserted total: ${totalUpserted}`);
+      fetchStats();
+      fetchClients();
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e);
+      console.error("Erro no sync de clientes:", e);
+      toast({ title: "Erro no sync de clientes", description: msg });
+      setSyncStatus(`Erro: ${msg}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value ?? 0);
 
@@ -258,16 +341,25 @@ export default function ClientesVtex() {
           </h1>
           <p className="text-muted-foreground">Gerencie os clientes sincronizados do sistema</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            fetchStats();
-            fetchClients();
-          }}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              fetchStats();
+              fetchClients();
+            }}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+
+          {stats.total === 0 && !loadError && (
+            <Button onClick={handleSyncClients} disabled={isSyncing}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {isSyncing ? "Sincronizando..." : "Sincronizar VTEX"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {loadError && (
@@ -279,6 +371,19 @@ export default function ClientesVtex() {
                 Se a mensagem citar <code>permission denied</code>/401, falta permissão no Supabase Cloud para ler <code>vtex_clients</code>.
                 Se não for permissão, provavelmente o sync de clientes ainda não foi executado no Cloud.
               </div>
+              <div className="mt-2 text-xs text-red-700">
+                <strong>Projeto Supabase:</strong> {getProjectRef()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {syncStatus && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">
+              <strong>Status do sync:</strong> {syncStatus}
             </div>
           </CardContent>
         </Card>
