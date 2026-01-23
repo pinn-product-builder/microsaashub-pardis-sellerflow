@@ -1,0 +1,123 @@
+contract:
+  name: "Hermes Pardini | VTEX Sync Clients (Master Data)"
+  version: "1.0.0"
+  last_updated: "2026-01-23"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Sincronizar clientes (Master Data CL + endereço AD) da VTEX para o Supabase (tabela vtex_clients),
+    suportando paginação por scroll (token) e enriquecimento opcional com cidade/UF.
+
+environments:
+  vtex:
+    account: "hermespardini"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+  supabase:
+    local_base: "http://127.0.0.1:65421/functions/v1"
+    cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
+    auth:
+      execution:
+        - "Admin autenticado (JWT em Authorization)"
+        - "OU header x-vtex-sync-secret (VTEX_SYNC_SECRET) para automação/cron"
+
+interface:
+  edge_function:
+    name: "vtex-sync-clients"
+    method: "GET"
+    path: "/vtex-sync-clients"
+    query_params:
+      all:
+        type: "boolean"
+        required: false
+        default: false
+        description: "Quando true, usa Master Data /scroll (recomendado para >10k)."
+      token:
+        type: "string"
+        required: false
+        description: "Token de continuação do /scroll (retornado pela chamada anterior)."
+      page:
+        type: "integer"
+        required: false
+        default: 1
+        description: "Modo paginado (search/range) para volumes menores."
+      pageSize:
+        type: "integer"
+        required: false
+        default: 200
+        min: 10
+        max: 1000
+      withAddress:
+        type: "boolean"
+        required: false
+        default: false
+        description: "Quando true, enriquece com cidade/UF (consulta AD por userId)."
+      concurrency:
+        type: "integer"
+        required: false
+        default: 4
+        min: 1
+        max: 12
+
+  response_200:
+    content_type: "application/json"
+    schema:
+      ok: { type: "boolean", example: true }
+      mode: { type: "string", example: "scroll_batch" }
+      pageSize: { type: "integer", example: 100 }
+      batchSize: { type: "integer", example: 100 }
+      upserted: { type: "integer", example: 100 }
+      nextToken: { type: "string|null" }
+      done: { type: "boolean", example: false }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "Master Data CL scroll"
+      method: "GET"
+      url: "https://{account}.{env}/api/dataentities/CL/scroll?_fields=..."
+      notes:
+        - "Para bases grandes, o /scroll é o caminho suportado."
+        - "Token pode vir por header x-vtex-md-token."
+    - name: "Master Data AD search (endereço)"
+      method: "GET"
+      url: "https://{account}.{env}/api/dataentities/AD/search?_where=userId={userId}"
+      notes:
+        - "Opcional (withAddress=true) para preencher city/uf."
+
+data_persistence:
+  supabase_tables:
+    - table: "vtex_clients"
+      pk: "md_id"
+      upsert_conflict_key: "md_id"
+      columns:
+        md_id: "string (id do documento no Master Data CL)"
+        company_name: "string (corporateName/tradeName/full/email fallback)"
+        cnpj: "string|null (documento; digits-only quando aplicável)"
+        email: "string|null"
+        trade_name: "string|null"
+        corporate_name: "string|null"
+        state_registration: "string|null"
+        city: "string|null (via AD)"
+        uf: "string|null (via AD)"
+        is_active: "boolean|null"
+        is_lab_to_lab: "boolean (default false; pode ser ajustado no app)"
+        raw: "jsonb (payload CL + enrichment)"
+      guarantees:
+        - "Upsert idempotente por md_id."
+        - "Não apagar clientes; apenas upsert/incremental."
+
+acceptance_criteria:
+  functional:
+    - "Em modo all=true, cada chamada retorna nextToken até done=true."
+    - "Ao final, a base de clientes deve aparecer no frontend (Cadastros → Clientes e Nova Cotação)."
+  security:
+    - "Execução restrita (admin JWT ou x-vtex-sync-secret)."
+    - "Não logar PII além do necessário (apenas métricas/IDs)."
+

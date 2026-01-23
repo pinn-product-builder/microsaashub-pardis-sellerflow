@@ -1,7 +1,7 @@
 contract:
   name: "Hermes Pardini | VTEX Sync Products"
-  version: "1.0.0"
-  last_updated: "2026-01-17"
+  version: "1.1.0"
+  last_updated: "2026-01-23"
   owner:
     company: "Pinn / Pardis SellerFlow"
     responsible: "Pedro Henrique Ventura"
@@ -26,7 +26,10 @@ environments:
     cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
     auth:
       internal_execution: "Service Role (SUPABASE_SERVICE_ROLE_KEY) dentro da Edge Function"
-      note: "O cliente NÃO precisa fornecer JWT para rodar este sync (verify_jwt=false)."
+      execution:
+        - "Admin autenticado (JWT em Authorization)"
+        - "OU header x-vtex-sync-secret (VTEX_SYNC_SECRET) para automação/cron"
+      note: "Sync não deve ficar aberto para anon/public."
 
 interface:
   edge_function:
@@ -123,6 +126,7 @@ data_persistence:
       guarantees:
         - "Upsert idempotente por vtex_product_id."
         - "raw sempre guarda o payload para auditoria e evolução de schema."
+        - "Ao finalizar o sync, o catálogo de busca deve estar atualizado (refresh da MV quando aplicável)."
 
 acceptance_criteria:
   functional:
@@ -131,4 +135,5 @@ acceptance_criteria:
   observability:
     - "Resposta sempre retorna upserted/errorsCount e next (ou null)."
   security:
+    - "Execução restrita (admin JWT ou x-vtex-sync-secret)."
     - "AppKey/AppToken não aparecem em logs nem retornos."

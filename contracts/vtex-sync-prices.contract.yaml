@@ -1,0 +1,119 @@
+contract:
+  name: "Hermes Pardini | VTEX Sync Prices (Pricing API)"
+  version: "1.0.0"
+  last_updated: "2026-01-23"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Sincronizar preços por trade policy (sales channel / tradePolicyId) da VTEX para o Supabase
+    (tabela vtex_sku_prices), com fallback e tolerância a SKUs sem preço.
+
+environments:
+  vtex:
+    account: "hermespardini"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+  supabase:
+    local_base: "http://127.0.0.1:65421/functions/v1"
+    cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
+    auth:
+      execution:
+        - "Admin autenticado (JWT em Authorization)"
+        - "OU header x-vtex-sync-secret (VTEX_SYNC_SECRET) para automação/cron"
+
+interface:
+  edge_function:
+    name: "vtex-sync-prices"
+    method: "GET"
+    path: "/vtex-sync-prices"
+    query_params:
+      sc:
+        type: "string"
+        required: false
+        default: "1"
+        description: "Trade policy / sales channel (ex.: 1, 2, mgpbrclusterd)."
+      page:
+        type: "integer"
+        required: false
+        default: 1
+        min: 1
+      pageSize:
+        type: "integer"
+        required: false
+        default: 200
+        min: 1
+        max: 500
+      missingOnly:
+        type: "boolean"
+        required: false
+        default: false
+        description: "Quando true, tenta sincronizar apenas SKUs sem preço nessa policy (dependendo do critério do banco)."
+      concurrency:
+        type: "integer"
+        required: false
+        default: 4
+        min: 1
+        max: 12
+
+  response_200:
+    schema:
+      ok: { type: "boolean", example: true }
+      tradePolicyId: { type: "string", example: "1" }
+      page: { type: "integer", example: 1 }
+      pageSize: { type: "integer", example: 200 }
+      batchSize: { type: "integer", example: 200 }
+      upserted: { type: "integer", example: 180 }
+      missingCount: { type: "integer", example: 20 }
+      errorsCount: { type: "integer", example: 0 }
+      next:
+        type: "object|null"
+        properties:
+          page: { type: "integer" }
+          pageSize: { type: "integer" }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "Pricing base"
+      method: "GET"
+      url: "https://{account}.{env}/api/pricing/pvt/price-sheet/{skuId}"
+      notes:
+        - "404 = SKU sem preço base (não é erro fatal; contabiliza missing)."
+    - name: "Pricing computed"
+      method: "GET"
+      url: "https://{account}.{env}/api/pricing/prices/{skuId}/computed?sc={tradePolicyId}"
+      notes:
+        - "Pode variar por conta; contrato aceita tentativa de variações do endpoint."
+        - "Valores monetários na VTEX vêm em centavos e devem ser normalizados para BRL (dividir por 100)."
+
+data_persistence:
+  supabase_tables:
+    - table: "vtex_sku_prices"
+      pk: "(vtex_sku_id, trade_policy_id, price_type, min_quantity)"
+      columns:
+        vtex_sku_id: "bigint"
+        trade_policy_id: "text"
+        price_type: "text (computed|fixed|list|base)"
+        selling_price: "numeric (BRL)"
+        list_price: "numeric (BRL)"
+        cost_price: "numeric (BRL)"
+        price_valid_until: "timestamptz|null"
+        raw: "jsonb"
+      guarantees:
+        - "404 da VTEX vira missingCount e não quebra o batch."
+        - "Fallback de preço efetivo no banco: computed → fixed → list → base."
+
+acceptance_criteria:
+  functional:
+    - "Sincronizar policy 1 e policy 2 deve preencher vtex_sku_prices com trade_policy_id correspondente."
+    - "Consulta de matriz de preços deve mostrar todas as policies disponíveis para um SKU quando existirem."
+  security:
+    - "Execução restrita (admin JWT ou x-vtex-sync-secret)."
+    - "Não logar segredos; logar apenas métricas e skuIds (amostrado)."
+

@@ -1,0 +1,110 @@
+contract:
+  name: "Hermes Pardini | VTEX Create OrderForm from Approved Quote"
+  version: "1.0.0"
+  last_updated: "2026-01-23"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Transformar uma cotação aprovada no SellerFlow em um carrinho montado na VTEX (orderForm),
+    aplicando cupom (quando existir), respeitando trade policy, preço e estoque.
+
+environments:
+  vtex:
+    account: "hermespardini"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+  supabase:
+    edge_function_base:
+      local: "http://127.0.0.1:65421/functions/v1"
+      cloud: "https://<PROJECT_REF>.supabase.co/functions/v1"
+
+interface:
+  edge_function:
+    name: "vtex-create-orderform"
+    method: "POST"
+    path: "/vtex-create-orderform"
+    headers:
+      content_type: "application/json"
+      authorization: "Bearer <JWT do usuário autenticado>"
+    request_body:
+      type: "object"
+      required:
+        - quoteId
+      properties:
+        quoteId:
+          type: "string"
+          example: "7f7d9c9f-1234-4c0a-9d1a-abcdef123456"
+        tradePolicyId:
+          type: "string"
+          required: false
+          default: "1"
+          description: "Trade policy usada na validação/criação do carrinho."
+        couponCode:
+          type: "string"
+          required: false
+          description: "Cupom previamente criado na VTEX (exclusivo por CNPJ)."
+        customerCnpj:
+          type: "string"
+          required: false
+          description: "CNPJ do cliente (opcional; pode ser derivado da cotação/vtex_clients)."
+
+  response_200:
+    schema:
+      ok: { type: "boolean", example: true }
+      quoteId: { type: "string" }
+      vtex:
+        type: "object"
+        properties:
+          orderFormId: { type: "string" }
+          salesChannel: { type: "string" }
+          marketingData:
+            type: "object|null"
+          itemsCount: { type: "integer" }
+      persisted:
+        type: "object"
+        properties:
+          vtex_order_form_id: { type: "string" }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "Create orderForm"
+      method: "POST"
+      url: "https://{account}.{env}/api/checkout/pub/orderForm"
+      notes:
+        - "Fluxo pode exigir atualização incremental do orderForm (add items / marketingData)."
+    - name: "Add items to orderForm"
+      method: "POST"
+      url: "https://{account}.{env}/api/checkout/pub/orderForm/{orderFormId}/items"
+    - name: "Apply coupon"
+      method: "POST"
+      url: "https://{account}.{env}/api/checkout/pub/orderForm/{orderFormId}/attachments/marketingData"
+      notes:
+        - "Aplicação via marketingData.coupon."
+
+data_persistence:
+  supabase_tables:
+    - table: "vtex_quotes"
+      updates:
+        vtex_order_form_id: "orderFormId retornado pela VTEX"
+        status: "sent (ou equivalente após criação do carrinho)"
+    - table: "vtex_quote_events"
+      insert:
+        event_type: "vtex_send"
+        message: "orderForm criado na VTEX"
+
+acceptance_criteria:
+  functional:
+    - "Cotação aprovada deve gerar um orderForm com os SKUs e quantidades corretas."
+    - "Quando existir cupom, o orderForm deve ter marketingData.coupon preenchido."
+    - "Preço/estoque devem ser validados (SellerFlow não deve enviar item sem preço/sem estoque)."
+  security:
+    - "Somente usuários autenticados podem criar orderForm."
+    - "Não expor AppKey/AppToken em logs/respostas."
+

@@ -1,13 +1,14 @@
 contract:
   name: "Hermes Pardini | VTEX Create Coupon (Promotions & Taxes)"
-  version: "1.0.0"
-  last_updated: "2026-01-17"
+  version: "1.1.0"
+  last_updated: "2026-01-23"
   owner:
     company: "Pinn / Pardis SellerFlow"
     responsible: "Pedro Henrique Ventura"
   goal: >
     Criar cupom na VTEX (para uso no carrinho/checkout) a partir de uma aprovação de margem/condição comercial,
     garantindo que o cliente valide previamente o payload (contrato) e regras de negócio.
+    Atualização de contrato: cupom exclusivo por CNPJ, com valor mínimo de pedido e regras de uso/validade.
 
 environments:
   vtex:
@@ -42,11 +43,18 @@ interface:
         - couponCode
         - discountType
         - discountValue
+        - customerCnpj
+        - minOrderValue
       properties:
         couponCode:
           type: "string"
           example: "PARDIS-APROV-12345"
           description: "Código do cupom (único). Pode ser gerado pelo SellerFlow."
+        quoteId:
+          type: "string"
+          required: false
+          example: "7f7d9c9f-1234-4c0a-9d1a-abcdef123456"
+          description: "ID da cotação no SellerFlow (para rastreio)."
         discountType:
           type: "string"
           enum: ["PERCENT", "ABSOLUTE"]
@@ -55,6 +63,20 @@ interface:
           type: "number"
           example: 8
           description: "Se PERCENT: 0-100. Se ABSOLUTE: valor monetário em BRL."
+        customerCnpj:
+          type: "string"
+          example: "12345678000190"
+          description: "CNPJ (apenas dígitos). Cupom deve ser restrito a este documento."
+        minOrderValue:
+          type: "number"
+          example: 1500
+          description: "Valor mínimo do pedido (BRL) conforme simulador/negociação."
+        validityHours:
+          type: "integer"
+          required: false
+          default: 24
+          example: 24
+          description: "Validade em horas a partir do startsAt (padrão: 24h)."
         startsAt:
           type: "string"
           format: "date-time"
@@ -79,6 +101,12 @@ interface:
           required: false
           default: false
           description: "Se pode combinar com outras promoções/cupons (validar regra com o cliente)."
+        usageType:
+          type: "string"
+          required: false
+          enum: ["ONCE_TOTAL"]
+          default: "ONCE_TOTAL"
+          description: "Uso único total (1 utilização no total)."
         reason:
           type: "string"
           required: false
@@ -123,10 +151,13 @@ upstream_calls:
 
 acceptance_criteria:
   business_rules_to_confirm_with_client:
-    - "Cupom é por pedido (1 uso) ou pode ser multi-uso?"
-    - "Expiração obrigatória? Padrão: 48h / 7 dias / até 25/02?"
-    - "Pode acumular com outras promoções?"
-    - "Pode restringir por cluster, canal, seller, ou lista de SKUs?"
+    - "Cupom deve ter validade de 24 horas (padrão), salvo ajuste explícito."
+    - "Uso único total (maxUsage=1) e também 1 por cliente (maxUsagePerCustomer=1)."
+    - "Não acumulativo com outras promoções/cupons (stackable=false)."
+    - "Cupom deve ser exclusivo para o CNPJ da cotação (parâmetro VTEX existente a ser confirmado)."
+    - "Cupom deve ter valor mínimo de pedido preenchido (minOrderValue) conforme simulador."
+    - "Desconto do cupom é derivado da negociação/simulador e pode variar de pedido para pedido."
+    - "Fluxo esperado: cotação aprovada → criar cupom → criar orderForm na VTEX aplicando o cupom."
   security:
     - "Nunca retornar AppKey/AppToken em resposta."
     - "Logar somente IDs e métricas, sem payload sensível."

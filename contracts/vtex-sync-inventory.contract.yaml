@@ -1,0 +1,101 @@
+contract:
+  name: "Hermes Pardini | VTEX Sync Inventory (Logistics)"
+  version: "1.0.0"
+  last_updated: "2026-01-23"
+  owner:
+    company: "Pinn / Pardis SellerFlow"
+    responsible: "Pedro Henrique Ventura"
+  goal: >
+    Sincronizar estoque disponível por SKU da VTEX para o Supabase (tabela vtex_sku_inventory),
+    para validação do carrinho (cotação) e disponibilidade de itens.
+
+environments:
+  vtex:
+    account: "hermespardini"
+    api_base: "https://hermespardini.vtexcommercestable.com.br"
+    auth:
+      type: "AppKey/AppToken"
+      headers:
+        - name: "X-VTEX-API-AppKey"
+          value: "<VTEX_APP_KEY>"
+        - name: "X-VTEX-API-AppToken"
+          value: "<VTEX_APP_TOKEN>"
+  supabase:
+    local_base: "http://127.0.0.1:65421/functions/v1"
+    cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
+    auth:
+      execution:
+        - "Admin autenticado (JWT em Authorization)"
+        - "OU header x-vtex-sync-secret (VTEX_SYNC_SECRET) para automação/cron"
+
+interface:
+  edge_function:
+    name: "vtex-sync-inventory"
+    method: "GET"
+    path: "/vtex-sync-inventory"
+    query_params:
+      page:
+        type: "integer"
+        required: false
+        default: 1
+      pageSize:
+        type: "integer"
+        required: false
+        default: 200
+        min: 1
+        max: 500
+      concurrency:
+        type: "integer"
+        required: false
+        default: 4
+        min: 1
+        max: 12
+
+  response_200:
+    schema:
+      ok: { type: "boolean", example: true }
+      page: { type: "integer", example: 1 }
+      pageSize: { type: "integer", example: 200 }
+      batchSize: { type: "integer", example: 200 }
+      upserted: { type: "integer", example: 200 }
+      errorsCount: { type: "integer", example: 0 }
+      next:
+        type: "object|null"
+        properties:
+          page: { type: "integer" }
+          pageSize: { type: "integer" }
+
+upstream_calls:
+  vtex_endpoints_used:
+    - name: "Inventory by SKU (Logistics)"
+      method: "GET"
+      url: "https://{account}.{env}/api/logistics/pvt/inventory/skus/{skuId}"
+      notes:
+        - "O payload pode trazer múltiplos warehouses."
+        - "Contrato prevê persistir por warehouse e uma view agregada para 'available_quantity'."
+
+data_persistence:
+  supabase_tables:
+    - table: "vtex_sku_inventory"
+      pk: "(vtex_sku_id, warehouse_id)"
+      columns:
+        vtex_sku_id: "bigint"
+        warehouse_id: "text"
+        warehouse_name: "text|null"
+        total_quantity: "numeric|null"
+        reserved_quantity: "numeric|null"
+        available_quantity: "numeric|null"
+        updated_at: "timestamptz"
+        raw: "jsonb"
+  derived:
+    - view: "vw_vtex_sku_inventory_agg"
+      goal: "Somar/normalizar available_quantity por SKU (uso no carrinho/validação)."
+
+acceptance_criteria:
+  functional:
+    - "Após sync, a busca de catálogo deve expor available_quantity / in_stock (quando aplicável)."
+    - "Validação do carrinho deve bloquear item sem estoque suficiente."
+  security:
+    - "Execução restrita (admin JWT ou x-vtex-sync-secret)."
+    - "Não logar segredos; logar apenas métricas."
+

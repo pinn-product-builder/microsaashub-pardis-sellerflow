@@ -11,16 +11,29 @@ Se vocês aprovarem o que está nos YAMLs, a implementação vai seguir exatamen
 ---
 
 ## O que tem aqui dentro
-Este pacote tem **3 YAMLs**, cada um cobrindo uma peça da integração:
+Este pacote tem **7 YAMLs**, cada um cobrindo uma peça da integração:
 
 1. `vtex-sync-products.contract.yaml`  
    Contrato do sync de **produtos** (Product) VTEX → banco (Supabase)
 
 2. `vtex-sync-skus.contract.yaml`  
-   Contrato do sync de **SKUs** (StockKeepingUnit) VTEX → banco (Supabase)
+   Contrato do sync de **SKUs** (StockKeepingUnit) VTEX → banco (Supabase)  
+   Inclui **embalagem/gramatura** e **validade** (campo do SKU) conforme solicitações do contrato.
 
 3. `vtex-create-coupon.contract.yaml`  
    Contrato para **criação de cupom/promo** via SellerFlow → VTEX
+
+4. `vtex-sync-clients.contract.yaml`  
+   Contrato do sync de **clientes** (Master Data CL/AD) VTEX → banco (Supabase)
+
+5. `vtex-sync-prices.contract.yaml`  
+   Contrato do sync de **preços por policy** (Pricing API) VTEX → banco (Supabase)
+
+6. `vtex-sync-inventory.contract.yaml`  
+   Contrato do sync de **estoque** (Logistics API) VTEX → banco (Supabase)
+
+7. `vtex-create-orderform.contract.yaml`  
+   Contrato do fluxo “**cotação aprovada → carrinho na VTEX**” (criar `orderForm` com itens/preço/estoque + cupom).
 
 ---
 
@@ -33,6 +46,7 @@ Eu mantive os 3 no mesmo padrão para ficar fácil de revisar. Em geral, vocês 
 - `upstream_calls`: endpoints da VTEX que são chamados por trás
 - `data_persistence`: como e onde persiste no banco (tabelas/chaves/campos)
 - `acceptance_criteria`: critérios objetivos pra dizer “ok, está certo”
+- `security`: regras mínimas (quem pode executar, proteção contra abuso, não logar segredo/PII)
 
 ---
 
@@ -143,6 +157,7 @@ Assim que estiver aprovado, eu sigo pra implementação final seguindo o contrat
 - Segredos (AppKey/AppToken) não ficam no YAML.
 - YAML descreve contrato de payload e regra; infra/CI/log detalhado é parte interna.
 - Se surgir regra nova (ex.: restrição por cluster/seller/canal no cupom), eu volto no YAML primeiro antes de implementar.
+- As Edge Functions de sync **não** devem ficar abertas: execução é restrita (admin autenticado ou `x-vtex-sync-secret`).
 
 ## Contato / Responsável
 - Responsável técnico: Pedro Henrique Ventura (Pinn)
