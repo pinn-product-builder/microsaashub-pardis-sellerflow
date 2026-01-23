@@ -29,6 +29,40 @@ function requiredAny(names: string[]) {
   throw new Error(`Missing env var (any): ${names.join(" | ")}`);
 }
 
+async function requireSyncAuth(req: Request) {
+  const secret = (Deno.env.get("VTEX_SYNC_SECRET") ?? "").trim();
+  const gotSecret = (req.headers.get("x-vtex-sync-secret") ?? "").trim();
+  if (secret && gotSecret && gotSecret === secret) return;
+
+  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!authHeader) throw new Error("Unauthorized: missing Authorization header");
+
+  const SUPABASE_URL = requiredAny(["SUPABASE_URL", "SB_URL"]);
+  const SUPABASE_ANON_KEY = requiredAny([
+    "SUPABASE_ANON_KEY",
+    "SB_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SB_PUBLISHABLE_KEY",
+  ]);
+  const SUPABASE_SERVICE_ROLE_KEY = requiredAny(["SUPABASE_SERVICE_ROLE_KEY", "SB_SERVICE_ROLE_KEY"]);
+
+  const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+  if (userError || !userData?.user) throw new Error("Unauthorized: invalid session");
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: roles, error: rolesError } = await (supabaseAdmin as any)
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userData.user.id);
+  if (rolesError) throw new Error(`Forbidden: cannot read user roles (${rolesError.message})`);
+
+  const isAdmin = Array.isArray(roles) && roles.some((r: any) => String(r.role) === "admin");
+  if (!isAdmin) throw new Error("Forbidden: admin required");
+}
+
 function toInt(v: string | null, def: number) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : def;
@@ -350,6 +384,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
+    await requireSyncAuth(req);
+
     // IMPORTANTE no seu setup local:
     // o CLI reclamou de SUPABASE_* e aceitou SB_*.
     const SUPABASE_URL = requiredAny(["SUPABASE_URL", "SB_URL"]);

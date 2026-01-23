@@ -25,6 +25,42 @@ function requiredAny(names: string[]) {
   throw new Error(`Missing env var (any): ${names.join(" | ")}`);
 }
 
+async function requireSyncAuth(req: Request) {
+  // Opção 1: segredo de automação/cron (não depende de usuário)
+  const secret = (Deno.env.get("VTEX_SYNC_SECRET") ?? "").trim();
+  const gotSecret = (req.headers.get("x-vtex-sync-secret") ?? "").trim();
+  if (secret && gotSecret && gotSecret === secret) return;
+
+  // Opção 2: usuário autenticado com role admin
+  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!authHeader) throw new Error("Unauthorized: missing Authorization header");
+
+  const SUPABASE_URL = requiredAny(["SUPABASE_URL", "SB_URL"]);
+  const SUPABASE_ANON_KEY = requiredAny([
+    "SUPABASE_ANON_KEY",
+    "SB_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "SB_PUBLISHABLE_KEY",
+  ]);
+  const SUPABASE_SERVICE_ROLE_KEY = requiredAny(["SUPABASE_SERVICE_ROLE_KEY", "SB_SERVICE_ROLE_KEY"]);
+
+  const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+  if (userError || !userData?.user) throw new Error("Unauthorized: invalid session");
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: roles, error: rolesError } = await (supabaseAdmin as any)
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userData.user.id);
+  if (rolesError) throw new Error(`Forbidden: cannot read user roles (${rolesError.message})`);
+
+  const isAdmin = Array.isArray(roles) && roles.some((r: any) => String(r.role) === "admin");
+  if (!isAdmin) throw new Error("Forbidden: admin required");
+}
+
 function toBool(v: string | null, def = false) {
   if (v == null) return def;
   const s = v.trim().toLowerCase();
@@ -109,6 +145,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
   try {
+    await requireSyncAuth(req);
+
     // IMPORTANTE: no local o CLI ignora SUPABASE_*, então use SB_URL / SB_SERVICE_ROLE_KEY
     const SUPABASE_URL = requiredAny(["SUPABASE_URL", "SB_URL"]);
     const SUPABASE_SERVICE_ROLE_KEY = requiredAny(["SUPABASE_SERVICE_ROLE_KEY", "SB_SERVICE_ROLE_KEY"]);
