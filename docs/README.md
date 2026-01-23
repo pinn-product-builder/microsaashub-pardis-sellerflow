@@ -64,7 +64,7 @@ Hoje o app cobre:
 
 ---
 
-## Onde procurar cada coisa
+## Arquivos:
 
 ### Código (frontend)
 - Páginas: `src/pages/**`
