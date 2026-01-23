@@ -8,17 +8,13 @@ export function usePendingApprovals() {
     queryKey: ['approvals', 'pending'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('vtex_approval_requests' as any)
-        .select(`
-          *,
-          quote:vtex_quotes(*, client:vtex_clients(*)),
-          rule:approval_rules(*)
-        `)
+        .from('approval_requests')
+        .select('*')
         .eq('status', 'pending')
         .order('requested_at', { ascending: false });
 
       if (error) throw error;
-      return data as ApprovalRequest[];
+      return (data ?? []) as unknown as ApprovalRequest[];
     },
   });
 }
@@ -28,12 +24,8 @@ export function useApprovalRequests(quoteId?: string) {
     queryKey: ['approvals', quoteId],
     queryFn: async () => {
       let query = supabase
-        .from('vtex_approval_requests' as any)
-        .select(`
-          *,
-          quote:vtex_quotes(*, client:vtex_clients(*)),
-          rule:approval_rules(*)
-        `)
+        .from('approval_requests')
+        .select('*')
         .order('requested_at', { ascending: false });
 
       if (quoteId) {
@@ -43,7 +35,7 @@ export function useApprovalRequests(quoteId?: string) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as ApprovalRequest[];
+      return (data ?? []) as unknown as ApprovalRequest[];
     },
   });
 }
@@ -63,7 +55,7 @@ export function useCreateApprovalRequest() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('vtex_approval_requests' as any)
+        .from('approval_requests')
         .insert({
           quote_id: input.quote_id,
           rule_id: input.rule_id,
@@ -80,14 +72,14 @@ export function useCreateApprovalRequest() {
 
       // Atualizar status da cotação
       await supabase
-        .from('vtex_quotes' as any)
+        .from('quotes')
         .update({ 
           status: 'pending_approval',
           requires_approval: true 
         })
         .eq('id', input.quote_id);
 
-      return data as ApprovalRequest;
+      return data as unknown as ApprovalRequest;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
@@ -109,23 +101,23 @@ export function useApproveRequest() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('vtex_approval_requests' as any)
+        .from('approval_requests')
         .update({
           status: 'approved',
           approved_by: user.id,
           comments,
           decided_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', id)
-        .select('*, quote:vtex_quotes(*)')
+        .select()
         .single();
 
       if (error) throw error;
 
       // Atualizar status da cotação
-      if (data.quote_id) {
+      if (data?.quote_id) {
         await supabase
-          .from('vtex_quotes' as any)
+          .from('quotes')
           .update({ 
             status: 'approved',
             is_authorized: true 
@@ -133,7 +125,7 @@ export function useApproveRequest() {
           .eq('id', data.quote_id);
       }
 
-      return data as ApprovalRequest;
+      return data as unknown as ApprovalRequest;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
@@ -157,23 +149,23 @@ export function useRejectRequest() {
       if (!comments) throw new Error('Comentário obrigatório para rejeição');
 
       const { data, error } = await supabase
-        .from('vtex_approval_requests' as any)
+        .from('approval_requests')
         .update({
           status: 'rejected',
           approved_by: user.id,
           comments,
           decided_at: new Date().toISOString(),
-        } as any)
+        })
         .eq('id', id)
-        .select('*, quote:vtex_quotes(*)')
+        .select()
         .single();
 
       if (error) throw error;
 
       // Atualizar status da cotação
-      if (data.quote_id) {
+      if (data?.quote_id) {
         await supabase
-          .from('vtex_quotes' as any)
+          .from('quotes')
           .update({ 
             status: 'rejected',
             is_authorized: false 
@@ -181,7 +173,7 @@ export function useRejectRequest() {
           .eq('id', data.quote_id);
       }
 
-      return data as ApprovalRequest;
+      return data as unknown as ApprovalRequest;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
@@ -199,26 +191,27 @@ export function useApprovalStats() {
     queryKey: ['approval-stats'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('vtex_approval_requests' as any)
+        .from('approval_requests')
         .select('status, requested_at, decided_at');
 
       if (error) throw error;
 
-      const stats = {
-        pending: data.filter(r => r.status === 'pending').length,
-        approved: data.filter(r => r.status === 'approved').length,
-        rejected: data.filter(r => r.status === 'rejected').length,
-        expired: data.filter(r => r.status === 'expired').length,
-        total: data.length,
+      const rows = data ?? [];
+      const stats: Record<string, number> = {
+        pending: rows.filter((r: any) => r.status === 'pending').length,
+        approved: rows.filter((r: any) => r.status === 'approved').length,
+        rejected: rows.filter((r: any) => r.status === 'rejected').length,
+        expired: rows.filter((r: any) => r.status === 'expired').length,
+        total: rows.length,
       };
 
       // Calcular tempo médio de aprovação
-      const approvedWithTime = data.filter(
-        r => r.status === 'approved' && r.decided_at && r.requested_at
+      const approvedWithTime = rows.filter(
+        (r: any) => r.status === 'approved' && r.decided_at && r.requested_at
       );
       
       if (approvedWithTime.length > 0) {
-        const totalTime = approvedWithTime.reduce((acc, r) => {
+        const totalTime = approvedWithTime.reduce((acc: number, r: any) => {
           const requested = new Date(r.requested_at).getTime();
           const decided = new Date(r.decided_at!).getTime();
           return acc + (decided - requested);

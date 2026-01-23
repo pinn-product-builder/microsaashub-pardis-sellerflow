@@ -289,7 +289,7 @@ serve(async (req) => {
     if (useVtexIds) {
       const idsRes = await vtexFetchSkuIds(page, pageSize);
       if (!idsRes.ok) {
-        return json({ ok: false, step: "vtex_list_ids", ...idsRes }, 500);
+        return json({ step: "vtex_list_ids", ...idsRes, ok: false }, 500);
       }
       skuIds = idsRes.ids;
       // não temos total oficial aqui; retornamos null e usamos “next” por página cheia

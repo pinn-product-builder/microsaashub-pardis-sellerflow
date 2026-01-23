@@ -8,7 +8,7 @@ export function useCustomers(filters?: CustomerFilters) {
     queryKey: ['customers', filters],
     queryFn: async () => {
       let query = supabase
-        .from('vtex_clients')
+        .from('customers')
         .select('*')
         .order('company_name');
 
@@ -41,7 +41,7 @@ export function useCustomers(filters?: CustomerFilters) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as Customer[];
+      return (data ?? []) as unknown as Customer[];
     },
   });
 }
@@ -51,13 +51,13 @@ export function useCustomer(id: string) {
     queryKey: ['customer', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('vtex_clients')
+        .from('customers')
         .select('*')
-        .eq('md_id', id)
-        .single();
+        .eq('id', id)
+        .maybeSingle();
 
       if (error) throw error;
-      return data as Customer;
+      return data as unknown as Customer;
     },
     enabled: !!id,
   });
@@ -69,14 +69,14 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Customer> }) => {
       const { data, error } = await supabase
-        .from('vtex_clients')
-        .update(updates)
-        .eq('md_id', id)
+        .from('customers')
+        .update(updates as any)
+        .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as Customer;
+      return data as unknown as Customer;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -96,7 +96,7 @@ export function useCustomerSearch() {
       const term = raw.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
       let q = supabase
-        .from('vtex_clients')
+        .from('customers')
         .select('*')
         .eq('is_active', true)
         .order('company_name')
@@ -111,7 +111,7 @@ export function useCustomerSearch() {
       const { data, error } = await q;
 
       if (error) throw error;
-      return data as Customer[];
+      return (data ?? []) as unknown as Customer[];
     },
   });
 }
