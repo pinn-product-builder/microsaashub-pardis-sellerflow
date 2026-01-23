@@ -9,15 +9,15 @@ export function useQuotes(filters?: QuoteFilters) {
     queryKey: ['quotes', filters],
     queryFn: async () => {
       let query = supabase
-        .from('quotes')
-        .select('*')
+        .from('vtex_quotes')
+        .select('*, client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
         .order('created_at', { ascending: false });
 
       if (filters?.status?.length) {
         query = query.in('status', filters.status);
       }
       if (filters?.customerId) {
-        query = query.eq('customer_id', filters.customerId);
+        query = query.eq('vtex_client_id', filters.customerId);
       }
       if (filters?.dateFrom) {
         query = query.gte('created_at', filters.dateFrom);
@@ -45,8 +45,8 @@ export function useQuote(id: string) {
     queryKey: ['quote', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('quotes')
-        .select('*')
+        .from('vtex_quotes')
+        .select('*, client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
         .eq('id', id)
         .maybeSingle();
 
@@ -83,7 +83,7 @@ export function useUpdateQuote() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
       const { data, error } = await supabase
-        .from('quotes')
+        .from('vtex_quotes')
         .update(updates)
         .eq('id', id)
         .select()
@@ -109,7 +109,7 @@ export function useUpdateQuoteStatus() {
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: any }) => {
       const { data, error } = await supabase
-        .from('quotes')
+        .from('vtex_quotes')
         .update({ status })
         .eq('id', id)
         .select()
@@ -172,8 +172,8 @@ export function useQuoteStats() {
       const weekAgo = format(addDays(new Date(), -7), 'yyyy-MM-dd');
 
       const { data, error } = await supabase
-        .from('quotes')
-        .select('status, total_offered, total_margin_percent, created_at');
+        .from('vtex_quotes')
+        .select('status, total, total_margin_percent, created_at');
 
       if (error) throw error;
 
@@ -185,7 +185,7 @@ export function useQuoteStats() {
         approved: quotes.filter((q: any) => q.status === 'approved').length,
         sent: quotes.filter((q: any) => q.status === 'sent').length,
         converted: quotes.filter((q: any) => q.status === 'converted').length,
-        totalValue: quotes.reduce((acc: number, q: any) => acc + (q.total_offered || 0), 0),
+        totalValue: quotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0),
         avgMargin: quotes.length > 0 
           ? quotes.reduce((acc: number, q: any) => acc + (q.total_margin_percent || 0), 0) / quotes.length 
           : 0,

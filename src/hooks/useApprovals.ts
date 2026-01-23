@@ -8,8 +8,8 @@ export function usePendingApprovals() {
     queryKey: ['approvals', 'pending'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('approval_requests')
-        .select('*')
+        .from('vtex_approval_requests')
+        .select('*, quote:vtex_quotes(id, quote_number, vtex_client_id, total, status, created_at, client:vtex_clients(md_id, company_name, cnpj, city, uf))')
         .eq('status', 'pending')
         .order('requested_at', { ascending: false });
 
@@ -24,8 +24,8 @@ export function useApprovalRequests(quoteId?: string) {
     queryKey: ['approvals', quoteId],
     queryFn: async () => {
       let query = supabase
-        .from('approval_requests')
-        .select('*')
+        .from('vtex_approval_requests')
+        .select('*, quote:vtex_quotes(id, quote_number, vtex_client_id, total, status, created_at, client:vtex_clients(md_id, company_name, cnpj, city, uf))')
         .order('requested_at', { ascending: false });
 
       if (quoteId) {
@@ -55,7 +55,7 @@ export function useCreateApprovalRequest() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests')
         .insert({
           quote_id: input.quote_id,
           rule_id: input.rule_id,
@@ -72,12 +72,23 @@ export function useCreateApprovalRequest() {
 
       // Atualizar status da cotação
       await supabase
-        .from('quotes')
+        .from('vtex_quotes')
         .update({ 
           status: 'pending_approval',
           requires_approval: true 
         })
         .eq('id', input.quote_id);
+
+      // Registrar evento (best-effort)
+      await supabase.from('vtex_quote_events').insert({
+        quote_id: input.quote_id,
+        event_type: 'approval',
+        from_status: null,
+        to_status: 'pending_approval',
+        message: input.reason ?? 'Solicitação de aprovação criada',
+        payload: { source: 'ui' },
+        created_by: user.id,
+      } as any);
 
       return data as unknown as ApprovalRequest;
     },
@@ -101,7 +112,7 @@ export function useApproveRequest() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests')
         .update({
           status: 'approved',
           approved_by: user.id,
@@ -117,12 +128,23 @@ export function useApproveRequest() {
       // Atualizar status da cotação
       if (data?.quote_id) {
         await supabase
-          .from('quotes')
+          .from('vtex_quotes')
           .update({ 
             status: 'approved',
             is_authorized: true 
           })
           .eq('id', data.quote_id);
+
+        // Evento (best-effort)
+        await supabase.from('vtex_quote_events').insert({
+          quote_id: data.quote_id,
+          event_type: 'approval',
+          from_status: 'pending_approval',
+          to_status: 'approved',
+          message: comments ?? 'Aprovada',
+          payload: { requestId: id, action: 'approve' },
+          created_by: user.id,
+        } as any);
       }
 
       return data as unknown as ApprovalRequest;
@@ -149,7 +171,7 @@ export function useRejectRequest() {
       if (!comments) throw new Error('Comentário obrigatório para rejeição');
 
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests')
         .update({
           status: 'rejected',
           approved_by: user.id,
@@ -165,12 +187,23 @@ export function useRejectRequest() {
       // Atualizar status da cotação
       if (data?.quote_id) {
         await supabase
-          .from('quotes')
+          .from('vtex_quotes')
           .update({ 
             status: 'rejected',
             is_authorized: false 
           })
           .eq('id', data.quote_id);
+
+        // Evento (best-effort)
+        await supabase.from('vtex_quote_events').insert({
+          quote_id: data.quote_id,
+          event_type: 'approval',
+          from_status: 'pending_approval',
+          to_status: 'rejected',
+          message: comments,
+          payload: { requestId: id, action: 'reject' },
+          created_by: user.id,
+        } as any);
       }
 
       return data as unknown as ApprovalRequest;
@@ -191,7 +224,7 @@ export function useApprovalStats() {
     queryKey: ['approval-stats'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests')
         .select('status, requested_at, decided_at');
 
       if (error) throw error;
