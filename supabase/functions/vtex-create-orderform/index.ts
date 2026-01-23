@@ -196,7 +196,8 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in vtex-create-orderform:", error);
-    return new Response(JSON.stringify({ error: "Erro interno no servidor", details: error?.message }), {
+    const errMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: "Erro interno no servidor", details: errMessage }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -105,17 +105,18 @@ export default function ClientesVtex() {
   const [saving, setSaving] = useState(false);
 
   const fetchStats = useCallback(async () => {
+    // Calculate stats from customers table directly
     const { data, error } = await supabase
-      .from("vw_vtex_clients_stats")
-      .select("*")
-      .maybeSingle();
+      .from('customers')
+      .select('is_active, is_lab_to_lab, uf');
     if (error) throw error;
-    const row = (data ?? {}) as any;
+    const rows = data ?? [];
+    const uniqueStates = new Set(rows.map((r: any) => r.uf).filter(Boolean));
     setStats({
-      total: Number(row.total ?? 0),
-      active: Number(row.active ?? 0),
-      l2l: Number(row.l2l ?? 0),
-      states: Number(row.states ?? 0),
+      total: rows.length,
+      active: rows.filter((r: any) => r.is_active).length,
+      l2l: rows.filter((r: any) => r.is_lab_to_lab).length,
+      states: uniqueStates.size,
     });
   }, []);
 
@@ -126,7 +127,7 @@ export default function ClientesVtex() {
       const to = from + pageSize - 1;
 
       let q = supabase
-        .from("vtex_clients")
+        .from("customers")
         .select("*", { count: "exact" })
         .order("company_name", { ascending: true });
 
@@ -144,12 +145,7 @@ export default function ClientesVtex() {
       const { data, error, count } = await q.range(from, to);
 
       if (error) throw error;
-      // vtex_clients usa md_id como PK; o UI espera "id"
-      const normalized = (data ?? []).map((c: any) => ({
-        ...c,
-        id: c.id ?? c.md_id,
-      }));
-      setCustomers(normalized as VtexClient[]);
+      setCustomers((data ?? []) as VtexClient[]);
       setTotalCount(Number(count ?? 0));
     } finally {
       setIsLoading(false);
@@ -192,8 +188,7 @@ export default function ClientesVtex() {
   };
 
   const updateClient = async (id: string, updates: Partial<VtexClient>) => {
-    // PK real é md_id
-    const { error } = await supabase.from("vtex_clients").update(updates).eq("md_id", id);
+    const { error } = await supabase.from("customers").update(updates as any).eq("id", id);
     if (error) throw error;
   };
 

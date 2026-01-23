@@ -29,6 +29,7 @@ export function QuoteItemsTable({
   items, 
   customer,
   showPardisIndicators = true,
+  tradePolicyId,
 }: QuoteItemsTableProps) {
   const { removeItem, updateItem, selectedCustomer } = useSellerFlowStore();
   const { toast } = useToast();

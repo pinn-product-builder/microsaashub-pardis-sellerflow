@@ -48,6 +48,7 @@ export default function NovaQuotacao() {
     setSelectedCustomer,
     setDestinationUF,
     addItem,
+    updateItem,
     setDiscount,
     setPaymentConditions,
     setNotes,
