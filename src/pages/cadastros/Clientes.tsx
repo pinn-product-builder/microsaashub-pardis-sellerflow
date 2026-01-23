@@ -95,6 +95,7 @@ export default function ClientesVtex() {
 
   const [customers, setCustomers] = useState<VtexClient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -105,29 +106,36 @@ export default function ClientesVtex() {
   const [saving, setSaving] = useState(false);
 
   const fetchStats = useCallback(async () => {
-    // Calculate stats from customers table directly
-    const { data, error } = await supabase
-      .from('customers')
-      .select('is_active, is_lab_to_lab, uf');
-    if (error) throw error;
-    const rows = data ?? [];
-    const uniqueStates = new Set(rows.map((r: any) => r.uf).filter(Boolean));
-    setStats({
-      total: rows.length,
-      active: rows.filter((r: any) => r.is_active).length,
-      l2l: rows.filter((r: any) => r.is_lab_to_lab).length,
-      states: uniqueStates.size,
-    });
+    try {
+      setLoadError(null);
+      const { data, error } = await supabase
+        .from("vw_vtex_clients_stats")
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      const row = (data ?? {}) as any;
+      setStats({
+        total: Number(row.total ?? 0),
+        active: Number(row.active ?? 0),
+        l2l: Number(row.l2l ?? 0),
+        states: Number(row.states ?? 0),
+      });
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e);
+      console.error("Erro ao carregar stats de clientes:", e);
+      setLoadError(msg);
+    }
   }, []);
 
   const fetchClients = useCallback(async () => {
     setIsLoading(true);
     try {
+      setLoadError(null);
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
       let q = supabase
-        .from("customers")
+        .from("vtex_clients")
         .select("*", { count: "exact" })
         .order("company_name", { ascending: true });
 
@@ -145,8 +153,17 @@ export default function ClientesVtex() {
       const { data, error, count } = await q.range(from, to);
 
       if (error) throw error;
-      setCustomers((data ?? []) as VtexClient[]);
+      // vtex_clients usa md_id como PK; o UI espera "id"
+      const normalized = (data ?? []).map((c: any) => ({
+        ...c,
+        id: c.id ?? c.md_id,
+      }));
+      setCustomers(normalized as VtexClient[]);
       setTotalCount(Number(count ?? 0));
+    } catch (e) {
+      const msg = (e as any)?.message ?? String(e);
+      console.error("Erro ao carregar clientes (VTEX):", e);
+      setLoadError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -188,7 +205,8 @@ export default function ClientesVtex() {
   };
 
   const updateClient = async (id: string, updates: Partial<VtexClient>) => {
-    const { error } = await supabase.from("customers").update(updates as any).eq("id", id);
+    // PK real é md_id
+    const { error } = await supabase.from("vtex_clients").update(updates).eq("md_id", id);
     if (error) throw error;
   };
 
@@ -251,6 +269,20 @@ export default function ClientesVtex() {
           Atualizar
         </Button>
       </div>
+
+      {loadError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="text-sm text-red-800">
+              <strong>Erro ao carregar clientes:</strong> {loadError}
+              <div className="mt-2 text-xs text-red-700">
+                Se a mensagem citar <code>permission denied</code>/401, falta permissão no Supabase Cloud para ler <code>vtex_clients</code>.
+                Se não for permissão, provavelmente o sync de clientes ainda não foi executado no Cloud.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
