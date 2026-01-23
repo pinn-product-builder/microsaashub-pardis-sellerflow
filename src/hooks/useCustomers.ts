@@ -1,14 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { Customer, CustomerFilters } from '@/types/pardis';
 import { toast } from 'sonner';
 
+type VtexClientRow = Database['public']['Tables']['vtex_clients']['Row'];
+
 export function useCustomers(filters?: CustomerFilters) {
   return useQuery({
-    queryKey: ['customers', filters],
+    queryKey: ['vtex_clients', filters],
     queryFn: async () => {
       let query = supabase
-        .from('customers')
+        .from('vtex_clients')
         .select('*')
         .order('company_name');
 
@@ -41,6 +44,7 @@ export function useCustomers(filters?: CustomerFilters) {
       const { data, error } = await query;
 
       if (error) throw error;
+      // Mantém compatibilidade do tipo legado, mas o shape real aqui é vtex_clients
       return (data ?? []) as unknown as Customer[];
     },
   });
@@ -48,12 +52,12 @@ export function useCustomers(filters?: CustomerFilters) {
 
 export function useCustomer(id: string) {
   return useQuery({
-    queryKey: ['customer', id],
+    queryKey: ['vtex_client', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('customers')
+        .from('vtex_clients')
         .select('*')
-        .eq('id', id)
+        .eq('md_id', id)
         .maybeSingle();
 
       if (error) throw error;
@@ -69,9 +73,9 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Customer> }) => {
       const { data, error } = await supabase
-        .from('customers')
-        .update(updates as any)
-        .eq('id', id)
+        .from('vtex_clients')
+        .update(updates as unknown as Partial<VtexClientRow>)
+        .eq('md_id', id)
         .select()
         .single();
 
@@ -79,7 +83,7 @@ export function useUpdateCustomer() {
       return data as unknown as Customer;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['vtex_clients'] });
       toast.success('Cliente atualizado com sucesso');
     },
     onError: (error: Error) => {
@@ -96,7 +100,7 @@ export function useCustomerSearch() {
       const term = raw.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
       let q = supabase
-        .from('customers')
+        .from('vtex_clients')
         .select('*')
         .eq('is_active', true)
         .order('company_name')
