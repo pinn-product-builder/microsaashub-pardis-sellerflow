@@ -140,6 +140,56 @@ export class PricingService {
     };
   }
 
+  /**
+   * Cria um QuoteItem a partir de um preço unitário já definido (ex: preço vindo da VTEX).
+   * Isso garante que a cotação nunca fique “sem preço” por depender de regras internas.
+   */
+  static createQuoteItemWithUnitPrice(
+    product: Product,
+    quantity: number,
+    destinationUF: string,
+    unitPrice: number,
+    customer?: Customer
+  ): QuoteItem {
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new Error("Preço unitário inválido");
+    }
+    if (quantity <= 0) {
+      throw new Error("Quantidade inválida");
+    }
+
+    // Impostos: usar motor avançado se tiver cliente; caso contrário usa regra básica
+    const taxes = customer
+      ? TaxService.calculateAdvancedTaxes({
+          product,
+          customer,
+          quantity,
+          unitPrice,
+          originUF: "SP",
+          destinationUF,
+          operationType: "VENDA" as const,
+          paymentTerm: "À vista",
+        }).taxes
+      : this.calculateTaxes(product, destinationUF, unitPrice);
+
+    const freight = this.calculateFreight(product, quantity, destinationUF);
+
+    // Margem aproximada (apenas para UI): se não tiver baseCost, fica 0
+    const baseCost = Number.isFinite(product.baseCost) ? product.baseCost : 0;
+    const margin = unitPrice > 0 && baseCost > 0 ? ((unitPrice - baseCost) / unitPrice) * 100 : 0;
+
+    return {
+      id: `${product.id}-${Date.now()}`,
+      product,
+      quantity,
+      unitPrice,
+      totalPrice: unitPrice * quantity,
+      taxes,
+      freight,
+      margin,
+    };
+  }
+
   static validateMargin(product: Product, margin: number, channel: string = 'B2B'): boolean {
     const rule = pricingRules.find(r => 
       r.category === product.category && r.channel === channel

@@ -1,7 +1,71 @@
-project_id = "tdqbjkumdkwnilybxdid"
+[api]
+port = 65421
 
-[functions.calculate-pricing]
-verify_jwt = false
+[db]
+port = 65422
+shadow_port = 65420
 
-[functions.process-approval]
+[studio]
+port = 65423
+
+[inbucket]
+port = 65424
+smtp_port = 65425
+pop3_port = 65426
+
+[analytics]
+enabled = false
+port = 65427
+vector_port = 65428
+
+# -----------------------
+# Edge Functions
+# -----------------------
+
+[functions.vtex-ping]
+enabled = true
 verify_jwt = false
+entrypoint = "./functions/vtex-ping/index.ts"
+
+[functions.vtex-sync-products]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-sync-products/index.ts"
+# NÃO coloque import_map aqui se você não tem deno.json nessa pasta
+
+[functions.vtex-sync-skus]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-sync-skus/index.ts"
+
+[functions.vtex-sync-clients]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-sync-clients/index.ts"
+
+[functions.vtex-sync-prices]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-sync-prices/index.ts"
+
+[functions.vtex-sync-inventory]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-sync-inventory/index.ts"
+
+[functions.vtex-cron-clients]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-cron-clients/index.ts"
+
+
+[functions.vtex-create-coupon]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-create-coupon/index.ts"
+import_map = "./functions/vtex-create-coupon/deno.json"
+
+[functions.vtex-create-orderform]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/vtex-create-orderform/index.ts"

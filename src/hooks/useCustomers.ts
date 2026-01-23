@@ -8,7 +8,7 @@ export function useCustomers(filters?: CustomerFilters) {
     queryKey: ['customers', filters],
     queryFn: async () => {
       let query = supabase
-        .from('customers')
+        .from('vtex_clients')
         .select('*')
         .order('company_name');
 
@@ -22,8 +22,21 @@ export function useCustomers(filters?: CustomerFilters) {
         query = query.eq('is_active', filters.isActive);
       }
       if (filters?.search) {
-        query = query.or(`company_name.ilike.%${filters.search}%,cnpj.ilike.%${filters.search}%`);
+        const raw = filters.search.trim();
+        const digits = raw.replace(/\D/g, '');
+        const term = raw.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+        if (digits) {
+          query = query.or(
+            `company_name.ilike.%${term}%,trade_name.ilike.%${term}%,cnpj.ilike.%${digits}%`
+          );
+        } else {
+          query = query.or(`company_name.ilike.%${term}%,trade_name.ilike.%${term}%`);
+        }
       }
+
+      // Segurança/performance: se não há busca, não carrega a base inteira no combobox
+      if (!filters?.search) query = query.limit(100);
+      else query = query.limit(50);
 
       const { data, error } = await query;
 
@@ -38,9 +51,9 @@ export function useCustomer(id: string) {
     queryKey: ['customer', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('customers')
+        .from('vtex_clients')
         .select('*')
-        .eq('id', id)
+        .eq('md_id', id)
         .single();
 
       if (error) throw error;
@@ -56,9 +69,9 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Customer> }) => {
       const { data, error } = await supabase
-        .from('customers')
+        .from('vtex_clients')
         .update(updates)
-        .eq('id', id)
+        .eq('md_id', id)
         .select()
         .single();
 
@@ -78,12 +91,24 @@ export function useUpdateCustomer() {
 export function useCustomerSearch() {
   return useMutation({
     mutationFn: async (search: string) => {
-      const { data, error } = await supabase
-        .from('customers')
+      const raw = (search || '').trim();
+      const digits = raw.replace(/\D/g, '');
+      const term = raw.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+
+      let q = supabase
+        .from('vtex_clients')
         .select('*')
-        .or(`company_name.ilike.%${search}%,cnpj.ilike.%${search}%`)
         .eq('is_active', true)
-        .limit(10);
+        .order('company_name')
+        .limit(20);
+
+      if (digits) {
+        q = q.or(`company_name.ilike.%${term}%,trade_name.ilike.%${term}%,cnpj.ilike.%${digits}%`);
+      } else if (term) {
+        q = q.or(`company_name.ilike.%${term}%,trade_name.ilike.%${term}%`);
+      }
+
+      const { data, error } = await q;
 
       if (error) throw error;
       return data as Customer[];

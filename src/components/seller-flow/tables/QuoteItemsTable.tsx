@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -14,19 +15,24 @@ import { useSellerFlowStore } from '@/stores/sellerFlowStore';
 import { MarginIndicator } from '@/components/seller-flow/display/MarginIndicator';
 import { AuthorizationBadge } from '@/components/seller-flow/display/AuthorizationBadge';
 import { usePardisQuote } from '@/hooks/usePardisQuote';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 interface QuoteItemsTableProps {
   items: QuoteItem[];
   customer?: Customer | null;
   showPardisIndicators?: boolean;
+  tradePolicyId?: string; // legado (não usado com auto-policy)
 }
 
 export function QuoteItemsTable({ 
   items, 
   customer,
-  showPardisIndicators = true 
+  showPardisIndicators = true,
 }: QuoteItemsTableProps) {
   const { removeItem, updateItem, selectedCustomer } = useSellerFlowStore();
+  const { toast } = useToast();
+  const [repricingIds, setRepricingIds] = useState<Record<string, boolean>>({});
   
   // Use customer from props or from store
   const effectiveCustomer = customer || selectedCustomer;
@@ -34,16 +40,69 @@ export function QuoteItemsTable({
   // Calculate Pardis margins
   const { itemCalculations } = usePardisQuote(items, effectiveCustomer);
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+  const handleQuantityChange = async (itemId: string, newQuantity: number) => {
     if (newQuantity >= 1) {
       const item = items.find(i => i.id === itemId);
       if (item) {
-        const updatedItem = {
+        // Itens VTEX: recalcular preço efetivo para a nova quantidade (policy 1) usando RPC.
+        // Isso evita ficar com preço incorreto em tiers (fixed/min_quantity) e nunca deixa preço "em branco".
+        const isVtex = String(item.product?.id || '').startsWith('vtex:');
+        if (isVtex) {
+          const skuId = Number(item.product.sku);
+          if (!Number.isFinite(skuId)) {
+            toast({
+              title: 'SKU inválido',
+              description: 'Não foi possível recalcular preço VTEX para esse item.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          setRepricingIds(prev => ({ ...prev, [itemId]: true }));
+          try {
+            const rpcName = tradePolicyId ? 'get_vtex_effective_prices' : 'get_vtex_effective_prices_any_policy';
+            const args: any = { sku_ids: [skuId], quantities: [newQuantity] };
+            if (tradePolicyId) args.trade_policy_id = String(tradePolicyId);
+            const { data, error } = await (supabase as any).rpc(rpcName, args);
+            if (error) throw error;
+
+            const row = (data ?? [])[0] as { effective_price?: number | null; trade_policy_id?: string | null } | undefined;
+            const unit = row?.effective_price ?? null;
+
+            if (!unit || unit <= 0) {
+              toast({
+                title: 'SKU sem preço',
+                description: `Não encontramos preço para o SKU ${skuId} na quantidade ${newQuantity} (nenhuma policy).`,
+                variant: 'destructive',
+              });
+              return;
+            }
+
+            updateItem(itemId, {
+              ...item,
+              quantity: newQuantity,
+              unitPrice: unit,
+              totalPrice: unit * newQuantity,
+              vtexTradePolicyId: tradePolicyId ? String(tradePolicyId) : (row?.trade_policy_id ?? (item as any).vtexTradePolicyId),
+            });
+          } catch (e: any) {
+            toast({
+              title: 'Erro ao recalcular preço',
+              description: e?.message ?? 'Falha ao buscar preço efetivo na VTEX/Supabase.',
+              variant: 'destructive',
+            });
+          } finally {
+            setRepricingIds(prev => ({ ...prev, [itemId]: false }));
+          }
+          return;
+        }
+
+        // Itens não-VTEX: mantém unitPrice e apenas ajusta total
+        updateItem(itemId, {
           ...item,
           quantity: newQuantity,
-          totalPrice: item.unitPrice * newQuantity
-        };
-        updateItem(itemId, updatedItem);
+          totalPrice: item.unitPrice * newQuantity,
+        });
       }
     }
   };
@@ -113,7 +172,7 @@ export function QuoteItemsTable({
                       size="sm"
                       className="h-6 w-6 p-0"
                       onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                      disabled={item.quantity <= 1}
+                      disabled={item.quantity <= 1 || !!repricingIds[item.id]}
                     >
                       -
                     </Button>
@@ -123,6 +182,7 @@ export function QuoteItemsTable({
                       size="sm"
                       className="h-6 w-6 p-0"
                       onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                      disabled={!!repricingIds[item.id]}
                     >
                       +
                     </Button>

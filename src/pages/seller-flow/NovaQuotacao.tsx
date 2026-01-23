@@ -6,17 +6,27 @@ import { Badge } from '@/components/ui/badge';
 import { Save, Send, ArrowLeft, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { CustomerSelector } from '@/components/seller-flow/forms/CustomerSelector';
-import { ProductSelector } from '@/components/seller-flow/forms/ProductSelector';
+import { VtexProductSelector } from '@/components/seller-flow/forms/VtexProductSelector';
 import { QuoteItemsTable } from '@/components/seller-flow/tables/QuoteItemsTable';
 import { PriceSummary } from '@/components/seller-flow/display/PriceSummary';
 import { PaymentConditions } from '@/components/seller-flow/forms/PaymentConditions';
 import { AuthorizationBadge } from '@/components/seller-flow/display/AuthorizationBadge';
 import { useSellerFlowStore } from '@/stores/sellerFlowStore';
 import { QuoteService } from '@/services/quoteService';
-import { VTEXService } from '@/services/vtexService';
+import { EdgeFunctions } from '@/services/edgeFunctions';
+import { VtexQuoteService } from '@/services/vtexQuoteService';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePardisQuote, getApproverLabel } from '@/hooks/usePardisQuote';
 import { Customer } from '@/types/seller-flow';
+import { useVtexPolicyStore } from '@/stores/vtexPolicyStore';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function NovaQuotacao() {
   const { id } = useParams();
@@ -24,6 +34,8 @@ export default function NovaQuotacao() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
+  const { mode: policyMode, tradePolicyId, setMode: setPolicyMode, setTradePolicyId, policies, loadPolicies } = useVtexPolicyStore();
+  const [isRepricingAll, setIsRepricingAll] = useState(false);
   const { toast } = useToast();
   
   const {
@@ -34,6 +46,7 @@ export default function NovaQuotacao() {
     paymentConditions,
     notes,
     setSelectedCustomer,
+    setDestinationUF,
     addItem,
     setDiscount,
     setPaymentConditions,
@@ -59,17 +72,20 @@ export default function NovaQuotacao() {
     });
   }, [selectedCustomer, destinationUF, items.length, currentStep, pardisSummary]);
 
+  // (removido) selector de policy manual
+
   // Carregar cotação para edição
   useEffect(() => {
     const loadQuote = async () => {
       if (isEditing && id) {
-        const quote = await QuoteService.getQuote(id);
+        const quote = await VtexQuoteService.getQuote(id);
         if (quote) {
           setCurrentQuote(quote);
           setSelectedCustomer(quote.customer);
           setDiscount(quote.discount);
           setPaymentConditions(quote.paymentConditions);
           setNotes(quote.notes || '');
+          // mantém valor legacy apenas; modo padrão continua auto
           
           // Adicionar itens da cotação
           quote.items?.forEach(item => addItem(item));
@@ -91,6 +107,54 @@ export default function NovaQuotacao() {
     };
     loadQuote();
   }, [isEditing, id]);
+
+  useEffect(() => {
+    if (policyMode === "fixed") loadPolicies();
+  }, [policyMode, loadPolicies]);
+
+  useEffect(() => {
+    // Se o usuário fixar policy, recalcula todos os itens VTEX no carrinho (uma chamada RPC com arrays)
+    if (policyMode !== "fixed") return;
+    if (!items.length) return;
+
+    const vtexItems = items.filter((it: any) => String(it.product?.id || "").startsWith("vtex:"));
+    if (!vtexItems.length) return;
+
+    (async () => {
+      setIsRepricingAll(true);
+      try {
+        const sku_ids = vtexItems.map((it: any) => Number(it.product.sku));
+        const quantities = vtexItems.map((it: any) => Number(it.quantity));
+        const { data, error } = await (supabase as any).rpc("get_vtex_effective_prices", {
+          sku_ids,
+          quantities,
+          trade_policy_id: String(tradePolicyId || "1"),
+        });
+        if (error) throw error;
+        const map = new Map<number, any>();
+        for (const r of (data ?? [])) map.set(Number(r.vtex_sku_id), r);
+
+        vtexItems.forEach((it: any) => {
+          const skuId = Number(it.product.sku);
+          const row = map.get(skuId);
+          const unit = row?.effective_price ?? null;
+          if (unit && unit > 0) {
+            updateItem(it.id, {
+              ...it,
+              unitPrice: unit,
+              totalPrice: unit * it.quantity,
+              vtexTradePolicyId: String(tradePolicyId || "1"),
+            } as any);
+          }
+        });
+      } catch {
+        // silencioso (a UI já mostra valores anteriores)
+      } finally {
+        setIsRepricingAll(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [policyMode, tradePolicyId]);
 
   const handleCustomerSelect = (customer: Customer) => {
     console.log('Customer selected:', customer.companyName, 'UF:', customer.uf);
@@ -132,48 +196,26 @@ export default function NovaQuotacao() {
 
     setIsLoading(true);
     try {
-      if (isEditing && id) {
-        // Atualizar cotação existente
-        await QuoteService.updateQuote(id, {
-          customer: selectedCustomer,
-          destinationUF,
-          items,
-          subtotal: totals.subtotal,
-          totalTaxes: totals.totalTaxes,
-          totalFreight: totals.totalFreight,
-          discount: totals.discount,
-          total: totals.total,
-          paymentConditions,
-          notes
-        });
+      const saved = await VtexQuoteService.createOrUpdateQuote({
+        quoteId: isEditing ? id : undefined,
+        customer: selectedCustomer as any,
+        destinationUF,
+        tradePolicyId,
+        items: items as any,
+        status: "draft",
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        total: totals.total,
+        totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
+        requiresApproval: pardisSummary.requiresApproval,
+        isAuthorized: pardisSummary.isAuthorized,
+        notes,
+      });
 
-        toast({
-          title: "Sucesso",
-          description: "Cotação atualizada com sucesso."
-        });
-      } else {
-        // Criar nova cotação
-        const quote = await QuoteService.createQuote({
-          customer: selectedCustomer,
-          destinationUF,
-          items,
-          subtotal: totals.subtotal,
-          totalTaxes: totals.totalTaxes,
-          totalFreight: totals.totalFreight,
-          discount: totals.discount,
-          total: totals.total,
-          status: 'draft',
-          paymentConditions,
-          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-          createdBy: 'current-user',
-          notes
-        });
-
-        toast({
-          title: "Sucesso",
-          description: `Cotação ${quote?.number || ''} salva como rascunho.`
-        });
-      }
+      toast({
+        title: "Sucesso",
+        description: `Cotação ${saved.number} salva como rascunho.`,
+      });
 
       clearQuote();
       setCurrentStep(1);
@@ -200,53 +242,66 @@ export default function NovaQuotacao() {
 
     setIsLoading(true);
     try {
-      let quote;
-      
-      if (isEditing && id) {
-        // Finalizar cotação existente
-        quote = QuoteService.updateQuote(id, {
-          customer: selectedCustomer,
-          destinationUF,
-          items,
-          subtotal: totals.subtotal,
-          totalTaxes: totals.totalTaxes,
-          totalFreight: totals.totalFreight,
-          discount: totals.discount,
-          total: totals.total,
-          status: 'calculated',
-          paymentConditions,
-          notes
+      const saved = await VtexQuoteService.createOrUpdateQuote({
+        quoteId: isEditing ? id : undefined,
+        customer: selectedCustomer as any,
+        destinationUF,
+        tradePolicyId,
+        items: items as any,
+        status: "calculated",
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        total: totals.total,
+        totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
+        requiresApproval: pardisSummary.requiresApproval,
+        isAuthorized: pardisSummary.isAuthorized,
+        notes,
+      });
+
+      // Se requer aprovação, cria solicitação e muda status para pending_approval
+      if (pardisSummary.requiresApproval) {
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData?.user;
+        if (!user) {
+          throw new Error("Usuário não autenticado");
+        }
+
+        const { error: approvalErr } = await (supabase as any).from("vtex_approval_requests").insert({
+          quote_id: saved.id,
+          requested_by: user.id,
+          quote_total: totals.total,
+          quote_margin_percent: pardisSummary.totalMarginPercent ?? null,
+          reason: `Margem ${pardisSummary.totalMarginPercent.toFixed(2)}% requer aprovação`,
+          status: "pending",
+        });
+        if (approvalErr) throw approvalErr;
+
+        const { error: qErr } = await (supabase as any).from("vtex_quotes").update({
+          status: "pending_approval",
+          requires_approval: true,
+          updated_by: user.id,
+        }).eq("id", saved.id);
+        if (qErr) throw qErr;
+
+        toast({
+          title: "Enviado para aprovação",
+          description: `Cotação ${saved.number} enviada para aprovação.`,
         });
       } else {
-        // Criar e finalizar nova cotação
-        quote = QuoteService.createQuote({
-          customer: selectedCustomer,
-          destinationUF,
-          items,
-          subtotal: totals.subtotal,
-          totalTaxes: totals.totalTaxes,
-          totalFreight: totals.totalFreight,
-          discount: totals.discount,
-          total: totals.total,
-          status: 'calculated',
-          paymentConditions,
-          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-          createdBy: 'current-user',
-          notes
-        });
-      }
-
       toast({
         title: "Sucesso",
-        description: `Cotação ${quote.number} finalizada com sucesso!`
+        description: `Cotação ${saved.number} finalizada com sucesso!`
       });
+      }
 
       clearQuote();
       setCurrentStep(1);
     } catch (error) {
+      // Log detalhado para debug (PostgREST costuma retornar erro rico)
+      console.error("Erro ao finalizar cotação:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível finalizar a cotação.",
+        description: (error as any)?.message ?? "Não foi possível finalizar a cotação.",
         variant: "destructive"
       });
     } finally {
@@ -266,59 +321,61 @@ export default function NovaQuotacao() {
 
     setIsSendingToVTEX(true);
     try {
-      // Primeiro, criar/atualizar a cotação
-      let quote;
-      
-      if (isEditing && id) {
-        quote = QuoteService.updateQuote(id, {
-          customer: selectedCustomer,
-          destinationUF,
-          items,
-          subtotal: totals.subtotal,
-          totalTaxes: totals.totalTaxes,
-          totalFreight: totals.totalFreight,
-          discount: totals.discount,
-          total: totals.total,
-          status: 'calculated',
-          paymentConditions,
-          notes
+      const saved = await VtexQuoteService.createOrUpdateQuote({
+        quoteId: isEditing ? id : undefined,
+        customer: selectedCustomer as any,
+        destinationUF,
+        tradePolicyId,
+        items: items as any,
+        status: "calculated",
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        total: totals.total,
+        totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
+        requiresApproval: pardisSummary.requiresApproval,
+        isAuthorized: pardisSummary.isAuthorized,
+        notes,
+      });
+
+      // Validação server-side: preço + estoque
+      const validation = await VtexQuoteService.validateCart(policyMode === "fixed" ? tradePolicyId : null, items as any);
+      const failures = validation.filter((r) => !r.ok);
+      if (failures.length) {
+        toast({
+          title: "Falha na validação do carrinho",
+          description: `Há ${failures.length} item(ns) com problema (preço/estoque). Ajuste antes de enviar.`,
+          variant: "destructive",
         });
-      } else {
-        quote = QuoteService.createQuote({
-          customer: selectedCustomer,
-          destinationUF,
-          items,
-          subtotal: totals.subtotal,
-          totalTaxes: totals.totalTaxes,
-          totalFreight: totals.totalFreight,
-          discount: totals.discount,
-          total: totals.total,
-          status: 'calculated',
-          paymentConditions,
-          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          createdBy: 'current-user',
-          notes
-        });
+        return;
       }
 
-      // Enviar para VTEX
-      const result = await VTEXService.sendOrderToVTEX(quote);
+      if (pardisSummary.requiresApproval) {
+        toast({
+          title: "Requer aprovação",
+          description: "Esta cotação precisa ser aprovada antes do envio à VTEX.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const result = await EdgeFunctions.createVtexOrderForm({
+        quoteId: saved.id,
+        tradePolicyId,
+        seller: "1",
+      });
       
-      if (result.success) {
+      if (result?.success) {
         toast({
           title: "Sucesso",
-          description: `Cotação enviada para VTEX! ${result.message}`
+          description: `OrderForm criado na VTEX: ${result.orderFormId}`
         });
-        
-        // Atualizar status da cotação
-        QuoteService.updateQuote(quote.id, { status: 'sent' });
-        
+
         clearQuote();
         setCurrentStep(1);
       } else {
         toast({
           title: "Erro na integração VTEX",
-          description: result.message,
+          description: "Não foi possível criar o orderForm.",
           variant: "destructive"
         });
       }
@@ -339,7 +396,7 @@ export default function NovaQuotacao() {
     { id: 3, title: "Finalização", description: "Revise e finalize" }
   ];
 
-  const canProceedToStep2 = selectedCustomer && destinationUF;
+  const canProceedToStep2 = !!selectedCustomer && !!destinationUF;
   const canProceedToStep3 = canProceedToStep2 && items.length > 0;
 
   return (
@@ -465,6 +522,73 @@ export default function NovaQuotacao() {
                 selectedCustomer={selectedCustomer}
                 onCustomerSelect={handleCustomerSelect}
               />
+
+              {/* UF destino pode vir vazia na base VTEX; nesse caso, o usuário escolhe manualmente */}
+              {selectedCustomer && (
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm font-medium">UF de destino *</div>
+                  <Select value={destinationUF || ''} onValueChange={(v) => setDestinationUF(v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a UF" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[
+                        "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
+                        "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
+                        "RS","RO","RR","SC","SP","SE","TO",
+                      ].map((uf) => (
+                        <SelectItem key={uf} value={uf}>
+                          {uf}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!destinationUF && (
+                    <div className="text-xs text-muted-foreground">
+                      O cliente selecionado não possui UF cadastrada; selecione a UF para liberar o passo de produtos.
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t">
+                    <div className="text-sm font-medium">Política comercial (para preço VTEX)</div>
+                    <div className="flex flex-col md:flex-row gap-2 mt-2">
+                      <select
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm md:w-56"
+                        value={policyMode}
+                        onChange={(e) => setPolicyMode(e.target.value as any)}
+                      >
+                        <option value="auto">Automático</option>
+                        <option value="fixed">Fixar policy</option>
+                      </select>
+                      {policyMode === "fixed" && (
+                        <select
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm md:w-72"
+                          value={tradePolicyId}
+                          onChange={(e) => setTradePolicyId(e.target.value)}
+                        >
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          {policies
+                            .map((p) => p.trade_policy_id)
+                            .filter((p) => p !== "1" && p !== "2")
+                            .slice(0, 80)
+                            .map((p) => (
+                              <option key={p} value={p}>
+                                {p}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      {policyMode === "auto"
+                        ? "Automático: escolhe a policy com preço disponível (prioridade: 1 → 2 → demais)."
+                        : `Fixado: todos os preços serão recalculados usando "${tradePolicyId}".`}
+                      {isRepricingAll ? " Recalculando itens..." : ""}
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -475,9 +599,11 @@ export default function NovaQuotacao() {
                 <CardTitle>2. Produtos</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <ProductSelector 
+                <VtexProductSelector
                   destinationUF={destinationUF}
                   selectedCustomer={selectedCustomer}
+                  policyMode={policyMode}
+                  tradePolicyId={tradePolicyId}
                   onAddProduct={(item) => {
                     addItem(item);
                     handleProductAdded();
@@ -486,7 +612,7 @@ export default function NovaQuotacao() {
                 {items.length > 0 && (
                   <>
                     <Separator />
-                    <QuoteItemsTable items={items} />
+                    <QuoteItemsTable items={items} tradePolicyId={policyMode === "fixed" ? tradePolicyId : undefined} />
                   </>
                 )}
                 {items.length > 0 && currentStep < 3 && (

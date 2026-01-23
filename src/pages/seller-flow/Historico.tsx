@@ -22,9 +22,9 @@ export default function Historico() {
   const filteredQuotes = useMemo(() => {
     return quotes.filter((quote) => {
       // Search filter
-      const customerName = (quote as any).customers?.company_name || '';
+      const customerName = (quote as any).client?.company_name || '';
       const matchesSearch = searchTerm === '' || 
-        quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String((quote as any).quote_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         customerName.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Status filter
@@ -70,30 +70,30 @@ export default function Historico() {
   const tableQuotes = useMemo(() => {
     return filteredQuotes.map(quote => ({
       id: quote.id,
-      number: quote.quote_number,
+      number: String((quote as any).quote_number ?? ''),
       customer: {
-        id: quote.customer_id,
-        companyName: (quote as any).customers?.company_name || 'Cliente',
-        cnpj: (quote as any).customers?.cnpj || '',
-        uf: (quote as any).customers?.uf || '',
-        city: (quote as any).customers?.city || '',
+        id: (quote as any).vtex_client_id,
+        companyName: (quote as any).client?.company_name || 'Cliente',
+        cnpj: (quote as any).client?.cnpj || '',
+        uf: (quote as any).client?.uf || '',
+        city: (quote as any).client?.city || '',
         creditLimit: 0,
         paymentTerms: []
       },
-      destinationUF: (quote as any).customers?.uf || '',
+      destinationUF: (quote as any).destination_uf || (quote as any).client?.uf || '',
       items: [],
       subtotal: quote.subtotal || 0,
       totalTaxes: 0,
       totalFreight: 0,
-      discount: quote.total_discount || 0,
-      total: quote.total_offered || 0,
-      status: quote.status as any,
+      discount: (quote as any).total_discount || 0,
+      total: (quote as any).total || 0,
+      status: (quote.status ?? 'draft') as any,
       paymentConditions: '',
-      validUntil: new Date(quote.valid_until),
+      validUntil: new Date(),
       createdAt: new Date(quote.created_at),
       updatedAt: new Date(quote.updated_at),
       createdBy: quote.created_by,
-      marginPercent: quote.total_margin_percent || 0
+      marginPercent: (quote as any).total_margin_percent || 0
     }));
   }, [filteredQuotes]);
 

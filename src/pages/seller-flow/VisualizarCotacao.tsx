@@ -21,17 +21,14 @@ import {
   Activity,
   Shield
 } from 'lucide-react';
-import { QuoteService } from '@/services/quoteService';
-import { VTEXService } from '@/services/vtexService';
-import { ConversionService } from '@/services/conversionService';
+import { EdgeFunctions } from '@/services/edgeFunctions';
+import { VtexQuoteService } from '@/services/vtexQuoteService';
+import { supabase } from '@/integrations/supabase/client';
 import { Quote } from '@/types/seller-flow';
-import { ValidationResult } from '@/types/vtex';
 import { QuoteStatusBadge } from '@/components/seller-flow/display/QuoteStatusBadge';
 import { QuoteItemsTable } from '@/components/seller-flow/tables/QuoteItemsTable';
 import { ExportActions } from '@/components/seller-flow/actions/ExportActions';
 import { EmailDialog } from '@/components/seller-flow/dialogs/EmailDialog';
-import { ConversionTimeline } from '@/components/seller-flow/conversion/ConversionTimeline';
-import { PreSendValidation } from '@/components/seller-flow/conversion/PreSendValidation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -44,20 +41,55 @@ export default function VisualizarCotacao() {
   const [isLoading, setIsLoading] = useState(true);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
-  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
-  const [showValidation, setShowValidation] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
+  const [events, setEvents] = useState<any[]>([]);
+  const [vtexSettings, setVtexSettings] = useState<{ isEnabled: boolean } | null>(null);
+  const [validationResults, setValidationResults] = useState<any[]>([]);
 
   useEffect(() => {
     const loadQuote = async () => {
       if (id) {
-        const foundQuote = await QuoteService.getQuote(id);
+        const foundQuote = await VtexQuoteService.getQuote(id);
         setQuote(foundQuote);
+        const { data: ev } = await (supabase as any)
+          .from('vtex_quote_events')
+          .select('*')
+          .eq('quote_id', id)
+          .order('created_at', { ascending: false });
+        setEvents(ev ?? []);
         setIsLoading(false);
       }
     };
     loadQuote();
   }, [id]);
+
+  // Evita tela branca: `vtexSettings` era referenciado no JSX mas não existia.
+  // Aqui buscamos via app_settings (se existir) e fazemos fallback seguro.
+  useEffect(() => {
+    const loadVtexSettings = async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'vtex_settings')
+          .maybeSingle();
+
+        if (error) {
+          // Em ambientes onde app_settings não existe ainda, não quebrar a tela.
+          setVtexSettings({ isEnabled: true });
+          return;
+        }
+
+        const v = data?.value ?? {};
+        const enabled = v?.enabled ?? v?.isEnabled ?? true;
+        setVtexSettings({ isEnabled: !!enabled });
+      } catch (e) {
+        console.warn('Falha ao carregar vtex_settings (fallback habilitado):', e);
+        setVtexSettings({ isEnabled: true });
+      }
+    };
+
+    loadVtexSettings();
+  }, []);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -74,37 +106,38 @@ export default function VisualizarCotacao() {
   const handleDuplicate = async () => {
     if (!quote) return;
 
-    const duplicatedQuote = await QuoteService.createQuote({
-      customer: quote.customer,
+    // Duplicação simplificada: cria nova vtex_quote com os mesmos itens
+    const duplicated = await VtexQuoteService.createOrUpdateQuote({
+      customer: quote.customer as any,
       destinationUF: quote.destinationUF,
-      items: quote.items,
+      tradePolicyId: (quote as any).tradePolicyId ?? "1",
+      items: quote.items as any,
+      status: "draft",
       subtotal: quote.subtotal,
-      totalTaxes: quote.totalTaxes,
-      totalFreight: quote.totalFreight,
       discount: quote.discount,
       total: quote.total,
-      status: 'draft',
-      paymentConditions: quote.paymentConditions,
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      createdBy: 'current-user',
-      notes: quote.notes
+      notes: quote.notes,
     });
 
     toast({
       title: "Cotação Duplicada",
-      description: `Nova cotação ${duplicatedQuote?.number || 'criada'} com sucesso!`
+      description: `Nova cotação ${duplicated?.number || 'criada'} com sucesso!`
     });
 
-    if (duplicatedQuote?.id) {
-      navigate(`/seller-flow/cotacao/${duplicatedQuote.id}`);
+    if (duplicated?.id) {
+      navigate(`/seller-flow/cotacao/${duplicated.id}`);
     }
   };
 
   const handleConvertToOrder = async () => {
     if (!quote) return;
 
-    await QuoteService.updateQuote(quote.id, { 
-      notes: `${quote.notes}\n\nConvertido em pedido em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`
+    // Placeholder: conversão real (OMS/pedido) será implementada depois do orderForm
+    await (supabase as any).from("vtex_quote_events").insert({
+      quote_id: quote.id,
+      event_type: "note",
+      message: `Convertido em pedido em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
+      payload: {},
     });
 
     toast({
@@ -119,51 +152,58 @@ export default function VisualizarCotacao() {
     setShowEmailDialog(true);
   };
 
+  const handleValidateCart = async () => {
+    if (!quote) return;
+    try {
+      const tradePolicyId = (quote as any).tradePolicyId ?? null;
+      const validation = await VtexQuoteService.validateCart(tradePolicyId, quote.items as any);
+      setValidationResults(validation ?? []);
+      const failures = validation.filter((r) => !r.ok);
+      if (failures.length) {
+        toast({
+          title: "Carrinho com pendências",
+          description: `Há ${failures.length} item(ns) com problema (preço/estoque).`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Carrinho validado",
+          description: "Preço e estoque OK para todos os itens.",
+        });
+      }
+    } catch {
+      toast({
+        title: "Erro",
+        description: "Não foi possível validar o carrinho agora.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSendToVTEX = async () => {
     if (!quote) return;
 
-    // Verificar se há falhas nas validações
-    const hasFailures = validationResults.some(r => r.status === 'failed');
-    if (hasFailures) {
-      toast({
-        title: "Validações Pendentes",
-        description: "Corrija os problemas nas validações antes de enviar para VTEX.",
-        variant: "destructive"
-      });
-      setShowValidation(true);
-      return;
-    }
-
     setIsSendingToVTEX(true);
     try {
-      const result = await ConversionService.processConversion(quote);
-      
-      if (result.success) {
+      const tradePolicyId = (quote as any).tradePolicyId ?? null;
+      const validation = await VtexQuoteService.validateCart(tradePolicyId, quote.items as any);
+      setValidationResults(validation ?? []);
+      const failures = validation.filter((r) => !r.ok);
+      if (failures.length) {
         toast({
-          title: "Processamento Iniciado",
-          description: result.message
+          title: "Falha na validação",
+          description: `Há ${failures.length} item(ns) com problema (preço/estoque).`,
+          variant: "destructive",
         });
-        
-        // Atualizar status da cotação baseado no resultado
-        const newStatus = result.timeline.steps.some(s => s.name === 'Enviando para VTEX' && s.status === 'completed') 
-          ? 'sent' 
-          : result.timeline.steps.some(s => s.name === 'Avaliando aprovação' && s.status === 'completed' && s.details?.includes('Aprovação manual'))
-          ? 'pending'
-          : 'processing';
-
-        await QuoteService.updateQuote(quote.id, { 
-          notes: `${quote.notes}\n\nProcessamento iniciado em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`
-        });
-        
-        setQuote(prev => prev ? { ...prev, status: newStatus as any } : null);
-        setShowTimeline(true);
-      } else {
-        toast({
-          title: "Erro no Processamento",
-          description: result.message,
-          variant: "destructive"
-        });
+        return;
       }
+
+      const res = await EdgeFunctions.createVtexOrderForm({ quoteId: quote.id, tradePolicyId, seller: "1" });
+      toast({
+        title: "Enviado para VTEX",
+        description: `OrderForm criado: ${res.orderFormId}`,
+      });
+      setQuote((prev) => (prev ? { ...prev, status: "sent" as any } : prev));
     } catch (error) {
       toast({
         title: "Erro",
@@ -173,10 +213,6 @@ export default function VisualizarCotacao() {
     } finally {
       setIsSendingToVTEX(false);
     }
-  };
-
-  const handleValidationComplete = (results: ValidationResult[]) => {
-    setValidationResults(results);
   };
 
   if (isLoading) {
@@ -214,10 +250,7 @@ export default function VisualizarCotacao() {
     );
   }
 
-  const vtexSettings = VTEXService.getCurrentSettings();
-  const canSendToVTEX = vtexSettings?.isEnabled && 
-    (quote.status === 'calculated' || quote.status === 'approved');
-  const conversionTimeline = ConversionService.getConversionTimeline(quote.id);
+  const canSendToVTEX = (quote.status === 'calculated' || quote.status === 'approved');
 
   return (
     <div className="space-y-6">
@@ -262,7 +295,7 @@ export default function VisualizarCotacao() {
             <>
               <Button 
                 variant="outline" 
-                onClick={() => setShowValidation(!showValidation)}
+                onClick={handleValidateCart}
                 className="border-blue-300 text-blue-700 hover:bg-blue-50"
               >
                 <Shield className="h-4 w-4 mr-2" />
@@ -271,23 +304,13 @@ export default function VisualizarCotacao() {
               <Button 
                 variant="outline" 
                 onClick={handleSendToVTEX}
-                disabled={isSendingToVTEX || validationResults.some(r => r.status === 'failed')}
+                disabled={isSendingToVTEX}
                 className="border-orange-300 text-orange-700 hover:bg-orange-50"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 {isSendingToVTEX ? 'Processando...' : 'Enviar para VTEX'}
               </Button>
             </>
-          )}
-          {conversionTimeline && (
-            <Button 
-              variant="outline" 
-              onClick={() => setShowTimeline(!showTimeline)}
-              className="border-purple-300 text-purple-700 hover:bg-purple-50"
-            >
-              <Activity className="h-4 w-4 mr-2" />
-              Timeline
-            </Button>
           )}
           {quote.status === 'calculated' && (
             <Button onClick={handleConvertToOrder}>
@@ -297,19 +320,6 @@ export default function VisualizarCotacao() {
           )}
         </div>
       </div>
-
-      {/* Validation Panel */}
-      {showValidation && canSendToVTEX && (
-        <PreSendValidation 
-          quote={quote} 
-          onValidationComplete={handleValidationComplete}
-        />
-      )}
-
-      {/* Timeline Panel */}
-      {showTimeline && conversionTimeline && (
-        <ConversionTimeline timeline={conversionTimeline} />
-      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
@@ -351,6 +361,39 @@ export default function VisualizarCotacao() {
             </CardHeader>
             <CardContent>
               <QuoteItemsTable items={quote.items} />
+            </CardContent>
+          </Card>
+
+          {/* Histórico */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Activity className="h-5 w-5 mr-2" />
+                Histórico
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem eventos ainda.</p>
+              ) : (
+                <div className="space-y-3">
+                  {events.slice(0, 30).map((ev) => (
+                    <div key={ev.id} className="text-sm">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium">{ev.message || ev.event_type}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(ev.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        </span>
+                      </div>
+                      {(ev.from_status || ev.to_status) && (
+                        <p className="text-xs text-muted-foreground">
+                          {ev.from_status ? `${ev.from_status} → ` : ''}{ev.to_status ?? ''}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
