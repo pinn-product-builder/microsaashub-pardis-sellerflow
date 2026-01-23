@@ -8,10 +8,10 @@ export function usePendingApprovals() {
     queryKey: ['approvals', 'pending'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests' as any)
         .select(`
           *,
-          quote:quotes(*, customer:customers(*)),
+          quote:vtex_quotes(*, client:vtex_clients(*)),
           rule:approval_rules(*)
         `)
         .eq('status', 'pending')
@@ -28,10 +28,10 @@ export function useApprovalRequests(quoteId?: string) {
     queryKey: ['approvals', quoteId],
     queryFn: async () => {
       let query = supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests' as any)
         .select(`
           *,
-          quote:quotes(*, customer:customers(*)),
+          quote:vtex_quotes(*, client:vtex_clients(*)),
           rule:approval_rules(*)
         `)
         .order('requested_at', { ascending: false });
@@ -63,7 +63,7 @@ export function useCreateApprovalRequest() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests' as any)
         .insert({
           quote_id: input.quote_id,
           rule_id: input.rule_id,
@@ -80,7 +80,7 @@ export function useCreateApprovalRequest() {
 
       // Atualizar status da cotação
       await supabase
-        .from('quotes')
+        .from('vtex_quotes' as any)
         .update({ 
           status: 'pending_approval',
           requires_approval: true 
@@ -109,7 +109,7 @@ export function useApproveRequest() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests' as any)
         .update({
           status: 'approved',
           approved_by: user.id,
@@ -117,7 +117,7 @@ export function useApproveRequest() {
           decided_at: new Date().toISOString(),
         } as any)
         .eq('id', id)
-        .select('*, quote:quotes(*)')
+        .select('*, quote:vtex_quotes(*)')
         .single();
 
       if (error) throw error;
@@ -125,7 +125,7 @@ export function useApproveRequest() {
       // Atualizar status da cotação
       if (data.quote_id) {
         await supabase
-          .from('quotes')
+          .from('vtex_quotes' as any)
           .update({ 
             status: 'approved',
             is_authorized: true 
@@ -157,7 +157,7 @@ export function useRejectRequest() {
       if (!comments) throw new Error('Comentário obrigatório para rejeição');
 
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests' as any)
         .update({
           status: 'rejected',
           approved_by: user.id,
@@ -165,7 +165,7 @@ export function useRejectRequest() {
           decided_at: new Date().toISOString(),
         } as any)
         .eq('id', id)
-        .select('*, quote:quotes(*)')
+        .select('*, quote:vtex_quotes(*)')
         .single();
 
       if (error) throw error;
@@ -173,7 +173,7 @@ export function useRejectRequest() {
       // Atualizar status da cotação
       if (data.quote_id) {
         await supabase
-          .from('quotes')
+          .from('vtex_quotes' as any)
           .update({ 
             status: 'rejected',
             is_authorized: false 
@@ -199,7 +199,7 @@ export function useApprovalStats() {
     queryKey: ['approval-stats'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('approval_requests')
+        .from('vtex_approval_requests' as any)
         .select('status, requested_at, decided_at');
 
       if (error) throw error;

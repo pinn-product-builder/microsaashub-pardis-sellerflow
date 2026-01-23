@@ -16,7 +16,7 @@ export default function CPQDashboard() {
 
   const stats = useMemo(() => {
     const total = quotes.length;
-    const totalValue = quotes.reduce((sum, quote) => sum + (quote.total_offered || 0), 0);
+    const totalValue = quotes.reduce((sum, quote) => sum + ((quote as any).total || 0), 0);
     const pendingQuotes = quotes.filter(q => q.status === 'calculated' || q.status === 'sent').length;
     const thisMonthQuotes = quotes.filter(q => {
       const quoteDate = new Date(q.created_at);
@@ -224,11 +224,11 @@ export default function CPQDashboard() {
                             {quote.quote_number}
                           </Link>
                           <p className="text-sm text-muted-foreground truncate">
-                            {(quote as any).customers?.company_name || 'Cliente'}
+                            {(quote as any).client?.company_name || 'Cliente'}
                           </p>
                         </div>
                         <div className="text-right ml-4">
-                          <p className="font-medium">{formatCurrency(quote.total_offered || 0)}</p>
+                          <p className="font-medium">{formatCurrency((quote as any).total || 0)}</p>
                           <Badge variant="secondary" className="text-xs">
                             {getStatusLabel(quote.status)}
                           </Badge>

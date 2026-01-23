@@ -222,6 +222,8 @@ export interface QuoteItemLegacy {
   approvalRequired?: boolean;
   minimumPrice?: number;
   taxAlerts?: TaxAlert[];
+  /** Para itens VTEX: policy efetivamente usada para precificar este item (auditoria) */
+  vtexTradePolicyId?: string;
 }
 
 // -----------------------------------------------------------------------------

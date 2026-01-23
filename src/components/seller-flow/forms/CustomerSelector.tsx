@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,16 +32,26 @@ export function CustomerSelector({ selectedCustomer, onCustomerSelect }: Custome
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
-  const { data: customersData = [], isLoading } = useCustomers({ isActive: true });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchValue), 350);
+    return () => clearTimeout(t);
+  }, [searchValue]);
+
+  const { data: customersData = [], isLoading } = useCustomers({
+    isActive: true,
+    search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
+  });
 
   // Transform Supabase data to CPQ Customer type
   const customers: Customer[] = useMemo(() => {
     return customersData.map(c => ({
-      id: c.id,
+      // vtex_clients usa md_id (Master Data CL) como PK
+      id: (c as any).md_id ?? (c as any).id,
       cnpj: c.cnpj,
       companyName: c.company_name,
-      uf: c.uf,
-      city: c.city,
+      uf: (c.uf ?? '') as any,
+      city: (c.city ?? '') as any,
       creditLimit: c.credit_limit || 0,
       paymentTerms: c.available_payment_terms || ['À vista'],
       priceTableId: c.price_table_type || undefined,
@@ -51,14 +61,7 @@ export function CustomerSelector({ selectedCustomer, onCustomerSelect }: Custome
     }));
   }, [customersData]);
 
-  const filteredCustomers = useMemo(() => {
-    if (!searchValue) return customers;
-    
-    return customers.filter(customer =>
-      customer.companyName.toLowerCase().includes(searchValue.toLowerCase()) ||
-      customer.cnpj.includes(searchValue.replace(/\D/g, ''))
-    );
-  }, [customers, searchValue]);
+  const filteredCustomers = customers;
 
   const handleSelect = (customer: Customer) => {
     onCustomerSelect(customer);

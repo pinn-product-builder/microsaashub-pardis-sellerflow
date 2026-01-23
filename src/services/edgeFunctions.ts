@@ -57,6 +57,30 @@ interface ApprovalResult {
 
 export class EdgeFunctions {
   /**
+   * Cria um orderForm na VTEX a partir de uma vtex_quote (server-side, com AppKey/Token)
+   */
+  static async createVtexOrderForm(params: { quoteId: string; tradePolicyId?: string; seller?: string }) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Usuário não autenticado');
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/vtex-create-orderform`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+      },
+      body: JSON.stringify(params)
+    });
+
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(json?.error || 'Erro ao criar orderForm na VTEX');
+    }
+    return json as { success: boolean; orderFormId: string; orderForm: any };
+  }
+
+  /**
    * Calcula preço de forma segura no servidor
    */
   static async calculatePricing(request: PricingRequest): Promise<PricingResult> {
