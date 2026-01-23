@@ -1,13 +1,14 @@
 contract:
   name: "Hermes Pardini | VTEX Sync SKUs"
-  version: "1.0.0"
-  last_updated: "2026-01-17"
+  version: "1.1.0"
+  last_updated: "2026-01-23"
   owner:
     company: "Pinn / Pardis SellerFlow"
     responsible: "Pedro Henrique Ventura"
   goal: >
     Sincronizar detalhes de SKUs da VTEX para o Supabase (tabela vtex_skus),
-    garantindo preenchimento de sku_name e vtex_product_id.
+    garantindo preenchimento de name e vtex_product_id.
+    Atualização de contrato: incluir campos de catálogo solicitados (embalagem/gramatura) e campo de validade do SKU.
 
 environments:
   vtex:
@@ -24,6 +25,11 @@ environments:
   supabase:
     local_base: "http://127.0.0.1:65421/functions/v1"
     cloud_base: "https://<PROJECT_REF>.supabase.co/functions/v1"
+    auth:
+      execution:
+        - "Admin autenticado (JWT em Authorization)"
+        - "OU header x-vtex-sync-secret (VTEX_SYNC_SECRET) para automação/cron"
+      note: "Não expor sync publicamente com anon key sem proteção."
 
 interface:
   edge_function:
@@ -95,7 +101,7 @@ upstream_calls:
       method: "GET"
       url: "https://{account}.{env}/api/catalog_system/pvt/sku/stockkeepingunitbyid/{skuId}"
       notes:
-        - "Fonte principal de sku_name (SkuName) e vtex_product_id (ProductId)."
+        - "Fonte principal de name (SkuName/NameComplete/ProductName) e vtex_product_id (ProductId)."
 
 data_persistence:
   supabase_tables:
@@ -105,25 +111,34 @@ data_persistence:
       columns:
         vtex_sku_id: "number (from Id)"
         vtex_product_id: "number|null (from ProductId)"
-        sku_name: "string|null (from SkuName)  <<< CAMPO CRÍTICO"
-        name_complete: "string|null (from NameComplete)"
-        product_name: "string|null (from ProductName)"
-        brand_id: "number|null (from BrandId)"
-        brand_name: "string|null (from BrandName)"
+        name: "string|null (best-effort from SkuName/NameComplete/ProductName)"
         is_active: "boolean|null (from IsActive)"
-        is_inventoried: "boolean|null (from IsInventoried)"
-        ean: "string|null (from AlternateIds.Ean)"
-        ref_id: "string|null (from AlternateIds.RefId)"
-        detail_url: "string|null (from DetailUrl)"
-        image_url: "string|null (from ImageUrl)"
+        ean: "string|null (best-effort; digits-only)"
+        ref_id: "string|null (best-effort)"
+        embalagem: >
+          "string|null (campo solicitado).
+          Fonte preferencial: especificação do SKU (ex.: 'Embalagem').
+          Fallback: extração heurística do name/name_complete (ex.: 'cx 100', 'kit 10', 'pct 50')."
+        gramatura: >
+          "string|null (campo solicitado).
+          Fonte preferencial: especificação do SKU (ex.: 'Gramatura').
+          Fallback: extração heurística do name/name_complete (ex.: '20g', '500ml', '10cm')."
+        validade_sku: >
+          "string|date|null (campo solicitado).
+          Fonte: especificação do SKU (ex.: 'Validade' / 'validade').
+          Observação: o formato exato (date vs texto) será validado com o cliente e normalizado na persistência."
         raw: "jsonb (payload completo do SKU)"
       guarantees:
         - "Upsert idempotente por vtex_sku_id."
-        - "sku_name não deve ficar null para SKUs válidos retornados pela VTEX."
+        - "name não deve ficar null para SKUs válidos retornados pela VTEX (salvo exceções)."
 
 acceptance_criteria:
   functional:
-    - "Após rodar até o final, query de validação (sku_name is null) deve retornar 0 (ou justificar exceções)."
+    - "Após rodar até o final, query de validação (name is null) deve retornar 0 (ou justificar exceções)."
     - "totalSkusInScope deve bater com a VTEX para o salesChannelId validado."
+    - "Campos embalagem/gramatura/validade_sku devem estar preenchidos para SKUs onde a VTEX possui especificação correspondente."
   observability:
     - "Resposta sempre inclui next (ou null) e métricas por página."
+  security:
+    - "Execução restrita (admin JWT ou x-vtex-sync-secret)."
+    - "Não logar PII/segredos; logar apenas métricas e IDs."

@@ -104,8 +104,8 @@ Se a ideia é precificar, cotar e aprovar condições, SKU precisa estar consist
 
 ## Pontos que vocês precisam validar
 - Qual **salesChannelId** é o canal correto para o sync (padrão normalmente é `1`, mas precisa ser validado)
-- Quais campos devem ser obrigatórios no banco (principalmente `sku_name` e o vínculo `vtex_product_id`)
-- Se o comportamento `missingOnly` deve considerar “faltante” apenas inexistente ou também “incompleto” (ex.: `sku_name` nulo)
+- Quais campos devem ser obrigatórios no banco (principalmente `name` e o vínculo `vtex_product_id`)
+- Se o comportamento `missingOnly` deve considerar “faltante” apenas inexistente ou também “incompleto” (ex.: `name` nulo)
 
 ## Critério de aceite (direto)
 Rodando até `next=null`:
