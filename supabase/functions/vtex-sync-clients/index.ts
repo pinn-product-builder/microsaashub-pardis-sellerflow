@@ -561,6 +561,7 @@ serve(async (req) => {
     const withCredit = toBool(u.searchParams.get("withCredit"), false);
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
+    const useStateToken = toBool(u.searchParams.get("useStateToken"), true);
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
@@ -568,7 +569,25 @@ serve(async (req) => {
     if (all) {
       // Edge runtime tem limite de CPU por request; lote menor evita 502 sem body.
       const scrollSize = Math.min(100, Math.max(10, pageSize));
-      const token = normStr(u.searchParams.get("token"));
+      const stateKey = "clients_scroll_token";
+      let token = normStr(u.searchParams.get("token"));
+      let reusedStateToken = false;
+
+      // Se não veio token na URL, tenta reutilizar token global salvo no Supabase,
+      // evitando abrir múltiplas sessões simultâneas de /scroll na VTEX.
+      if (!token && useStateToken) {
+        const { data: st } = await supabase
+          .from("vtex_sync_state")
+          .select("value")
+          .eq("key", stateKey)
+          .maybeSingle();
+        const t = (st?.value as any)?.token ? String((st!.value as any).token) : null;
+        if (t) {
+          token = t;
+          reusedStateToken = true;
+        }
+      }
+
       const r = await vtexScrollClientsPage({ pageSize: scrollSize, token });
       if (!r.ok) return json({ step: "vtex_scroll", ...r }, 502);
 
@@ -686,6 +705,19 @@ serve(async (req) => {
 
       const done = !r.nextToken || rows.length === 0;
 
+      // Atualiza token global (para que chamadas concorrentes continuem o mesmo scroll)
+      if (useStateToken) {
+        if (done || !r.nextToken) {
+          await supabase
+            .from("vtex_sync_state")
+            .upsert({ key: stateKey, value: { token: null }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+        } else {
+          await supabase
+            .from("vtex_sync_state")
+            .upsert({ key: stateKey, value: { token: r.nextToken }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+        }
+      }
+
       return json({
         ok: true,
         mode: "scroll_batch",
@@ -693,6 +725,8 @@ serve(async (req) => {
         withAddress,
         withCredit,
         overwriteCredit,
+        useStateToken,
+        reusedStateToken,
         batchSize: rows.length,
         upserted: rows.length,
         nextToken: r.nextToken,
