@@ -118,8 +118,30 @@ function Start-FunctionsServe([string]$envFile) {
   # Usamos um processo separado para não travar o loop.
   $args = @("functions", "serve", "vtex-sync-clients", "--no-verify-jwt", "--env-file", $envFile)
   Info "Iniciando: supabase $($args -join ' ')"
-  Start-Process -FilePath "supabase" -ArgumentList $args -WindowStyle Minimized | Out-Null
-  Start-Sleep -Seconds 3
+
+  $logDir = Join-Path $PSScriptRoot ".tmp"
+  if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+  $logPath = Join-Path $logDir "functions-serve.vtex-sync-clients.log"
+
+  $p = Start-Process -FilePath "supabase" -ArgumentList $args -WindowStyle Minimized -PassThru -RedirectStandardOutput $logPath -RedirectStandardError $logPath
+
+  # Aguarda o runtime subir e imprimir a URL/porta no log.
+  $deadline = (Get-Date).AddSeconds(60)
+  while ((Get-Date) -lt $deadline) {
+    if ($p.HasExited) {
+      $tail = ""
+      if (Test-Path $logPath) { $tail = (Get-Content $logPath -Tail 80 | Out-String) }
+      throw "supabase functions serve encerrou imediatamente (exit=$($p.ExitCode)). Log: `n$tail"
+    }
+    Start-Sleep -Milliseconds 750
+    if (Test-Path $logPath) {
+      $txt = (Get-Content $logPath -Tail 200 | Out-String)
+      if ($txt -match "http[s]?://[^\s\"']+") { return @{ LogPath = $logPath } }
+      if ($txt -match "Serving|serve|listening") { return @{ LogPath = $logPath } }
+    }
+  }
+
+  return @{ LogPath = $logPath }
 }
 
 function Resolve-FunctionsBase([string[]]$candidates, [string]$syncSecret) {
@@ -137,6 +159,18 @@ function Resolve-FunctionsBase([string[]]$candidates, [string]$syncSecret) {
     }
   }
   throw "Não consegui encontrar um endpoint de functions válido. Tente fechar processos antigos de 'supabase functions serve' e rode novamente."
+}
+
+function Extract-ServeBaseFromLog([string]$logPath) {
+  if (-not (Test-Path $logPath)) { return "" }
+  $txt = (Get-Content $logPath -Tail 400 | Out-String)
+  # tenta achar a primeira URL local impressa pelo serve
+  $m = [regex]::Match($txt, "http://(?:127\\.0\\.0\\.1|localhost):(?<port>\\d+)(?<path>/functions/v1)?", "IgnoreCase")
+  if (-not $m.Success) { return "" }
+  $port = $m.Groups["port"].Value
+  $path = $m.Groups["path"].Value
+  if ([string]::IsNullOrWhiteSpace($path)) { $path = "/functions/v1" }
+  return "http://127.0.0.1:$port$path"
 }
 
 function Reset-WindowedStateCloud([string]$projectRef) {
@@ -184,11 +218,13 @@ if ($Mode -eq "local") {
   }
 
   # garante que a edge function está servindo com o env-file
-  Start-FunctionsServe $envFile
+  $serve = Start-FunctionsServe $envFile
 
   # O `functions serve` expõe seu próprio endpoint (normalmente :54321), que pode ser diferente do Kong (:65421).
   # Vamos detectar automaticamente qual responde com codeVersion.
+  $fromLog = Extract-ServeBaseFromLog ($serve.LogPath)
   $candidates = @(
+    $fromLog,
     "http://127.0.0.1:54321/functions/v1",
     "http://localhost:54321/functions/v1",
     $functionsUrl
