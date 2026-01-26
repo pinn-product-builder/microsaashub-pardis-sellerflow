@@ -50,13 +50,17 @@ function CurlJson([string]$url, [hashtable]$headers) {
 }
 
 function Ensure-SupabaseLocalRunning() {
-  try {
-    & supabase status | Out-Null
-  } catch {
+  if (-not (Get-Command supabase -ErrorAction SilentlyContinue)) {
     throw "Supabase CLI não encontrado no PATH. Instale e tente novamente (https://supabase.com/docs/guides/cli)."
   }
 
-  $status = & supabase status 2>&1
+  # O `supabase status` pode escrever avisos em stderr (ex.: 'Stopped services: ...').
+  # Com $ErrorActionPreference=Stop isso vira erro fatal. Aqui tratamos como texto e seguimos.
+  $oldEap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $status = (& supabase status 2>&1 | Out-String)
+  $ErrorActionPreference = $oldEap
+
   if ($status -match "supabase local development setup is running") {
     Info "Supabase local já está rodando."
     return
