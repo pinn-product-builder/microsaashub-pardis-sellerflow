@@ -42,7 +42,8 @@ function CurlJson([string]$url, [hashtable]$headers) {
   # -sS: silent but show errors
   $args = @("-sS", $url)
   foreach ($k in $headers.Keys) {
-    $args += @("-H", "$k: $($headers[$k])")
+    # PowerShell: "$k:" tenta resolver "$k:" como "drive scope", então usamos ${k}
+    $args += @("-H", "${k}: $($headers[$k])")
   }
   $out = & curl.exe @args
   return $out
