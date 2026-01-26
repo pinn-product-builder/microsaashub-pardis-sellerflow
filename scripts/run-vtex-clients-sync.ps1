@@ -70,18 +70,39 @@ function Ensure-SupabaseLocalRunning() {
   & supabase start | Out-Null
 }
 
-function Set-LocalSecrets([hashtable]$secrets) {
-  $pairs = @()
-  foreach ($k in $secrets.Keys) {
-    $v = [string]$secrets[$k]
+function Get-SupabaseStatusJson() {
+  $raw = & supabase status --output json 2>&1
+  $text = ($raw | Out-String).Trim()
+  # o CLI às vezes imprime "Stopped services: ..." depois do JSON; pega só o primeiro bloco JSON
+  $start = $text.IndexOf("{")
+  $end = $text.IndexOf("}", $start)
+  if ($start -lt 0) { throw "Não consegui ler supabase status --output json" }
+  $jsonText = $text.Substring($start)
+  # Tenta parsear o primeiro objeto JSON completo
+  try { return ($jsonText | ConvertFrom-Json) } catch { throw "Falha ao parsear supabase status JSON: $($_.Exception.Message)" }
+}
+
+function Write-EnvFile([string]$path, [hashtable]$env) {
+  $lines = @()
+  foreach ($k in $env.Keys) {
+    $v = [string]$env[$k]
     if (-not [string]::IsNullOrWhiteSpace($v)) {
-      $pairs += "$k=$v"
+      # mantém simples: KEY=VALUE (sem quotes). Se tiver caracteres especiais, funciona na maioria dos casos.
+      $lines += "$k=$v"
     }
   }
-  if ($pairs.Count -eq 0) { return }
+  $dir = Split-Path -Parent $path
+  if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
+  Set-Content -Path $path -Value $lines -Encoding UTF8
+}
 
-  # aplica secrets no runtime local
-  & supabase secrets set --local @pairs | Out-Null
+function Start-FunctionsServe([string]$envFile) {
+  # Sobe a edge runtime local com env vars. Precisa ficar rodando durante o sync.
+  # Usamos um processo separado para não travar o loop.
+  $args = @("functions", "serve", "vtex-sync-clients", "--no-verify-jwt", "--env-file", $envFile)
+  Info "Iniciando: supabase $($args -join ' ')"
+  Start-Process -FilePath "supabase" -ArgumentList $args -WindowStyle Minimized | Out-Null
+  Start-Sleep -Seconds 3
 }
 
 function Reset-WindowedStateCloud([string]$projectRef) {
@@ -102,18 +123,34 @@ if ($Mode -eq "local") {
   $syncSecret = [guid]::NewGuid().ToString("N")
   Info "Usando VTEX_SYNC_SECRET local (gerado) para executar o sync."
 
-  Set-LocalSecrets @{
+  $st = Get-SupabaseStatusJson
+  $functionsUrl = [string]$st.FUNCTIONS_URL
+  if ([string]::IsNullOrWhiteSpace($functionsUrl)) { $functionsUrl = "http://127.0.0.1:65421/functions/v1" }
+
+  $envFile = Join-Path $PSScriptRoot ".tmp\.env.vtex-sync-local"
+  Write-EnvFile $envFile @{
+    # Supabase local (para upsert no DB com service role)
+    SUPABASE_URL = [string]$st.API_URL
+    SUPABASE_ANON_KEY = [string]$st.ANON_KEY
+    SUPABASE_SERVICE_ROLE_KEY = [string]$st.SERVICE_ROLE_KEY
+
+    # VTEX
     VTEX_ACCOUNT = $VTEX_ACCOUNT
     VTEX_ENV = $VTEX_ENV
     VTEX_APP_KEY = $VTEX_APP_KEY
     VTEX_APP_TOKEN = $VTEX_APP_TOKEN
     VTEX_CUSTOMER_CREDIT_ENV = $VTEX_CUSTOMER_CREDIT_ENV
+
+    # Auth bypass local via secret
     VTEX_SYNC_SECRET = $syncSecret
   }
 
-  $base = "http://127.0.0.1:65421"
+  # garante que a edge function está servindo com o env-file
+  Start-FunctionsServe $envFile
+
+  $base = $functionsUrl.TrimEnd("/")
   $url =
-    "$base/functions/v1/vtex-sync-clients" +
+    "$base/vtex-sync-clients" +
     "?all=true" +
     "&strategy=$Strategy" +
     "&pageSize=$PageSize" +
@@ -131,7 +168,7 @@ if ($Mode -eq "local") {
     Start-Sleep -Seconds $SleepSeconds
   }
 
-  Info "Finalizado no local. Para atualizar a cloud, rode o mesmo script com -Mode cloud (sem precisar migrar CSV)."
+  Info "Finalizado no local. Observação: o processo 'supabase functions serve' continua rodando (pode fechar depois)."
   exit 0
 }
 
