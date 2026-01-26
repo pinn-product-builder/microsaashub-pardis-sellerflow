@@ -631,7 +631,10 @@ serve(async (req) => {
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
     const useStateToken = toBool(u.searchParams.get("useStateToken"), true);
-    const strategy = (normStr(u.searchParams.get("strategy")) ?? "scroll").toLowerCase(); // scroll | windowed
+    // Estratégia default:
+    // - all=true: preferimos windowed (evita /scroll e também evita o hard-limit de 10k do /search)
+    // - all=false: mantém fluxo normal (range/search)
+    const strategy = (normStr(u.searchParams.get("strategy")) ?? (all ? "windowed" : "scroll")).toLowerCase(); // scroll | windowed
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
