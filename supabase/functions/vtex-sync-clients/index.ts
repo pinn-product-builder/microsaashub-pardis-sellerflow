@@ -3,6 +3,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
+// Bump this when deploying changes you need to verify in Cloud responses.
+const CODE_VERSION = "2026-01-26.windowed-where-fallback.v1";
+
 const corsHeaders = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers":
@@ -15,7 +18,12 @@ function sleep(ms: number) {
 }
 
 function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
+  // Always include code version for debugging cloud deploy drift.
+  const payload =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? { codeVersion: CODE_VERSION, ...(data as any) }
+      : { codeVersion: CODE_VERSION, data };
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, "content-type": "application/json; charset=utf-8" },
   });
@@ -698,7 +706,7 @@ serve(async (req) => {
             if (!split) {
               // não conseguimos dividir mais: devolve erro claro
               await saveWindowedState(supabase, stateKey, state);
-              return json({ ok: false, step: "windowed_split", error: "Janela ainda >10k e não foi possível dividir mais.", window: w }, 502);
+            return json({ ok: false, step: "windowed_split", strategy, all, error: "Janela ainda >10k e não foi possível dividir mais.", window: w }, 502);
             }
             // push em LIFO para priorizar a primeira metade
             state.queue.unshift(split[1], split[0]);
@@ -707,7 +715,7 @@ serve(async (req) => {
 
           if (!probe.ok) {
             await saveWindowedState(supabase, stateKey, state);
-            return json({ ok: false, step: "windowed_probe", ...probe }, 502);
+            return json({ ok: false, step: "windowed_probe", strategy, all, ...probe }, 502);
           }
 
           state.current = { ...w, page: 1, pageSize: Math.min(500, Math.max(10, pageSize)), total: probe.total ?? null };
@@ -716,7 +724,7 @@ serve(async (req) => {
         if (!state.current) {
           // nada a fazer
           await saveWindowedState(supabase, stateKey, state);
-          return json({ ok: true, mode: "windowed_done", done: true, queueLen: state.queue.length });
+          return json({ ok: true, mode: "windowed_done", strategy, all, done: true, queueLen: state.queue.length });
         }
 
         // fetch da janela atual — usa whereStyle já detectado (ou tenta variações se ainda não tiver)
@@ -746,10 +754,10 @@ serve(async (req) => {
             state.current = null;
             state.queue.unshift(split[1], split[0]);
             await saveWindowedState(supabase, stateKey, state);
-            return json({ ok: true, mode: "windowed_split_deferred", done: false, queueLen: state.queue.length });
+          return json({ ok: true, mode: "windowed_split_deferred", strategy, all, done: false, queueLen: state.queue.length });
           }
-          await saveWindowedState(supabase, stateKey, state);
-          return json({ ok: false, step: "windowed_fetch", ...r }, 502);
+        await saveWindowedState(supabase, stateKey, state);
+        return json({ ok: false, step: "windowed_fetch", strategy, all, ...r }, 502);
         }
 
         const arr = Array.isArray(r.data) ? r.data : [];
@@ -907,7 +915,7 @@ serve(async (req) => {
       }
 
       const r = await vtexScrollClientsPage({ pageSize: scrollSize, token });
-      if (!r.ok) return json({ step: "vtex_scroll", ...r }, 502);
+      if (!r.ok) return json({ step: "vtex_scroll", strategy, all, ...r }, 502);
 
       const arr = Array.isArray(r.data) ? r.data : [];
       const rows = arr
