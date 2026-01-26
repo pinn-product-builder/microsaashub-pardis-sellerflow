@@ -549,6 +549,7 @@ type Window = { start: string; end: string };
 type WindowedState = {
   queue: Window[];
   current: (Window & { page: number; pageSize: number; total?: number | null }) | null;
+  whereStyle?: string | null;
 };
 
 function clampDateMs(x: number) {
@@ -563,10 +564,22 @@ function midIso(startIso: string, endIso: string) {
   return new Date(clampDateMs(m)).toISOString();
 }
 
-function windowWhere(w: Window) {
-  // Sintaxe tolerante para o Master Data v1 (_where é "SQL-like")
-  // Preferimos `between ... AND ...`.
-  return `createdIn between ${w.start} AND ${w.end}`;
+function windowWhere(w: Window, style: string) {
+  const s = w.start;
+  const e = w.end;
+  switch (style) {
+    case "between_quoted":
+      return `createdIn between '${s}' AND '${e}'`;
+    case "gte_lt":
+      return `createdIn>=${s} AND createdIn<${e}`;
+    case "gte_lt_quoted":
+      return `createdIn>='${s}' AND createdIn<'${e}'`;
+    case "between":
+    default:
+      // Sintaxe tolerante para o Master Data v1 (_where é "SQL-like")
+      // Preferimos `between ... AND ...`.
+      return `createdIn between ${s} AND ${e}`;
+  }
 }
 
 async function readWindowedState(supabase: any, key: string, nowIso: string): Promise<WindowedState> {
@@ -581,6 +594,7 @@ async function readWindowedState(supabase: any, key: string, nowIso: string): Pr
     return {
       queue: v.queue as Window[],
       current: v.current ?? null,
+      whereStyle: v.whereStyle ?? null,
     };
   }
 
@@ -588,6 +602,7 @@ async function readWindowedState(supabase: any, key: string, nowIso: string): Pr
   return {
     queue: [{ start: "2000-01-01T00:00:00.000Z", end: nowIso }],
     current: null,
+    whereStyle: null,
   };
 }
 
@@ -647,13 +662,36 @@ serve(async (req) => {
         const nowIso = new Date().toISOString();
         const state = await readWindowedState(supabase, stateKey, nowIso);
 
+        const whereStyles = ["between", "between_quoted", "gte_lt", "gte_lt_quoted"] as const;
+        const pickWhereStyles = (preferred: string | null) => {
+          if (preferred && whereStyles.includes(preferred as any)) {
+            return [preferred, ...whereStyles.filter((s) => s !== preferred)];
+          }
+          return [...whereStyles];
+        };
+
         // garante um current válido (divide janelas que estouram 10k)
         let safety = 0;
         while (!state.current && state.queue.length && safety < 20) {
           safety++;
           const w = state.queue.shift()!;
-          const where = windowWhere(w);
-          const probe = await vtexFetchClientsPage({ page: 1, pageSize: 1, where });
+
+          let probe: any = null;
+          let usedStyle: string | null = null;
+          for (const st of pickWhereStyles(state.whereStyle ?? null)) {
+            const where = windowWhere(w, st);
+            const r = await vtexFetchClientsPage({ page: 1, pageSize: 1, where });
+            // Se der 400 por sintaxe, tenta a próxima variação.
+            if (!r.ok && r.status === 400 && !isVtexMasterDataOver10kError(r.bodyPreview || "")) {
+              probe = r;
+              continue;
+            }
+            probe = r;
+            usedStyle = st;
+            break;
+          }
+
+          if (usedStyle) state.whereStyle = usedStyle;
 
           if (!probe.ok && probe.status === 400 && isVtexMasterDataOver10kError(probe.bodyPreview || "")) {
             const split = splitWindow(w);
@@ -681,8 +719,21 @@ serve(async (req) => {
           return json({ ok: true, mode: "windowed_done", done: true, queueLen: state.queue.length });
         }
 
-        const where = windowWhere({ start: state.current.start, end: state.current.end });
-        const r = await vtexFetchClientsPage({ page: state.current.page, pageSize: state.current.pageSize, where });
+        // fetch da janela atual — usa whereStyle já detectado (ou tenta variações se ainda não tiver)
+        let r: any = null;
+        let usedFetchStyle: string | null = null;
+        for (const st of pickWhereStyles(state.whereStyle ?? null)) {
+          const where = windowWhere({ start: state.current.start, end: state.current.end }, st);
+          const rr = await vtexFetchClientsPage({ page: state.current.page, pageSize: state.current.pageSize, where });
+          if (!rr.ok && rr.status === 400 && !isVtexMasterDataOver10kError(rr.bodyPreview || "")) {
+            r = rr;
+            continue;
+          }
+          r = rr;
+          usedFetchStyle = st;
+          break;
+        }
+        if (usedFetchStyle) state.whereStyle = usedFetchStyle;
         if (!r.ok) {
           // se ainda estourou 10k (improvável), divide e reprocessa na próxima chamada
           if (r.status === 400 && isVtexMasterDataOver10kError(r.bodyPreview || "")) {
