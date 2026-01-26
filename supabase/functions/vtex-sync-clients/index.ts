@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
 // Bump this when deploying changes you need to verify in Cloud responses.
-const CODE_VERSION = "2026-01-26.windowed-where-fallback.v1";
+const CODE_VERSION = "2026-01-26.windowed-and-lowercase.v2";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
