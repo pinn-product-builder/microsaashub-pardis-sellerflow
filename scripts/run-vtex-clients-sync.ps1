@@ -97,6 +97,13 @@ function Write-EnvFile([string]$path, [hashtable]$env) {
   Set-Content -Path $path -Value $lines -Encoding UTF8
 }
 
+function To-DockerHostUrl([string]$url) {
+  if ([string]::IsNullOrWhiteSpace($url)) { return $url }
+  # Quando a function roda em container (functions serve), 127.0.0.1 aponta para o container, não para sua máquina.
+  # No Windows/Mac, use host.docker.internal para acessar serviços no host.
+  return ($url -replace "http://127\.0\.0\.1:", "http://host.docker.internal:" -replace "https://127\.0\.0\.1:", "https://host.docker.internal:")
+}
+
 function Start-FunctionsServe([string]$envFile) {
   # Sobe a edge runtime local com env vars. Precisa ficar rodando durante o sync.
   # Usamos um processo separado para não travar o loop.
@@ -104,6 +111,23 @@ function Start-FunctionsServe([string]$envFile) {
   Info "Iniciando: supabase $($args -join ' ')"
   Start-Process -FilePath "supabase" -ArgumentList $args -WindowStyle Minimized | Out-Null
   Start-Sleep -Seconds 3
+}
+
+function Resolve-FunctionsBase([string[]]$candidates, [string]$syncSecret) {
+  foreach ($base in $candidates) {
+    if ([string]::IsNullOrWhiteSpace($base)) { continue }
+    $b = $base.TrimEnd("/")
+    $probe =
+      "$b/vtex-sync-clients" +
+      "?all=true&strategy=windowed&pageSize=1&withAddress=0&withCredit=0&overwriteCredit=0&concurrency=1"
+    try {
+      $resp = CurlJson $probe @{ "x-vtex-sync-secret" = $syncSecret }
+      if ($resp -match '"codeVersion"\s*:') { return $b }
+    } catch {
+      # ignore
+    }
+  }
+  throw "Não consegui encontrar um endpoint de functions válido. Tente fechar processos antigos de 'supabase functions serve' e rode novamente."
 }
 
 function Reset-WindowedStateCloud([string]$projectRef) {
@@ -131,7 +155,7 @@ if ($Mode -eq "local") {
   $envFile = Join-Path $PSScriptRoot ".tmp\.env.vtex-sync-local"
   Write-EnvFile $envFile @{
     # Supabase local (para upsert no DB com service role)
-    SUPABASE_URL = [string]$st.API_URL
+    SUPABASE_URL = (To-DockerHostUrl([string]$st.API_URL))
     SUPABASE_ANON_KEY = [string]$st.ANON_KEY
     SUPABASE_SERVICE_ROLE_KEY = [string]$st.SERVICE_ROLE_KEY
 
@@ -149,7 +173,14 @@ if ($Mode -eq "local") {
   # garante que a edge function está servindo com o env-file
   Start-FunctionsServe $envFile
 
-  $base = $functionsUrl.TrimEnd("/")
+  # O `functions serve` expõe seu próprio endpoint (normalmente :54321), que pode ser diferente do Kong (:65421).
+  # Vamos detectar automaticamente qual responde com codeVersion.
+  $candidates = @(
+    "http://127.0.0.1:54321/functions/v1",
+    "http://localhost:54321/functions/v1",
+    $functionsUrl
+  )
+  $base = Resolve-FunctionsBase $candidates $syncSecret
   $url =
     "$base/vtex-sync-clients" +
     "?all=true" +
