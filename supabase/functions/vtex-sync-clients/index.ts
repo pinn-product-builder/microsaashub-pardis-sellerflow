@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
 // Bump this when deploying changes you need to verify in Cloud responses.
-const CODE_VERSION = "2026-01-26.windowed-range100-statefix.v3";
+const CODE_VERSION = "2026-01-26.windowed-range100-1based.v4";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -375,7 +375,9 @@ async function vtexFetchClientsPage(opts: {
   // Quando excede, a VTEX retorna erro "O range está inválido ... range não pode ser maior que 100."
   const effectivePageSize = Math.min(100, Math.max(1, opts.pageSize));
 
-  const from = (Math.max(1, opts.page) - 1) * effectivePageSize;
+  // Observação: alguns accounts VTEX rejeitam range iniciando em 0 e exigem valores > 0.
+  // Por isso usamos 1-based (resources=1-100, 101-200, ...).
+  const from = (Math.max(1, opts.page) - 1) * effectivePageSize + 1;
   const to = from + effectivePageSize - 1;
 
   const url =
