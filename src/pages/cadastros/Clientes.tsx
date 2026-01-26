@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -100,6 +101,22 @@ export default function ClientesVtex() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncProgress, setSyncProgress] = useState<{
+    startedAt: number | null;
+    batch: number;
+    maxBatches: number;
+    totalUpserted: number;
+    lastBatchUpserted: number;
+    done: boolean;
+  }>({
+    startedAt: null,
+    batch: 0,
+    maxBatches: 25,
+    totalUpserted: 0,
+    lastBatchUpserted: 0,
+    done: false,
+  });
+  const [syncTick, setSyncTick] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -210,6 +227,14 @@ export default function ClientesVtex() {
       let nextToken: string | null = null;
       let totalUpserted = 0;
       const maxBatches = 25; // evita travar o browser
+      setSyncProgress({
+        startedAt: Date.now(),
+        batch: 0,
+        maxBatches,
+        totalUpserted: 0,
+        lastBatchUpserted: 0,
+        done: false,
+      });
 
       for (let i = 0; i < maxBatches; i++) {
         const u = new URL(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/vtex-sync-clients`);
@@ -243,6 +268,14 @@ export default function ClientesVtex() {
         totalUpserted += Number(body.upserted ?? 0);
         nextToken = body.nextToken ?? null;
         const done = Boolean(body.done);
+
+        setSyncProgress((p) => ({
+          ...p,
+          batch: i + 1,
+          totalUpserted,
+          lastBatchUpserted: Number(body.upserted ?? 0),
+          done,
+        }));
         if (done || !nextToken) break;
       }
 
@@ -252,6 +285,7 @@ export default function ClientesVtex() {
       });
 
       setSyncStatus(`Finalizado. Upserted total: ${totalUpserted}`);
+      setSyncProgress((p) => ({ ...p, done: true, totalUpserted }));
       fetchStats();
       fetchClients();
     } catch (e) {
@@ -262,6 +296,19 @@ export default function ClientesVtex() {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  useEffect(() => {
+    if (!isSyncing) return;
+    const t = setInterval(() => setSyncTick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [isSyncing]);
+
+  const formatDuration = (ms: number) => {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m > 0 ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
   };
 
   const formatCurrency = (value: number) =>
@@ -384,8 +431,40 @@ export default function ClientesVtex() {
       {syncStatus && (
         <Card>
           <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">
-              <strong>Status do sync:</strong> {syncStatus}
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                <strong>Status do sync:</strong> {syncStatus}
+              </div>
+
+              {isSyncing && (
+                <div className="space-y-2">
+                  <Progress
+                    value={
+                      syncProgress.maxBatches > 0
+                        ? Math.min(100, Math.round((syncProgress.batch / syncProgress.maxBatches) * 100))
+                        : 0
+                    }
+                  />
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span>
+                      <strong>Lote:</strong> {syncProgress.batch}/{syncProgress.maxBatches}
+                    </span>
+                    <span>
+                      <strong>Upserted:</strong> {syncProgress.totalUpserted}
+                    </span>
+                    <span>
+                      <strong>Último lote:</strong> +{syncProgress.lastBatchUpserted}
+                    </span>
+                    <span>
+                      <strong>Tempo:</strong>{" "}
+                      {syncProgress.startedAt ? formatDuration(Date.now() - syncProgress.startedAt) : "-"}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Progresso estimado por lote (a VTEX não informa um total confiável durante o scroll).
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
