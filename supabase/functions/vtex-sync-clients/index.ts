@@ -442,9 +442,9 @@ async function vtexScrollClientsPage(opts: {
   const u = new URL(`${base}/api/dataentities/CL/scroll`);
   u.searchParams.set("_fields", fields);
   u.searchParams.set("_size", String(Math.min(1000, Math.max(1, opts.pageSize))));
-  // Continuação: alguns ambientes aceitam o token só via header (mais estável).
-  // Evitamos colocar no querystring para não ficar preso no mesmo cursor.
-  // if (opts.token) u.searchParams.set("_token", opts.token);
+  // Continuação: em alguns ambientes o token funciona via header, em outros via querystring.
+  // Para evitar abrir "scroll novo" a cada chamada (e estourar limite), enviamos nos dois.
+  if (opts.token) u.searchParams.set("_token", opts.token);
 
   const maxRetries = 8;
   let attempt = 0;
@@ -491,7 +491,12 @@ async function vtexScrollClientsPage(opts: {
       break;
     }
 
-    const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+    // VTEX pode responder 400 quando há muitas sessões simultâneas de scroll; isso é temporário.
+    const tooManyScrolls =
+      res.status === 400 &&
+      /maximum\s+simultaneous\s+scrolls\s+rate\s+exceeded/i.test(text);
+
+    const retryable = res.status === 429 || tooManyScrolls || (res.status >= 500 && res.status <= 599);
     if (!retryable || attempt >= maxRetries) {
       return {
         ok: false as const,
