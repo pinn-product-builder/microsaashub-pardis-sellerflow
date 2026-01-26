@@ -88,14 +88,32 @@ function digitsOnly(x: unknown): string | null {
   return d.length ? d : null;
 }
 
+function extractBestAddress(arr: any[]): { city: string | null; uf: string | null; raw: any | null } {
+  const list = Array.isArray(arr) ? arr : [];
+  if (!list.length) return { city: null, uf: null, raw: null };
+
+  // Prioriza registros completos (cidade+UF), depois UF, depois cidade.
+  const scored = list
+    .map((x) => ({
+      x,
+      city: normStr(x?.city),
+      uf: normStr(x?.state),
+      score: (normStr(x?.city) ? 2 : 0) + (normStr(x?.state) ? 2 : 0),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const best = scored[0];
+  return { city: best?.city ?? null, uf: best?.uf ?? null, raw: best?.x ?? null };
+}
+
 async function vtexFetchAddressByUserId(userId: string) {
   const { base, headers } = vtexBase();
-  const fields = ["userId", "city", "state"].join(",");
+  const fields = ["userId", "city", "state", "addressType", "addressName"].join(",");
   const url =
     `${base}/api/dataentities/AD/search` +
     `?_fields=${encodeURIComponent(fields)}` +
     `&_where=${encodeURIComponent(`userId=${userId}`)}` +
-    `&_page=1&_pageSize=1`;
+    `&_page=1&_pageSize=5`;
 
   const maxRetries = 6;
   let attempt = 0;
@@ -107,12 +125,12 @@ async function vtexFetchAddressByUserId(userId: string) {
       try {
         const data = JSON.parse(text);
         const arr = Array.isArray(data) ? data : [];
-        const first = arr[0] ?? null;
+        const best = extractBestAddress(arr);
         return {
           ok: true as const,
-          city: normStr(first?.city),
-          uf: normStr(first?.state),
-          raw: first,
+          city: best.city,
+          uf: best.uf,
+          raw: best.raw,
         };
       } catch {
         return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
@@ -144,6 +162,142 @@ function vtexBase() {
   };
 
   return { base, headers };
+}
+
+function toNumberLike(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const s = v.trim().replace(",", ".");
+    const n = Number(s);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function extractCreditFromPayload(payload: any): number | null {
+  const candidates = [
+    payload?.availableCredit,
+    payload?.available,
+    payload?.creditAvailable,
+    payload?.balance,
+    payload?.creditLimit,
+    payload?.limit,
+    payload?.credit,
+    payload?.value,
+  ];
+  for (const c of candidates) {
+    const n = toNumberLike(c);
+    if (n != null) return n;
+  }
+
+  if (Array.isArray(payload) && payload.length) return extractCreditFromPayload(payload[0]);
+
+  const nested = payload?.data ?? payload?.account ?? payload?.result ?? null;
+  if (nested) return extractCreditFromPayload(nested);
+
+  return null;
+}
+
+function vtexCreditBases(): Array<{ base: string; headers: Record<string, string> }> {
+  const account = requiredAny(["VTEX_ACCOUNT"]).trim();
+  const envPrimary = (Deno.env.get("VTEX_ENV")?.trim() || "vtexcommercestable.com.br")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "");
+  const envCredit = (Deno.env.get("VTEX_CUSTOMER_CREDIT_ENV")?.trim() || "")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "");
+
+  const appKey = requiredAny(["VTEX_APP_KEY"]).trim();
+  const appToken = requiredAny(["VTEX_APP_TOKEN"]).trim();
+
+  const headers = {
+    "X-VTEX-API-AppKey": appKey,
+    "X-VTEX-API-AppToken": appToken,
+    accept: "application/json",
+  };
+
+  const bases = [
+    envCredit ? `https://${account}.${envCredit}` : null,
+    `https://${account}.myvtex.com`,
+    `https://${account}.${envPrimary}`,
+  ].filter(Boolean) as string[];
+
+  const uniq = Array.from(new Set(bases));
+  return uniq.map((base) => ({ base, headers }));
+}
+
+async function vtexFetchCustomerCredit(opts: { document?: string | null; email?: string | null; userId?: string | null }) {
+  const document = digitsOnly(opts.document);
+  const email = normStr(opts.email);
+  const userId = normStr(opts.userId);
+
+  if (!document && !email && !userId) {
+    return { ok: true as const, credit: null as number | null, raw: null as any, tried: [] as string[] };
+  }
+
+  const bases = vtexCreditBases();
+
+  const paths: string[] = [];
+  if (document) {
+    paths.push(
+      `/api/customer-credit/accounts?document=${encodeURIComponent(document)}`,
+      `/api/customer-credit/account?document=${encodeURIComponent(document)}`,
+      `/api/customer-credit/accounts/${encodeURIComponent(document)}`,
+      `/api/creditcontrol/accounts?document=${encodeURIComponent(document)}`,
+      `/api/creditcontrol/accounts/${encodeURIComponent(document)}`,
+      `/_v/customer-credit/accounts?document=${encodeURIComponent(document)}`,
+    );
+  }
+  if (email) {
+    paths.push(
+      `/api/customer-credit/accounts?email=${encodeURIComponent(email)}`,
+      `/api/customer-credit/account?email=${encodeURIComponent(email)}`,
+      `/api/creditcontrol/accounts?email=${encodeURIComponent(email)}`,
+    );
+  }
+  if (userId) {
+    paths.push(
+      `/api/customer-credit/accounts?userId=${encodeURIComponent(userId)}`,
+      `/api/creditcontrol/accounts?userId=${encodeURIComponent(userId)}`,
+    );
+  }
+
+  const tried: string[] = [];
+  const maxRetries = 4;
+
+  for (const b of bases) {
+    for (const path of paths) {
+      const url = `${b.base}${path}`;
+      tried.push(url);
+      let attempt = 0;
+
+      while (true) {
+        attempt++;
+        const res = await fetch(url, { headers: b.headers });
+        const text = await res.text();
+
+        // endpoints inexistentes/invalid: tenta próximo
+        if (res.status === 404 || res.status === 400) break;
+
+        if (res.ok) {
+          try {
+            const payload = JSON.parse(text);
+            const credit = extractCreditFromPayload(payload);
+            return { ok: true as const, credit, raw: payload, tried };
+          } catch {
+            return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+          }
+        }
+
+        const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+        if (!retryable || attempt >= maxRetries) break;
+        await sleep(400 * attempt);
+      }
+    }
+  }
+
+  return { ok: true as const, credit: null as number | null, raw: null as any, tried };
 }
 
 async function vtexFetchClientsPage(opts: {
@@ -398,7 +552,9 @@ serve(async (req) => {
     const pageSize = Math.min(1000, toInt(u.searchParams.get("pageSize"), 200)); // Master Data costuma aceitar até 1000
     const missingOnly = toBool(u.searchParams.get("missingOnly"), false);
     const all = toBool(u.searchParams.get("all"), false);
-    const withAddress = toBool(u.searchParams.get("withAddress"), false);
+    const withAddress = toBool(u.searchParams.get("withAddress"), true);
+    const withCredit = toBool(u.searchParams.get("withCredit"), false);
+    const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
@@ -452,10 +608,6 @@ serve(async (req) => {
 
           // enriquecidos/defaults (UI)
           if (c?.isCorporate === true && document) row.cnpj = document;
-          row.is_lab_to_lab = false;
-          row.credit_limit = 0;
-          row.price_table_type = "BR";
-          row.is_active = true;
           row.last_sync_at = new Date().toISOString();
 
           return row;
@@ -464,7 +616,10 @@ serve(async (req) => {
 
       if (withAddress) {
         await mapLimit(rows, concurrency, async (row) => {
-          const userId = normStr((row as any).vtex_user_id) ?? normStr((row as any).user_id);
+          const userId =
+            normStr((row as any).vtex_user_id) ??
+            normStr((row as any).user_id) ??
+            normStr((row as any).email);
           if (!userId) return;
           const ad = await vtexFetchAddressByUserId(userId);
           if (!ad.ok) return;
@@ -476,6 +631,40 @@ serve(async (req) => {
           // guarda raw do AD junto no raw já existente
           const raw = (row as any).raw ?? {};
           (row as any).raw = { cl: raw, ad: ad.raw };
+        });
+      }
+
+      let existingCreditById: Map<string, number> | null = null;
+      if (withCredit && !overwriteCredit && rows.length) {
+        const ids = rows.map((r) => String((r as any).md_id)).filter(Boolean);
+        const { data: existing, error: exErr } = await supabase
+          .from("vtex_clients")
+          .select("md_id, credit_limit")
+          .in("md_id", ids);
+        if (!exErr && Array.isArray(existing)) {
+          existingCreditById = new Map(existing.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]));
+        }
+      }
+
+      if (withCredit) {
+        await mapLimit(rows, Math.min(concurrency, 6), async (row) => {
+          const mdId = String((row as any).md_id ?? "");
+          const current = existingCreditById ? Number(existingCreditById.get(mdId) ?? 0) : 0;
+          if (!overwriteCredit && current > 0) return;
+
+          const doc = normStr((row as any).cnpj) ?? normStr((row as any).document);
+          const email = normStr((row as any).email);
+          const userId = normStr((row as any).vtex_user_id) ?? normStr((row as any).user_id);
+
+          const r = await vtexFetchCustomerCredit({ document: doc, email, userId });
+          if (!r.ok) return;
+          if (r.credit == null) return;
+
+          (row as any).credit_limit = r.credit;
+
+          const raw = (row as any).raw ?? {};
+          const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
+          (row as any).raw = { ...prev, credit: r.raw, credit_tried: (r as any).tried?.slice(0, 5) };
         });
       }
 
@@ -496,6 +685,9 @@ serve(async (req) => {
         ok: true,
         mode: "scroll_batch",
         pageSize: scrollSize,
+        withAddress,
+        withCredit,
+        overwriteCredit,
         batchSize: rows.length,
         upserted: rows.length,
         nextToken: r.nextToken,
@@ -554,10 +746,6 @@ serve(async (req) => {
         if (normStr(c?.updatedIn)) row.updated_in = c.updatedIn;
 
         if (c?.isCorporate === true && document) row.cnpj = document;
-        row.is_lab_to_lab = false;
-        row.credit_limit = 0;
-        row.price_table_type = "BR";
-        row.is_active = true;
         row.last_sync_at = new Date().toISOString();
 
         return row;
@@ -566,7 +754,10 @@ serve(async (req) => {
 
     if (withAddress) {
       await mapLimit(rows, concurrency, async (row) => {
-        const userId = normStr((row as any).vtex_user_id) ?? normStr((row as any).user_id);
+        const userId =
+          normStr((row as any).vtex_user_id) ??
+          normStr((row as any).user_id) ??
+          normStr((row as any).email);
         if (!userId) return;
         const ad = await vtexFetchAddressByUserId(userId);
         if (!ad.ok) return;
@@ -577,6 +768,40 @@ serve(async (req) => {
         }
         const raw = (row as any).raw ?? {};
         (row as any).raw = { cl: raw, ad: ad.raw };
+      });
+    }
+
+    let existingCreditById: Map<string, number> | null = null;
+    if (withCredit && !overwriteCredit && rows.length) {
+      const ids = rows.map((r) => String((r as any).md_id)).filter(Boolean);
+      const { data: existing, error: exErr } = await supabase
+        .from("vtex_clients")
+        .select("md_id, credit_limit")
+        .in("md_id", ids);
+      if (!exErr && Array.isArray(existing)) {
+        existingCreditById = new Map(existing.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]));
+      }
+    }
+
+    if (withCredit) {
+      await mapLimit(rows, Math.min(concurrency, 6), async (row) => {
+        const mdId = String((row as any).md_id ?? "");
+        const current = existingCreditById ? Number(existingCreditById.get(mdId) ?? 0) : 0;
+        if (!overwriteCredit && current > 0) return;
+
+        const doc = normStr((row as any).cnpj) ?? normStr((row as any).document);
+        const email = normStr((row as any).email);
+        const userId = normStr((row as any).vtex_user_id) ?? normStr((row as any).user_id);
+
+        const r = await vtexFetchCustomerCredit({ document: doc, email, userId });
+        if (!r.ok) return;
+        if (r.credit == null) return;
+
+        (row as any).credit_limit = r.credit;
+
+        const raw = (row as any).raw ?? {};
+        const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
+        (row as any).raw = { ...prev, credit: r.raw, credit_tried: (r as any).tried?.slice(0, 5) };
       });
     }
 
@@ -612,6 +837,8 @@ serve(async (req) => {
       pageSize,
       missingOnly,
       withAddress,
+      withCredit,
+      overwriteCredit,
       batchSize: rows.length,
       upserted: rows.length,
       next,

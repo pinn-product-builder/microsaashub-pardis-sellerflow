@@ -57,8 +57,18 @@ interface:
       withAddress:
         type: "boolean"
         required: false
-        default: false
+        default: true
         description: "Quando true, enriquece com cidade/UF (consulta AD por userId)."
+      withCredit:
+        type: "boolean"
+        required: false
+        default: false
+        description: "Quando true, tenta enriquecer com crédito do cliente (Customer Credit API), gravando em credit_limit."
+      overwriteCredit:
+        type: "boolean"
+        required: false
+        default: false
+        description: "Quando true (junto com withCredit), sobrescreve credit_limit mesmo se já houver valor no banco."
       concurrency:
         type: "integer"
         required: false

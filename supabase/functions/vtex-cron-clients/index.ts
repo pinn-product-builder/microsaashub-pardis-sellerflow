@@ -42,6 +42,8 @@ serve(async (req) => {
     const url = new URL(req.url);
     const pageSize = Math.min(200, Math.max(10, toInt(url.searchParams.get("pageSize"), 100)));
     const withAddress = (url.searchParams.get("withAddress") ?? "1") !== "0";
+    const withCredit = (url.searchParams.get("withCredit") ?? "0") === "1";
+    const overwriteCredit = (url.searchParams.get("overwriteCredit") ?? "0") === "1";
 
     // Lê token do estado (continuação do scroll)
     const stateKey = "clients_scroll_token";
@@ -59,6 +61,8 @@ serve(async (req) => {
     fnUrl.searchParams.set("all", "true");
     fnUrl.searchParams.set("pageSize", String(pageSize));
     fnUrl.searchParams.set("withAddress", withAddress ? "true" : "false");
+    fnUrl.searchParams.set("withCredit", withCredit ? "true" : "false");
+    fnUrl.searchParams.set("overwriteCredit", overwriteCredit ? "true" : "false");
     fnUrl.searchParams.set("concurrency", "4");
     if (token) fnUrl.searchParams.set("token", token);
 
@@ -88,6 +92,8 @@ serve(async (req) => {
       mode: "scheduled_scroll_batch",
       pageSize,
       withAddress,
+      withCredit,
+      overwriteCredit,
       hadToken: !!token,
       nextToken: nextToken ? "***set***" : null,
       done,

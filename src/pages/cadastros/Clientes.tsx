@@ -216,6 +216,8 @@ export default function ClientesVtex() {
         u.searchParams.set("all", "true");
         u.searchParams.set("pageSize", "100");
         u.searchParams.set("withAddress", "true");
+        u.searchParams.set("withCredit", "true");
+        u.searchParams.set("overwriteCredit", "false");
         u.searchParams.set("concurrency", "4");
         if (nextToken) u.searchParams.set("token", nextToken);
 
@@ -353,7 +355,7 @@ export default function ClientesVtex() {
             Atualizar
           </Button>
 
-          {stats.total === 0 && !loadError && (
+          {!loadError && (
             <Button onClick={handleSyncClients} disabled={isSyncing}>
               <RefreshCw className="h-4 w-4 mr-2" />
               {isSyncing ? "Sincronizando..." : "Sincronizar VTEX"}
