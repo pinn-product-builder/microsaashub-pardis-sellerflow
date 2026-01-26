@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
 // Bump this when deploying changes you need to verify in Cloud responses.
-const CODE_VERSION = "2026-01-26.windowed-and-lowercase.v2";
+const CODE_VERSION = "2026-01-26.windowed-range100-statefix.v3";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -760,6 +760,8 @@ serve(async (req) => {
             const split = splitWindow(w);
             if (!split) {
               // não conseguimos dividir mais: devolve erro claro
+              // devolve a janela para a fila (para não “perder” trabalho)
+              state.queue.unshift(w);
               await saveWindowedState(supabase, stateKey, state);
             return json({ ok: false, step: "windowed_split", strategy, all, error: "Janela ainda >10k e não foi possível dividir mais.", window: w }, 502);
             }
@@ -769,6 +771,8 @@ serve(async (req) => {
           }
 
           if (!probe.ok) {
+            // Não remova a janela da fila em caso de erro (senão a próxima chamada pode retornar windowed_done).
+            state.queue.unshift(w);
             await saveWindowedState(supabase, stateKey, state);
             return json({ ok: false, step: "windowed_probe", strategy, all, ...probe }, 502);
           }
