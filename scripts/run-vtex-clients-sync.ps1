@@ -38,6 +38,15 @@ function Require-NonEmpty([string]$name, [string]$value) {
 
 function Info([string]$msg) { Write-Host $msg }
 
+function Get-ObjProp([object]$obj, [string]$name, [string]$def = "") {
+  if ($null -eq $obj) { return $def }
+  $p = $obj.PSObject.Properties[$name]
+  if ($null -eq $p) { return $def }
+  $v = [string]$p.Value
+  if ([string]::IsNullOrWhiteSpace($v)) { return $def }
+  return $v
+}
+
 function CurlJson([string]$url, [hashtable]$headers) {
   # -sS: silent but show errors
   $args = @("-sS", $url)
@@ -77,7 +86,7 @@ function Get-SupabaseStatusJson() {
   $text = ($raw | Out-String).Trim()
 
   # o CLI às vezes imprime "Stopped services: ..." depois do JSON; extrai o primeiro objeto JSON
-  $m = [regex]::Match($text, "\{[\s\S]*\}")
+  $m = [regex]::Match($text, "\{[\s\S]*?\}")
   if (-not $m.Success) { throw "Não consegui extrair JSON de: supabase status --output json" }
   $jsonText = $m.Value
   try { return ($jsonText | ConvertFrom-Json) } catch { throw "Falha ao parsear supabase status JSON: $($_.Exception.Message)" }
@@ -149,15 +158,19 @@ if ($Mode -eq "local") {
   Info "Usando VTEX_SYNC_SECRET local (gerado) para executar o sync."
 
   $st = Get-SupabaseStatusJson
-  $functionsUrl = [string]$st.FUNCTIONS_URL
-  if ([string]::IsNullOrWhiteSpace($functionsUrl)) { $functionsUrl = "http://127.0.0.1:65421/functions/v1" }
+  $apiUrl = Get-ObjProp $st "API_URL" "http://127.0.0.1:65421"
+  $functionsUrl = Get-ObjProp $st "FUNCTIONS_URL" ""
+  if ([string]::IsNullOrWhiteSpace($functionsUrl)) {
+    # fallback: alguns CLIs podem não retornar FUNCTIONS_URL
+    $functionsUrl = ($apiUrl.TrimEnd("/") + "/functions/v1")
+  }
 
   $envFile = Join-Path $PSScriptRoot ".tmp\.env.vtex-sync-local"
   Write-EnvFile $envFile @{
     # Supabase local (para upsert no DB com service role)
-    SUPABASE_URL = (To-DockerHostUrl([string]$st.API_URL))
-    SUPABASE_ANON_KEY = [string]$st.ANON_KEY
-    SUPABASE_SERVICE_ROLE_KEY = [string]$st.SERVICE_ROLE_KEY
+    SUPABASE_URL = (To-DockerHostUrl($apiUrl))
+    SUPABASE_ANON_KEY = (Get-ObjProp $st "ANON_KEY" "")
+    SUPABASE_SERVICE_ROLE_KEY = (Get-ObjProp $st "SERVICE_ROLE_KEY" "")
 
     # VTEX
     VTEX_ACCOUNT = $VTEX_ACCOUNT
