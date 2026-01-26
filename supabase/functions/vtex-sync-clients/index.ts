@@ -117,40 +117,54 @@ function extractBestAddress(arr: any[]): { city: string | null; uf: string | nul
 async function vtexFetchAddressByUserId(userId: string) {
   const { base, headers } = vtexBase();
   const fields = ["userId", "city", "state", "addressType", "addressName"].join(",");
-  const url =
-    `${base}/api/dataentities/AD/search` +
-    `?_fields=${encodeURIComponent(fields)}` +
-    `&_where=${encodeURIComponent(`userId=${userId}`)}` +
-    `&_page=1&_pageSize=5`;
+
+  const safe = String(userId || "").trim();
+  const whereVariants = [
+    `userId=${safe}`,
+    `userId='${safe.replace(/'/g, "''")}'`,
+    `userId=\"${safe.replace(/\"/g, '\\"')}\"`,
+  ];
 
   const maxRetries = 6;
-  let attempt = 0;
-  while (true) {
-    attempt++;
-    const res = await fetch(url, { headers });
-    const text = await res.text();
-    if (res.ok) {
-      try {
-        const data = JSON.parse(text);
-        const arr = Array.isArray(data) ? data : [];
-        const best = extractBestAddress(arr);
-        return {
-          ok: true as const,
-          city: best.city,
-          uf: best.uf,
-          raw: best.raw,
-        };
-      } catch {
-        return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
-      }
-    }
+  let lastErr: any = null;
+  for (const where of whereVariants) {
+    const url =
+      `${base}/api/dataentities/AD/search` +
+      `?_fields=${encodeURIComponent(fields)}` +
+      `&_where=${encodeURIComponent(where)}` +
+      `&_page=1&_pageSize=10`;
 
-    const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
-    if (!retryable || attempt >= maxRetries) {
-      return { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      const res = await fetch(url, { headers });
+      const text = await res.text();
+      if (res.ok) {
+        try {
+          const data = JSON.parse(text);
+          const arr = Array.isArray(data) ? data : [];
+          const best = extractBestAddress(arr);
+          return {
+            ok: true as const,
+            city: best.city,
+            uf: best.uf,
+            raw: best.raw,
+          };
+        } catch {
+          return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+        }
+      }
+
+      const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+      if (!retryable || attempt >= maxRetries) {
+        lastErr = { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
+        break;
+      }
+      await sleep(500 * attempt);
     }
-    await sleep(500 * attempt);
   }
+
+  return lastErr ?? { ok: true as const, city: null, uf: null, raw: null };
 }
 
 function vtexBase() {
@@ -170,6 +184,22 @@ function vtexBase() {
   };
 
   return { base, headers };
+}
+
+async function vtexFetchEntitySchemaFields(entity: string): Promise<Set<string> | null> {
+  try {
+    const { base, headers } = vtexBase();
+    const url = `${base}/api/dataentities/${encodeURIComponent(entity)}/schema`;
+    const res = await fetch(url, { headers });
+    const text = await res.text();
+    if (!res.ok) return null;
+    const payload = JSON.parse(text);
+    const props = payload?.properties && typeof payload.properties === "object" ? payload.properties : null;
+    if (!props) return null;
+    return new Set(Object.keys(props));
+  } catch {
+    return null;
+  }
 }
 
 function toNumberLike(v: unknown): number | null {
@@ -316,12 +346,13 @@ async function vtexFetchClientsPage(opts: {
   page: number;
   pageSize: number;
   where?: string | null;
+  fields?: string | null;
 }) {
   const { base, headers: baseHeaders } = vtexBase();
 
   // Master Data (v1) Search: /api/dataentities/CL/search
   // Exemplos de uso de _fields/_where aparecem na doc/community. :contentReference[oaicite:2]{index=2}
-  const fields = [
+  const fields = (opts.fields && opts.fields.trim()) ? opts.fields.trim() : [
     "id",
     "email",
     "userId",
@@ -666,6 +697,28 @@ serve(async (req) => {
         const nowIso = new Date().toISOString();
         const state = await readWindowedState(supabase, stateKey, nowIso);
 
+        const clSchema = await vtexFetchEntitySchemaFields("CL");
+        // tenta puxar também campos de crédito se existirem na CL
+        const creditCandidates = ["creditLimit", "credit_limit", "credit_limit_value", "customerCredit", "customer_credit"];
+        const extra = clSchema ? creditCandidates.filter((c) => clSchema.has(c)) : [];
+        const clFields =
+          [
+            "id",
+            "email",
+            "userId",
+            "firstName",
+            "lastName",
+            "document",
+            "phone",
+            "isCorporate",
+            "corporateName",
+            "tradeName",
+            "stateRegistration",
+            "createdIn",
+            "updatedIn",
+            ...extra,
+          ].join(",");
+
         // Importante: nesta conta VTEX o token 'AND' é rejeitado no _where.
         // Então evitamos estilos com operadores (>= ... AND < ...) e usamos apenas "between ... and ...".
         const whereStyles = ["between_lc", "between_quoted_lc"] as const;
@@ -686,7 +739,7 @@ serve(async (req) => {
           let usedStyle: string | null = null;
           for (const st of pickWhereStyles(state.whereStyle ?? null)) {
             const where = windowWhere(w, st);
-            const r = await vtexFetchClientsPage({ page: 1, pageSize: 1, where });
+            const r = await vtexFetchClientsPage({ page: 1, pageSize: 1, where, fields: clFields });
             // Se der 400 por sintaxe, tenta a próxima variação.
             if (!r.ok && r.status === 400 && !isVtexMasterDataOver10kError(r.bodyPreview || "")) {
               probe = r;
@@ -730,7 +783,7 @@ serve(async (req) => {
         let usedFetchStyle: string | null = null;
         for (const st of pickWhereStyles(state.whereStyle ?? null)) {
           const where = windowWhere({ start: state.current.start, end: state.current.end }, st);
-          const rr = await vtexFetchClientsPage({ page: state.current.page, pageSize: state.current.pageSize, where });
+          const rr = await vtexFetchClientsPage({ page: state.current.page, pageSize: state.current.pageSize, where, fields: clFields });
           if (!rr.ok && rr.status === 400 && !isVtexMasterDataOver10kError(rr.bodyPreview || "")) {
             r = rr;
             continue;
@@ -759,6 +812,8 @@ serve(async (req) => {
         }
 
         const arr = Array.isArray(r.data) ? r.data : [];
+        let addressEnriched = 0;
+        let creditEnriched = 0;
         const rows = arr
           .map((c: any) => {
             const md_id = normStr(c?.id) ?? normStr(c?.userId) ?? normStr(c?.email);
@@ -798,6 +853,12 @@ serve(async (req) => {
 
             if (c?.isCorporate === true && document) row.cnpj = document;
             row.last_sync_at = new Date().toISOString();
+
+            // crédito vindo diretamente da CL (se o campo existir e tiver sido retornado)
+            const clCredit = toNumberLike(
+              c?.creditLimit ?? c?.credit_limit ?? c?.credit_limit_value ?? c?.customerCredit ?? c?.customer_credit,
+            );
+            if (clCredit != null && clCredit > 0) row.credit_limit = clCredit;
             return row;
           })
           .filter(Boolean) as Record<string, unknown>[];
@@ -816,6 +877,7 @@ serve(async (req) => {
               (row as any).uf = ad.uf;
               (row as any).price_table_type = ad.uf.toUpperCase() === "MG" ? "MG" : "BR";
             }
+            if ((row as any).city || (row as any).uf) addressEnriched++;
             const raw = (row as any).raw ?? {};
             (row as any).raw = { cl: raw, ad: ad.raw };
           });
@@ -838,6 +900,7 @@ serve(async (req) => {
             const mdId = String((row as any).md_id ?? "");
             const current = existingCreditById ? Number(existingCreditById.get(mdId) ?? 0) : 0;
             if (!overwriteCredit && current > 0) return;
+            if (Number((row as any).credit_limit ?? 0) > 0 && !overwriteCredit) return;
 
             const doc = normStr((row as any).cnpj) ?? normStr((row as any).document);
             const email = normStr((row as any).email);
@@ -848,6 +911,7 @@ serve(async (req) => {
             if (rr.credit == null) return;
 
             (row as any).credit_limit = rr.credit;
+            creditEnriched++;
             const raw = (row as any).raw ?? {};
             const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
             (row as any).raw = { ...prev, credit: rr.raw, credit_tried: (rr as any).tried?.slice(0, 5) };
@@ -887,6 +951,7 @@ serve(async (req) => {
           pageInWindow: state.current ? state.current.page : null,
           batchSize: rows.length,
           upserted: rows.length,
+          enriched: { address: addressEnriched, credit: creditEnriched },
           done,
         });
       }
