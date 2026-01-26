@@ -45,26 +45,25 @@ serve(async (req) => {
     const withCredit = (url.searchParams.get("withCredit") ?? "0") === "1";
     const overwriteCredit = (url.searchParams.get("overwriteCredit") ?? "0") === "1";
 
-    // Lê token do estado (continuação do scroll)
-    const stateKey = "clients_scroll_token";
+    // Estado de paginação (evita /scroll e seu limite de sessões simultâneas)
+    const stateKey = "clients_page";
     const { data: st } = await supabase
       .from("vtex_sync_state")
       .select("value")
       .eq("key", stateKey)
       .maybeSingle();
 
-    const token = (st?.value as any)?.token ? String((st!.value as any).token) : null;
+    const page = Math.max(1, toInt((st?.value as any)?.page ? String((st!.value as any).page) : null, 1));
 
     // Chama a própria function vtex-sync-clients (1 lote por execução)
     // remove apenas uma barra final (se existir)
     const fnUrl = new URL(`${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/vtex-sync-clients`);
-    fnUrl.searchParams.set("all", "true");
+    fnUrl.searchParams.set("page", String(page));
     fnUrl.searchParams.set("pageSize", String(pageSize));
     fnUrl.searchParams.set("withAddress", withAddress ? "true" : "false");
     fnUrl.searchParams.set("withCredit", withCredit ? "true" : "false");
     fnUrl.searchParams.set("overwriteCredit", overwriteCredit ? "true" : "false");
     fnUrl.searchParams.set("concurrency", "4");
-    if (token) fnUrl.searchParams.set("token", token);
 
     const res = await fetch(fnUrl.toString(), { method: "GET" });
     const text = await res.text();
@@ -73,29 +72,29 @@ serve(async (req) => {
     }
 
     const payload = JSON.parse(text);
-    const nextToken = payload?.nextToken ? String(payload.nextToken) : null;
-    const done = payload?.done === true;
+    const nextPage = payload?.next?.page ? Math.max(1, toInt(String(payload.next.page), 1)) : null;
+    const done = !nextPage;
 
-    // Atualiza token
-    if (done || !nextToken) {
+    // Atualiza paginação
+    if (done) {
       await supabase
         .from("vtex_sync_state")
-        .upsert({ key: stateKey, value: { token: null }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+        .upsert({ key: stateKey, value: { page: 1 }, updated_at: new Date().toISOString() }, { onConflict: "key" });
     } else {
       await supabase
         .from("vtex_sync_state")
-        .upsert({ key: stateKey, value: { token: nextToken }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+        .upsert({ key: stateKey, value: { page: nextPage }, updated_at: new Date().toISOString() }, { onConflict: "key" });
     }
 
     return json({
       ok: true,
-      mode: "scheduled_scroll_batch",
+      mode: "scheduled_range_page",
+      page,
+      nextPage: nextPage ?? null,
       pageSize,
       withAddress,
       withCredit,
       overwriteCredit,
-      hadToken: !!token,
-      nextToken: nextToken ? "***set***" : null,
       done,
       upstream: {
         batchSize: payload?.batchSize ?? null,
