@@ -225,13 +225,10 @@ export default function ClientesVtex() {
       }
 
       let totalUpserted = 0;
-      // Modo paginado (search/REST-Range) evita limite de "scroll simultâneo" na VTEX.
-      // Obs.: VTEX pode limitar a ~10k no search; para bases maiores usamos cron/scroll.
-      let page = 1;
-      const pageSize = 200;
-      const maxBatches = 60; // 60*200 = 12k (cobre o caso comum; evita travar o browser)
+      // Estratégia "windowed": divide por janelas de createdIn para nunca exceder 10k por consulta,
+      // evitando tanto o limite do /scroll quanto o limite de 10k do /search.
+      const maxBatches = 120; // evita travar o browser; pode re-rodar se necessário
       let totalFromApi: number | null = null;
-      let maxPagesFromApi: number | null = null;
 
       setSyncProgress({
         startedAt: Date.now(),
@@ -244,18 +241,17 @@ export default function ClientesVtex() {
 
       for (let i = 0; i < maxBatches; i++) {
         const u = new URL(`${supabaseUrl.replace(/\/+$/, "")}/functions/v1/vtex-sync-clients`);
-        u.searchParams.set("page", String(page));
-        u.searchParams.set("pageSize", String(pageSize));
+        u.searchParams.set("all", "true");
+        u.searchParams.set("strategy", "windowed");
+        u.searchParams.set("pageSize", "200");
         u.searchParams.set("withAddress", "true");
         u.searchParams.set("withCredit", "true");
         u.searchParams.set("overwriteCredit", "false");
         u.searchParams.set("concurrency", "4");
 
-        const totalHint =
-          totalFromApi != null ? ` (total≈${totalFromApi}${maxPagesFromApi ? ` / páginas≈${maxPagesFromApi}` : ""})` : "";
         setSyncStatus(
-          `Sync em andamento... página ${page}${maxPagesFromApi ? `/${maxPagesFromApi}` : ""}${totalHint}` +
-            `${totalUpserted ? ` (upserted=${totalUpserted})` : ""}`
+          `Sync em andamento... lote ${i + 1}${totalFromApi != null ? ` (total≈${totalFromApi})` : ""}` +
+          `${totalUpserted ? ` (upserted=${totalUpserted})` : ""}`
         );
 
         const res = await fetch(u.toString(), {
@@ -275,16 +271,8 @@ export default function ClientesVtex() {
           throw new Error(`Falha ao syncar clientes: ${text.slice(0, 500)}`);
         }
 
-        if (typeof body.total === "number" && Number.isFinite(body.total) && body.total >= 0) {
-          totalFromApi = body.total;
-          maxPagesFromApi = Math.max(1, Math.ceil(body.total / pageSize));
-          // reflete maxBatches "real" no progresso quando temos total
-          setSyncProgress((p) => ({ ...p, maxBatches: maxPagesFromApi ?? p.maxBatches }));
-        }
-
         totalUpserted += Number(body.upserted ?? 0);
-        const next = body.next ?? null;
-        const done = !next || !next.page;
+        const done = Boolean(body.done);
 
         setSyncProgress((p) => ({
           ...p,
@@ -295,7 +283,6 @@ export default function ClientesVtex() {
         }));
 
         if (done) break;
-        page = Number(next.page) || (page + 1);
       }
 
       toast({

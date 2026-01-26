@@ -300,9 +300,14 @@ async function vtexFetchCustomerCredit(opts: { document?: string | null; email?:
   return { ok: true as const, credit: null as number | null, raw: null as any, tried };
 }
 
+function isVtexMasterDataOver10kError(text: string) {
+  return /acima\s+de\s+dez\s+mil\s+documentos\s+utilize\s+a\s+rota\s+\/scroll/i.test(text);
+}
+
 async function vtexFetchClientsPage(opts: {
   page: number;
   pageSize: number;
+  where?: string | null;
 }) {
   const { base, headers: baseHeaders } = vtexBase();
 
@@ -332,7 +337,8 @@ async function vtexFetchClientsPage(opts: {
 
   const url =
     `${base}/api/dataentities/CL/search` +
-    `?_fields=${encodeURIComponent(fields)}`;
+    `?_fields=${encodeURIComponent(fields)}` +
+    (opts.where ? `&_where=${encodeURIComponent(opts.where)}` : "");
 
   const headers = {
     ...baseHeaders,
@@ -539,6 +545,69 @@ async function vtexScrollClientsPage(opts: {
   }
 }
 
+type Window = { start: string; end: string };
+type WindowedState = {
+  queue: Window[];
+  current: (Window & { page: number; pageSize: number; total?: number | null }) | null;
+};
+
+function clampDateMs(x: number) {
+  return Math.max(0, Math.min(x, 8640000000000000)); // Date range guard
+}
+
+function midIso(startIso: string, endIso: string) {
+  const a = Date.parse(startIso);
+  const b = Date.parse(endIso);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  const m = Math.floor((a + b) / 2);
+  return new Date(clampDateMs(m)).toISOString();
+}
+
+function windowWhere(w: Window) {
+  // Sintaxe tolerante para o Master Data v1 (_where é "SQL-like")
+  // Preferimos `between ... AND ...`.
+  return `createdIn between ${w.start} AND ${w.end}`;
+}
+
+async function readWindowedState(supabase: any, key: string, nowIso: string): Promise<WindowedState> {
+  const { data: st } = await supabase
+    .from("vtex_sync_state")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+
+  const v = (st?.value ?? null) as any;
+  if (v && typeof v === "object" && Array.isArray(v.queue)) {
+    return {
+      queue: v.queue as Window[],
+      current: v.current ?? null,
+    };
+  }
+
+  // Inicializa com um range grande; se estourar 10k, nós dividimos adaptativamente.
+  return {
+    queue: [{ start: "2000-01-01T00:00:00.000Z", end: nowIso }],
+    current: null,
+  };
+}
+
+async function saveWindowedState(supabase: any, key: string, state: WindowedState) {
+  await supabase
+    .from("vtex_sync_state")
+    .upsert({ key, value: state, updated_at: new Date().toISOString() }, { onConflict: "key" });
+}
+
+function splitWindow(w: Window): [Window, Window] | null {
+  const mid = midIso(w.start, w.end);
+  if (!mid) return null;
+  // evita loops com janelas muito pequenas
+  if (Date.parse(mid) <= Date.parse(w.start) + 3600_000) return null;
+  return [
+    { start: w.start, end: mid },
+    { start: mid, end: w.end },
+  ];
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -562,11 +631,206 @@ serve(async (req) => {
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
     const useStateToken = toBool(u.searchParams.get("useStateToken"), true);
+    const strategy = (normStr(u.searchParams.get("strategy")) ?? "scroll").toLowerCase(); // scroll | windowed
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
     // para não estourar timeout do gateway.
     if (all) {
+      // Estratégia windowed: usa /search com filtros de createdIn (janelas <=10k),
+      // persistindo estado em vtex_sync_state. Evita o limite do /scroll e o limite de 10k do search (por janela).
+      if (strategy === "windowed") {
+        const stateKey = "clients_windowed_state";
+        const nowIso = new Date().toISOString();
+        const state = await readWindowedState(supabase, stateKey, nowIso);
+
+        // garante um current válido (divide janelas que estouram 10k)
+        let safety = 0;
+        while (!state.current && state.queue.length && safety < 20) {
+          safety++;
+          const w = state.queue.shift()!;
+          const where = windowWhere(w);
+          const probe = await vtexFetchClientsPage({ page: 1, pageSize: 1, where });
+
+          if (!probe.ok && probe.status === 400 && isVtexMasterDataOver10kError(probe.bodyPreview || "")) {
+            const split = splitWindow(w);
+            if (!split) {
+              // não conseguimos dividir mais: devolve erro claro
+              await saveWindowedState(supabase, stateKey, state);
+              return json({ ok: false, step: "windowed_split", error: "Janela ainda >10k e não foi possível dividir mais.", window: w }, 502);
+            }
+            // push em LIFO para priorizar a primeira metade
+            state.queue.unshift(split[1], split[0]);
+            continue;
+          }
+
+          if (!probe.ok) {
+            await saveWindowedState(supabase, stateKey, state);
+            return json({ ok: false, step: "windowed_probe", ...probe }, 502);
+          }
+
+          state.current = { ...w, page: 1, pageSize: Math.min(500, Math.max(10, pageSize)), total: probe.total ?? null };
+        }
+
+        if (!state.current) {
+          // nada a fazer
+          await saveWindowedState(supabase, stateKey, state);
+          return json({ ok: true, mode: "windowed_done", done: true, queueLen: state.queue.length });
+        }
+
+        const where = windowWhere({ start: state.current.start, end: state.current.end });
+        const r = await vtexFetchClientsPage({ page: state.current.page, pageSize: state.current.pageSize, where });
+        if (!r.ok) {
+          // se ainda estourou 10k (improvável), divide e reprocessa na próxima chamada
+          if (r.status === 400 && isVtexMasterDataOver10kError(r.bodyPreview || "")) {
+            const w: Window = { start: state.current.start, end: state.current.end };
+            const split = splitWindow(w);
+            if (!split) {
+              await saveWindowedState(supabase, stateKey, state);
+              return json({ ok: false, step: "windowed_fetch", ...r }, 502);
+            }
+            state.current = null;
+            state.queue.unshift(split[1], split[0]);
+            await saveWindowedState(supabase, stateKey, state);
+            return json({ ok: true, mode: "windowed_split_deferred", done: false, queueLen: state.queue.length });
+          }
+          await saveWindowedState(supabase, stateKey, state);
+          return json({ ok: false, step: "windowed_fetch", ...r }, 502);
+        }
+
+        const arr = Array.isArray(r.data) ? r.data : [];
+        const rows = arr
+          .map((c: any) => {
+            const md_id = normStr(c?.id) ?? normStr(c?.userId) ?? normStr(c?.email);
+            if (!md_id) return null;
+
+            const first = normStr(c?.firstName);
+            const last = normStr(c?.lastName);
+            const full = normStr(`${first ?? ""} ${last ?? ""}`.trim()) ??
+              normStr(c?.corporateName) ??
+              normStr(c?.tradeName);
+
+            const document = digitsOnly(c?.document);
+            const phone = digitsOnly(c?.phone);
+
+            const row: Record<string, unknown> = { md_id, raw: c };
+            const email = normStr(c?.email);
+            const user_id = normStr(c?.userId);
+            const vtex_user_id = user_id;
+
+            if (email) row.email = email;
+            if (user_id) row.user_id = user_id;
+            if (first) row.first_name = first;
+            if (last) row.last_name = last;
+            if (full) row.full_name = full;
+            if (vtex_user_id) row.vtex_user_id = vtex_user_id;
+            row.company_name = normStr(c?.corporateName) ?? normStr(c?.tradeName) ?? full ?? email ?? md_id;
+            if (document) row.document = document;
+            if (phone) row.phone = phone;
+
+            if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
+            if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
+            if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
+            if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
+
+            if (normStr(c?.createdIn)) row.created_in = c.createdIn;
+            if (normStr(c?.updatedIn)) row.updated_in = c.updatedIn;
+
+            if (c?.isCorporate === true && document) row.cnpj = document;
+            row.last_sync_at = new Date().toISOString();
+            return row;
+          })
+          .filter(Boolean) as Record<string, unknown>[];
+
+        if (withAddress) {
+          await mapLimit(rows, concurrency, async (row) => {
+            const userId =
+              normStr((row as any).vtex_user_id) ??
+              normStr((row as any).user_id) ??
+              normStr((row as any).email);
+            if (!userId) return;
+            const ad = await vtexFetchAddressByUserId(userId);
+            if (!ad.ok) return;
+            if (ad.city) (row as any).city = ad.city;
+            if (ad.uf) {
+              (row as any).uf = ad.uf;
+              (row as any).price_table_type = ad.uf.toUpperCase() === "MG" ? "MG" : "BR";
+            }
+            const raw = (row as any).raw ?? {};
+            (row as any).raw = { cl: raw, ad: ad.raw };
+          });
+        }
+
+        let existingCreditById: Map<string, number> | null = null;
+        if (withCredit && !overwriteCredit && rows.length) {
+          const ids = rows.map((rr) => String((rr as any).md_id)).filter(Boolean);
+          const { data: existing, error: exErr } = await supabase
+            .from("vtex_clients")
+            .select("md_id, credit_limit")
+            .in("md_id", ids);
+          if (!exErr && Array.isArray(existing)) {
+            existingCreditById = new Map(existing.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]));
+          }
+        }
+
+        if (withCredit) {
+          await mapLimit(rows, Math.min(concurrency, 6), async (row) => {
+            const mdId = String((row as any).md_id ?? "");
+            const current = existingCreditById ? Number(existingCreditById.get(mdId) ?? 0) : 0;
+            if (!overwriteCredit && current > 0) return;
+
+            const doc = normStr((row as any).cnpj) ?? normStr((row as any).document);
+            const email = normStr((row as any).email);
+            const userId = normStr((row as any).vtex_user_id) ?? normStr((row as any).user_id);
+
+            const rr = await vtexFetchCustomerCredit({ document: doc, email, userId });
+            if (!rr.ok) return;
+            if (rr.credit == null) return;
+
+            (row as any).credit_limit = rr.credit;
+            const raw = (row as any).raw ?? {};
+            const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
+            (row as any).raw = { ...prev, credit: rr.raw, credit_tried: (rr as any).tried?.slice(0, 5) };
+          });
+        }
+
+        if (rows.length) {
+          const { error: upErr } = await supabase
+            .from("vtex_clients")
+            .upsert(rows, { onConflict: "md_id" });
+          if (upErr) return json({ ok: false, step: "supabase_upsert", error: upErr.message }, 500);
+        }
+
+        // avança pagina dentro da janela
+        let next: { page: number; pageSize: number } | null = null;
+        if (typeof r.total === "number" && typeof r.rangeEnd === "number") {
+          if (r.rangeEnd + 1 < r.total) next = { page: state.current.page + 1, pageSize: state.current.pageSize };
+        } else {
+          if (rows.length === state.current.pageSize) next = { page: state.current.page + 1, pageSize: state.current.pageSize };
+        }
+
+        if (next) {
+          state.current.page = next.page;
+        } else {
+          state.current = null;
+        }
+
+        const done = !state.current && state.queue.length === 0;
+        await saveWindowedState(supabase, stateKey, state);
+
+        return json({
+          ok: true,
+          mode: "windowed_batch",
+          strategy: "windowed",
+          window: state.current ? { start: state.current.start, end: state.current.end } : null,
+          queueLen: state.queue.length,
+          pageInWindow: state.current ? state.current.page : null,
+          batchSize: rows.length,
+          upserted: rows.length,
+          done,
+        });
+      }
+
       // Edge runtime tem limite de CPU por request; lote menor evita 502 sem body.
       const scrollSize = Math.min(100, Math.max(10, pageSize));
       const stateKey = "clients_scroll_token";
@@ -735,7 +999,7 @@ serve(async (req) => {
     }
 
     // modo paginado (search/range) — útil pra pequenos volumes (<10k)
-    const r = await vtexFetchClientsPage({ page, pageSize });
+    const r = await vtexFetchClientsPage({ page, pageSize, where: null });
     if (!r.ok) {
       // evita duplicar "ok" (r já tem ok=false)
       return json({ step: "vtex_fetch", ...r }, 502);
