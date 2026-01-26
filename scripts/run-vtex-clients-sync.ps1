@@ -71,14 +71,15 @@ function Ensure-SupabaseLocalRunning() {
 }
 
 function Get-SupabaseStatusJson() {
-  $raw = & supabase status --output json 2>&1
+  # No Windows PowerShell, stderr de comando nativo pode virar NativeCommandError e quebrar com EAP=Stop.
+  # Rodamos via cmd.exe e juntamos stderr->stdout no nível do CMD.
+  $raw = & cmd.exe /c "supabase status --output json 2>&1"
   $text = ($raw | Out-String).Trim()
-  # o CLI às vezes imprime "Stopped services: ..." depois do JSON; pega só o primeiro bloco JSON
-  $start = $text.IndexOf("{")
-  $end = $text.IndexOf("}", $start)
-  if ($start -lt 0) { throw "Não consegui ler supabase status --output json" }
-  $jsonText = $text.Substring($start)
-  # Tenta parsear o primeiro objeto JSON completo
+
+  # o CLI às vezes imprime "Stopped services: ..." depois do JSON; extrai o primeiro objeto JSON
+  $m = [regex]::Match($text, "\{[\s\S]*\}")
+  if (-not $m.Success) { throw "Não consegui extrair JSON de: supabase status --output json" }
+  $jsonText = $m.Value
   try { return ($jsonText | ConvertFrom-Json) } catch { throw "Falha ao parsear supabase status JSON: $($_.Exception.Message)" }
 }
 
