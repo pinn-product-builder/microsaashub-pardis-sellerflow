@@ -576,17 +576,13 @@ function windowWhere(w: Window, style: string) {
   const s = w.start;
   const e = w.end;
   switch (style) {
-    case "between_quoted":
-      return `createdIn between '${s}' AND '${e}'`;
-    case "gte_lt":
-      return `createdIn>=${s} AND createdIn<${e}`;
-    case "gte_lt_quoted":
-      return `createdIn>='${s}' AND createdIn<'${e}'`;
-    case "between":
+    case "between_quoted_lc":
+      return `createdIn between '${s}' and '${e}'`;
+    case "between_lc":
     default:
       // Sintaxe tolerante para o Master Data v1 (_where é "SQL-like")
       // Preferimos `between ... AND ...`.
-      return `createdIn between ${s} AND ${e}`;
+      return `createdIn between ${s} and ${e}`;
   }
 }
 
@@ -670,7 +666,9 @@ serve(async (req) => {
         const nowIso = new Date().toISOString();
         const state = await readWindowedState(supabase, stateKey, nowIso);
 
-        const whereStyles = ["between", "between_quoted", "gte_lt", "gte_lt_quoted"] as const;
+        // Importante: nesta conta VTEX o token 'AND' é rejeitado no _where.
+        // Então evitamos estilos com operadores (>= ... AND < ...) e usamos apenas "between ... and ...".
+        const whereStyles = ["between_lc", "between_quoted_lc"] as const;
         const pickWhereStyles = (preferred: string | null) => {
           if (preferred && whereStyles.includes(preferred as any)) {
             return [preferred, ...whereStyles.filter((s) => s !== preferred)];
