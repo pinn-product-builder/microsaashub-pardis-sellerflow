@@ -371,8 +371,12 @@ async function vtexFetchClientsPage(opts: {
   // Paginação mais estável via header REST-Range.
   // Alguns accounts ignoram _size/_pageSize na querystring e aplicam um default (ex.: 15),
   // o que quebra a paginação e pode "cortar" em ~10k.
-  const from = (Math.max(1, opts.page) - 1) * Math.max(1, opts.pageSize);
-  const to = from + Math.max(1, opts.pageSize) - 1;
+  // Alguns accounts limitam o REST-Range do Master Data Search para no máximo 100.
+  // Quando excede, a VTEX retorna erro "O range está inválido ... range não pode ser maior que 100."
+  const effectivePageSize = Math.min(100, Math.max(1, opts.pageSize));
+
+  const from = (Math.max(1, opts.page) - 1) * effectivePageSize;
+  const to = from + effectivePageSize - 1;
 
   const url =
     `${base}/api/dataentities/CL/search` +
