@@ -136,8 +136,9 @@ function Start-FunctionsServe([string]$envFile) {
     Start-Sleep -Milliseconds 750
     if (Test-Path $logPath) {
       $txt = (Get-Content $logPath -Tail 200 | Out-String)
-      if ($txt -match "http[s]?://[^\s\"']+") { return @{ LogPath = $logPath } }
-      if ($txt -match "Serving|serve|listening") { return @{ LogPath = $logPath } }
+      # regex em aspas duplas com \" e ' quebra o parser do PowerShell; mantenha simples e em aspas simples
+      if ($txt -match 'http[s]?://\S+') { return @{ LogPath = $logPath } }
+      if ($txt -match 'Serving|serve|listening') { return @{ LogPath = $logPath } }
     }
   }
 
@@ -277,7 +278,7 @@ if ($Mode -eq "cloud") {
     }
     Info "$i) $body"
     if ($body -match '"done"\s*:\s*true') { break }
-    if ($body -match "Unauthorized|Forbidden") { break }
+    if ($body -match 'Unauthorized|Forbidden') { break }
     Start-Sleep -Seconds $SleepSeconds
   }
 
