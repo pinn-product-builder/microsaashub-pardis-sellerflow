@@ -62,6 +62,7 @@ export default function ProdutosVtex() {
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
   const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<number, Record<string, number | null>>>({});
   const [openSkuPolicies, setOpenSkuPolicies] = useState<number | null>(null);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string>("1");
 
   const { mode, tradePolicyId, setMode, setTradePolicyId } = useVtexPolicyStore();
 
@@ -323,7 +324,22 @@ export default function ProdutosVtex() {
                         Preço ({mode === "fixed" ? `policy ${tradePolicyId}` : "auto"})
                       </TableHead>
                       <TableHead className="text-right">Preço Embalagem</TableHead>
-                      <TableHead>Policies (efetivo)</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          <span>Policy</span>
+                          <select
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            value={selectedPolicyId}
+                            onChange={(e) => setSelectedPolicyId(e.target.value)}
+                          >
+                            {POLICY_LABELS.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </TableHead>
                       <TableHead>Fonte</TableHead>
                       <TableHead>Policies</TableHead>
                       <TableHead className="text-right">Disp.</TableHead>
@@ -343,7 +359,11 @@ export default function ProdutosVtex() {
                         <TableCell>{r.embalagem ?? "-"}</TableCell>
                         <TableCell>{r.gramatura ?? "-"}</TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {typeof r.selling_price === "number" ? formatCurrency(r.selling_price) : "-"}
+                          {(() => {
+                            const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
+                            if (typeof r.selling_price !== "number") return "-";
+                            return formatCurrency((qty ?? 1) * r.selling_price);
+                          })()}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {(() => {
@@ -353,32 +373,26 @@ export default function ProdutosVtex() {
                           })()}
                         </TableCell>
                         <TableCell className="text-xs">
-                          <div className="space-y-1">
-                            {POLICY_LABELS.map((p) => {
-                              const effective = getPolicyEffective(r.vtex_sku_id, p.id);
-                              const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
-                              const qtyEffective = getPolicyEffectiveForQty(r.vtex_sku_id, p.id);
-                              const totalValue =
-                                qty && typeof qtyEffective === "number"
-                                  ? qtyEffective * qty
-                                  : qty && typeof effective === "number"
-                                    ? effective * qty
-                                    : null;
-                              return (
-                                <div key={p.id} className="flex items-center justify-between gap-2">
-                                  <span className="text-muted-foreground">{p.label}</span>
-                                  <span className="font-mono text-right">
-                                    {typeof effective === "number" ? formatCurrency(effective) : "-"}
-                                    {typeof totalValue === "number" ? (
-                                      <div className="text-[10px] text-muted-foreground">
-                                        emb {qty}: {formatCurrency(totalValue)}
-                                      </div>
-                                    ) : null}
-                                  </span>
+                          {(() => {
+                            const effective = getPolicyEffective(r.vtex_sku_id, selectedPolicyId);
+                            const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name) ?? 1;
+                            const qtyEffective = getPolicyEffectiveForQty(r.vtex_sku_id, selectedPolicyId);
+                            const base =
+                              typeof qtyEffective === "number"
+                                ? qtyEffective
+                                : typeof effective === "number"
+                                  ? effective
+                                  : null;
+                            if (typeof base !== "number") return <span className="text-muted-foreground">-</span>;
+                            return (
+                              <div className="font-mono text-right">
+                                {formatCurrency(base)}
+                                <div className="text-[10px] text-muted-foreground">
+                                  emb {qty}: {formatCurrency(base * qty)}
                                 </div>
-                              );
-                            })}
-                          </div>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-xs">
                           {r.price_available === false ? (

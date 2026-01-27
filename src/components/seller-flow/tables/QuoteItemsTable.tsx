@@ -42,6 +42,7 @@ export function QuoteItemsTable({
   const { toast } = useToast();
   const [repricingIds, setRepricingIds] = useState<Record<string, boolean>>({});
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
+  const [selectedPolicyId, setSelectedPolicyId] = useState<string>(tradePolicyId || '1');
   
   // Use customer from props or from store
   const effectiveCustomer = customer || selectedCustomer;
@@ -190,6 +191,10 @@ export function QuoteItemsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vtexSkuIds.join(',')]);
 
+  useEffect(() => {
+    if (tradePolicyId) setSelectedPolicyId(String(tradePolicyId));
+  }, [tradePolicyId]);
+
   // Get Pardis calculation for an item
   const getItemCalc = (itemId: string) => {
     return itemCalculations.find(c => c.itemId === itemId);
@@ -211,7 +216,22 @@ export function QuoteItemsTable({
             <TableHead>Produto</TableHead>
             <TableHead className="text-center">Qtd</TableHead>
             <TableHead className="text-right">Preço Unit.</TableHead>
-            <TableHead>Policies (efetivo)</TableHead>
+            <TableHead>
+              <div className="flex items-center gap-2">
+                <span>Policy</span>
+                <select
+                  className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                  value={selectedPolicyId}
+                  onChange={(e) => setSelectedPolicyId(e.target.value)}
+                >
+                  {POLICY_LABELS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </TableHead>
             {showPardisIndicators && (
               <>
                 <TableHead className="text-right">Preço Mín.</TableHead>
@@ -273,24 +293,21 @@ export function QuoteItemsTable({
                     const skuId = Number(item.product?.sku);
                     if (!Number.isFinite(skuId)) return <span className="text-muted-foreground">-</span>;
                     const embalagemQty = Number((item as any).vtexEmbalagemQty || 0);
+                    const effective = getPolicyEffective(skuId, selectedPolicyId);
+                    const totalValue =
+                      embalagemQty && typeof effective === 'number'
+                        ? effective * embalagemQty
+                        : typeof effective === 'number'
+                          ? effective
+                          : null;
                     return (
-                      <div className="space-y-1">
-                        {POLICY_LABELS.map((p) => {
-                          const effective = getPolicyEffective(skuId, p.id);
-                          return (
-                            <div key={p.id} className="flex items-center justify-between gap-2">
-                              <span className="text-muted-foreground">{p.label}</span>
-                              <span className="font-mono text-right">
-                                {typeof effective === 'number' ? formatCurrency(effective) : '-'}
-                                {embalagemQty && typeof effective === 'number' ? (
-                                  <div className="text-[10px] text-muted-foreground">
-                                    emb {embalagemQty}: {formatCurrency(effective * embalagemQty)}
-                                  </div>
-                                ) : null}
-                              </span>
-                            </div>
-                          );
-                        })}
+                      <div className="font-mono text-right">
+                        {typeof effective === 'number' ? formatCurrency(effective) : '-'}
+                        {typeof totalValue === 'number' ? (
+                          <div className="text-[10px] text-muted-foreground">
+                            emb {embalagemQty || 1}: {formatCurrency(totalValue)}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })()}
