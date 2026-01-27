@@ -579,12 +579,14 @@ async function vtexScrollClientsPage(opts: {
   pageSize: number;
   token?: string | null;
   fields?: string | null;
+  where?: string | null;
 }) {
   const { base, headers } = vtexBase();
   const fields = (opts.fields && opts.fields.trim()) ? opts.fields.trim() : CL_BASE_FIELDS.join(",");
 
   const u = new URL(`${base}/api/dataentities/CL/scroll`);
   u.searchParams.set("_fields", fields);
+  if (opts.where) u.searchParams.set("_where", opts.where);
   u.searchParams.set("_size", String(Math.min(1000, Math.max(1, opts.pageSize))));
   // Continuação: em alguns ambientes o token funciona via header, em outros via querystring.
   // Para evitar abrir "scroll novo" a cada chamada (e estourar limite), enviamos nos dois.
@@ -775,6 +777,7 @@ serve(async (req) => {
     const pageSize = Math.min(1000, toInt(u.searchParams.get("pageSize"), 200)); // Master Data costuma aceitar até 1000
     const missingOnly = toBool(u.searchParams.get("missingOnly"), false);
     const all = toBool(u.searchParams.get("all"), false);
+    const l2lOnly = toBool(u.searchParams.get("l2lOnly"), false);
     const withAddress = toBool(u.searchParams.get("withAddress"), true);
     const withCredit = toBool(u.searchParams.get("withCredit"), false);
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
@@ -788,11 +791,20 @@ serve(async (req) => {
 
     const clSchema = await vtexFetchEntitySchemaFields("CL");
     const clFields = buildClFields(clSchema);
+    const l2lField = clSchema ? CL_L2L_FIELDS.find((f) => clSchema.has(f)) ?? null : null;
+    const l2lWhere = l2lOnly && l2lField ? `${l2lField}=true` : null;
+    if (l2lOnly && !l2lField) {
+      return json(
+        { ok: false, step: "l2l_field_missing", error: "Campo L2L não encontrado no schema CL.", l2lOnly },
+        400,
+      );
+    }
+    const useAll = all && !l2lOnly;
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
     // para não estourar timeout do gateway.
-    if (all) {
+    if (useAll) {
       // Estratégia windowed: usa /search com filtros de createdIn (janelas <=10k),
       // persistindo estado em vtex_sync_state. Evita o limite do /scroll e o limite de 10k do search (por janela).
       if (strategy === "windowed") {
@@ -1125,7 +1137,7 @@ serve(async (req) => {
         }
       }
 
-      const r = await vtexScrollClientsPage({ pageSize: scrollSize, token, fields: clFields });
+      const r = await vtexScrollClientsPage({ pageSize: scrollSize, token, fields: clFields, where: l2lWhere });
       if (!r.ok) return json({ step: "vtex_scroll", strategy, all, ...r }, 502);
 
       const arr = Array.isArray(r.data) ? r.data : [];
@@ -1306,7 +1318,7 @@ serve(async (req) => {
     }
 
     // modo paginado (search/range) — útil pra pequenos volumes (<10k)
-    const r = await vtexFetchClientsPage({ page, pageSize, where: null, fields: clFields });
+    const r = await vtexFetchClientsPage({ page, pageSize, where: l2lWhere, fields: clFields });
     if (!r.ok) {
       // evita duplicar "ok" (r já tem ok=false)
       return json({ step: "vtex_fetch", ...r }, 502);

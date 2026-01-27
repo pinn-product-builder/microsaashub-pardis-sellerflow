@@ -8,7 +8,7 @@ param(
   [string]$VTEX_ENV = "vtexcommercestable.com.br",
   [string]$VTEX_APP_KEY = "",
   [string]$VTEX_APP_TOKEN = "",
-  [string]$VTEX_CUSTOMER_CREDIT_ENV = "",
+  [string]$VTEX_CUSTOMER_CREDIT_ENV = "", 
 
   # Supabase Cloud (obrigatório no modo cloud)
   [string]$SUPABASE_URL = "https://qhijoyrcbtnqfybuynzy.supabase.co",
@@ -23,6 +23,7 @@ param(
   [switch]$WithAddress = $true,
   [switch]$WithCredit = $true,
   [switch]$OverwriteCredit = $false,
+  [switch]$L2lOnly = $false,
   [ValidateSet("windowed", "scroll")]
   [string]$Strategy = "windowed"
 )
@@ -232,15 +233,17 @@ if ($Mode -eq "local") {
     $functionsUrl
   )
   $base = Resolve-FunctionsBase $candidates $syncSecret
+  $allParam = if ($L2lOnly.IsPresent) { "false" } else { "true" }
   $url =
     "$base/vtex-sync-clients" +
-    "?all=true" +
+    "?all=$allParam" +
     "&strategy=$Strategy" +
     "&pageSize=$PageSize" +
     "&withAddress=$([int]$WithAddress.IsPresent)" +
     "&withCredit=$([int]$WithCredit.IsPresent)" +
     "&overwriteCredit=$([int]$OverwriteCredit.IsPresent)" +
-    "&concurrency=$Concurrency"
+    "&concurrency=$Concurrency" +
+    "&l2lOnly=$([int]$L2lOnly.IsPresent)"
 
   Info "Chamando local: $url"
 
@@ -259,15 +262,17 @@ if ($Mode -eq "cloud") {
   Require-NonEmpty "SUPABASE_ANON_KEY" $SUPABASE_ANON_KEY
   Require-NonEmpty "SUPABASE_ADMIN_JWT" $SUPABASE_ADMIN_JWT
 
+  $allParam = if ($L2lOnly.IsPresent) { "false" } else { "true" }
   $url =
     "$SUPABASE_URL/functions/v1/vtex-sync-clients" +
-    "?all=true" +
+    "?all=$allParam" +
     "&strategy=$Strategy" +
     "&pageSize=$PageSize" +
     "&withAddress=$([int]$WithAddress.IsPresent)" +
     "&withCredit=$([int]$WithCredit.IsPresent)" +
     "&overwriteCredit=$([int]$OverwriteCredit.IsPresent)" +
-    "&concurrency=$Concurrency"
+    "&concurrency=$Concurrency" +
+    "&l2lOnly=$([int]$L2lOnly.IsPresent)"
 
   Info "Chamando cloud: $url"
   Info "Obs.: se receber Unauthorized/Forbidden, gere um access_token novo e garanta role admin em public.user_roles."
