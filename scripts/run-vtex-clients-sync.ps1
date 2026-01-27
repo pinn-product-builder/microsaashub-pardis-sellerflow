@@ -49,7 +49,8 @@ function Get-ObjProp([object]$obj, [string]$name, [string]$def = "") {
 
 function CurlJson([string]$url, [hashtable]$headers) {
   # -sS: silent but show errors
-  $args = @("-sS", $url)
+  # --max-time: evita travar indefinidamente se o gateway/edge demorar ou a conexão ficar pendurada
+  $args = @("-sS", "--max-time", "180", $url)
   foreach ($k in $headers.Keys) {
     # PowerShell: "$k:" tenta resolver "$k:" como "drive scope", então usamos ${k}
     $args += @("-H", "${k}: $($headers[$k])")

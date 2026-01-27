@@ -114,54 +114,106 @@ function extractBestAddress(arr: any[]): { city: string | null; uf: string | nul
   return { city: best?.city ?? null, uf: best?.uf ?? null, raw: best?.x ?? null };
 }
 
-async function vtexFetchAddressByUserId(userId: string) {
+async function vtexFetchProfileSystemAddress(userIdOrEmail: string) {
+  const { base, headers } = vtexBase();
+  const safe = String(userIdOrEmail || "").trim();
+  if (!safe) return { ok: true as const, city: null, uf: null, raw: null };
+
+  const url = `${base}/api/profile-system/pvt/users/${encodeURIComponent(safe)}/addresses`;
+  const maxRetries = 4;
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    const res = await fetch(url, { headers });
+    const text = await res.text();
+    if (res.ok) {
+      try {
+        const payload = JSON.parse(text);
+        const arr = Array.isArray(payload) ? payload : [];
+        // normaliza para o mesmo formato esperado pelo extractBestAddress
+        const normalized = arr.map((x: any) => ({
+          city: x?.city ?? x?.City ?? null,
+          state: x?.state ?? x?.State ?? null,
+          addressType: x?.addressType ?? null,
+          addressName: x?.addressName ?? null,
+          _raw: x,
+        }));
+        const best = extractBestAddress(normalized);
+        return { ok: true as const, city: best.city, uf: best.uf, raw: best.raw?._raw ?? best.raw ?? null };
+      } catch {
+        return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+      }
+    }
+
+    // 404 é comum (user não encontrado) -> não adianta retry
+    const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+    if (!retryable || attempt >= maxRetries) {
+      return { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
+    }
+    await sleep(400 * attempt);
+  }
+}
+
+async function vtexFetchAddressByUserId(userId: string, email?: string | null) {
   const { base, headers } = vtexBase();
   const fields = ["userId", "city", "state", "addressType", "addressName"].join(",");
 
-  const safe = String(userId || "").trim();
-  const whereVariants = [
-    `userId=${safe}`,
-    `userId='${safe.replace(/'/g, "''")}'`,
-    `userId=\"${safe.replace(/\"/g, '\\"')}\"`,
-  ];
+  // Em alguns accounts, o AD.userId pode corresponder ao `email` (e não ao CL.userId).
+  // Então tentamos ambos.
+  const candidates = [userId, email].map((x) => String(x ?? "").trim()).filter(Boolean);
 
   const maxRetries = 6;
   let lastErr: any = null;
-  for (const where of whereVariants) {
-    const url =
-      `${base}/api/dataentities/AD/search` +
-      `?_fields=${encodeURIComponent(fields)}` +
-      `&_where=${encodeURIComponent(where)}` +
-      `&_page=1&_pageSize=10`;
+  for (const cand of candidates) {
+    const whereVariants = [
+      `userId=${cand}`,
+      `userId='${cand.replace(/'/g, "''")}'`,
+      `userId=\"${cand.replace(/\"/g, '\\"')}\"`,
+    ];
+    for (const where of whereVariants) {
+      const url =
+        `${base}/api/dataentities/AD/search` +
+        `?_fields=${encodeURIComponent(fields)}` +
+        `&_where=${encodeURIComponent(where)}` +
+        `&_page=1&_pageSize=10`;
 
-    let attempt = 0;
-    while (true) {
-      attempt++;
-      const res = await fetch(url, { headers });
-      const text = await res.text();
-      if (res.ok) {
-        try {
-          const data = JSON.parse(text);
-          const arr = Array.isArray(data) ? data : [];
-          const best = extractBestAddress(arr);
-          return {
-            ok: true as const,
-            city: best.city,
-            uf: best.uf,
-            raw: best.raw,
-          };
-        } catch {
-          return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+      let attempt = 0;
+      while (true) {
+        attempt++;
+        const res = await fetch(url, { headers });
+        const text = await res.text();
+        if (res.ok) {
+          try {
+            const data = JSON.parse(text);
+            const arr = Array.isArray(data) ? data : [];
+            const best = extractBestAddress(arr);
+            // Se essa busca não achou nada útil, tenta o próximo candidato (ex.: email).
+            if (!best.city && !best.uf) break;
+            return {
+              ok: true as const,
+              city: best.city,
+              uf: best.uf,
+              raw: best.raw,
+            };
+          } catch {
+            return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+          }
         }
-      }
 
-      const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
-      if (!retryable || attempt >= maxRetries) {
-        lastErr = { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
-        break;
+        const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+        if (!retryable || attempt >= maxRetries) {
+          lastErr = { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
+          break;
+        }
+        await sleep(500 * attempt);
       }
-      await sleep(500 * attempt);
     }
+
+    // Fallback: Profile System (muito mais confiável para endereços em várias lojas VTEX).
+    // Só tenta depois de falhar no AD para esse candidato.
+    const ps = await vtexFetchProfileSystemAddress(cand);
+    if (ps.ok && (ps.city || ps.uf)) return ps;
+    if (!ps.ok) lastErr = ps;
   }
 
   return lastErr ?? { ok: true as const, city: null, uf: null, raw: null };
@@ -322,7 +374,9 @@ async function vtexFetchCustomerCredit(opts: { document?: string | null; email?:
           try {
             const payload = JSON.parse(text);
             const credit = extractCreditFromPayload(payload);
-            return { ok: true as const, credit, raw: payload, tried };
+            // Segurança: evita NaN/Infinity virar null no JSON (e quebrar NOT NULL no Postgres)
+            const safeCredit = typeof credit === "number" && Number.isFinite(credit) ? credit : null;
+            return { ok: true as const, credit: safeCredit, raw: payload, tried };
           } catch {
             return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
           }
@@ -685,6 +739,7 @@ serve(async (req) => {
     const withAddress = toBool(u.searchParams.get("withAddress"), true);
     const withCredit = toBool(u.searchParams.get("withCredit"), false);
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
+    const debugAddress = toBool(u.searchParams.get("debugAddress"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
     const useStateToken = toBool(u.searchParams.get("useStateToken"), true);
     // Estratégia default:
@@ -824,6 +879,9 @@ serve(async (req) => {
         const arr = Array.isArray(r.data) ? r.data : [];
         let addressEnriched = 0;
         let creditEnriched = 0;
+        let addressAttempted = 0;
+        let addressOkEmpty = 0;
+        let addressErrorSample: any = null;
         const rows = arr
           .map((c: any) => {
             const md_id = normStr(c?.id) ?? normStr(c?.userId) ?? normStr(c?.email);
@@ -875,25 +933,40 @@ serve(async (req) => {
 
         if (withAddress) {
           await mapLimit(rows, concurrency, async (row) => {
+            addressAttempted++;
             const userId =
               normStr((row as any).vtex_user_id) ??
               normStr((row as any).user_id) ??
+              normStr((row as any).md_id) ??
               normStr((row as any).email);
             if (!userId) return;
-            const ad = await vtexFetchAddressByUserId(userId);
-            if (!ad.ok) return;
+            const email = normStr((row as any).email);
+            const ad = await vtexFetchAddressByUserId(userId, email);
+            if (!ad.ok) {
+              if (debugAddress && !addressErrorSample) {
+                addressErrorSample = {
+                  status: (ad as any).status ?? null,
+                  statusText: (ad as any).statusText ?? null,
+                  url: (ad as any).url ?? null,
+                  bodyPreview: (ad as any).bodyPreview ?? null,
+                };
+              }
+              return;
+            }
             if (ad.city) (row as any).city = ad.city;
             if (ad.uf) {
               (row as any).uf = ad.uf;
               (row as any).price_table_type = ad.uf.toUpperCase() === "MG" ? "MG" : "BR";
             }
             if ((row as any).city || (row as any).uf) addressEnriched++;
+            else addressOkEmpty++;
             const raw = (row as any).raw ?? {};
             (row as any).raw = { cl: raw, ad: ad.raw };
           });
         }
 
         let existingCreditById: Map<string, number> | null = null;
+        let existingMdIds: Set<string> | null = null;
         if (withCredit && !overwriteCredit && rows.length) {
           const ids = rows.map((rr) => String((rr as any).md_id)).filter(Boolean);
           const { data: existing, error: exErr } = await supabase
@@ -902,6 +975,7 @@ serve(async (req) => {
             .in("md_id", ids);
           if (!exErr && Array.isArray(existing)) {
             existingCreditById = new Map(existing.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]));
+            existingMdIds = new Set(existing.map((x: any) => String(x.md_id)));
           }
         }
 
@@ -920,7 +994,9 @@ serve(async (req) => {
             if (!rr.ok) return;
             if (rr.credit == null) return;
 
-            (row as any).credit_limit = rr.credit;
+            if (typeof rr.credit === "number" && Number.isFinite(rr.credit)) {
+              (row as any).credit_limit = rr.credit;
+            }
             creditEnriched++;
             const raw = (row as any).raw ?? {};
             const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
@@ -929,6 +1005,43 @@ serve(async (req) => {
         }
 
         if (rows.length) {
+          // `credit_limit` é NOT NULL. Importante: no PostgREST, se um item do lote tem a coluna e outro não,
+          // a coluna pode acabar como NULL no insert/merge. Então garantimos `credit_limit` em *todas* as linhas.
+          // Regra:
+          // - se a linha já tem credit_limit numérico -> mantém
+          // - senão, usa o valor atual do banco (se existir) -> preserva alterações manuais
+          // - se não existir ainda no banco -> 0
+          const ids = rows.map((rr) => String((rr as any).md_id)).filter(Boolean);
+          const { data: existingCredits, error: exErr2 } = await supabase
+            .from("vtex_clients")
+            .select("md_id, credit_limit, price_table_type")
+            .in("md_id", ids);
+          const creditById = (!exErr2 && Array.isArray(existingCredits))
+            ? new Map(existingCredits.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]))
+            : new Map<string, number>();
+          const priceTableById = (!exErr2 && Array.isArray(existingCredits))
+            ? new Map(existingCredits.map((x: any) => [String(x.md_id), String((x as any).price_table_type ?? "BR")]))
+            : new Map<string, string>();
+
+          for (const row of rows) {
+            const mdId = String((row as any).md_id ?? "");
+            const n = Number((row as any).credit_limit);
+            const hasCredit = (row as any).credit_limit != null && Number.isFinite(n);
+            if (hasCredit) continue;
+            const current = mdId ? Number(creditById.get(mdId) ?? 0) : 0;
+            (row as any).credit_limit = Number.isFinite(current) ? current : 0;
+          }
+
+          // `price_table_type` também é NOT NULL (default 'BR'), mas pode virar NULL no merge do PostgREST
+          // se o lote misturar linhas com/sem a coluna. Garantimos sempre.
+          for (const row of rows) {
+            const cur = (row as any).price_table_type;
+            if (cur != null && String(cur).trim()) continue;
+            const mdId = String((row as any).md_id ?? "");
+            const current = mdId ? String(priceTableById.get(mdId) ?? "BR") : "BR";
+            (row as any).price_table_type = current || "BR";
+          }
+
           const { error: upErr } = await supabase
             .from("vtex_clients")
             .upsert(rows, { onConflict: "md_id" });
@@ -962,6 +1075,9 @@ serve(async (req) => {
           batchSize: rows.length,
           upserted: rows.length,
           enriched: { address: addressEnriched, credit: creditEnriched },
+          addressDebug: debugAddress
+            ? { attempted: addressAttempted, okEmpty: addressOkEmpty, errorSample: addressErrorSample }
+            : undefined,
           done,
         });
       }
@@ -1083,7 +1199,9 @@ serve(async (req) => {
           if (!r.ok) return;
           if (r.credit == null) return;
 
-          (row as any).credit_limit = r.credit;
+          if (typeof r.credit === "number" && Number.isFinite(r.credit)) {
+            (row as any).credit_limit = r.credit;
+          }
 
           const raw = (row as any).raw ?? {};
           const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
@@ -1096,6 +1214,36 @@ serve(async (req) => {
       }
 
       if (rows.length) {
+        // `credit_limit` é NOT NULL. Garantimos a coluna em *todas* as linhas do lote para evitar NULL no merge do PostgREST.
+        const ids = rows.map((rr) => String((rr as any).md_id)).filter(Boolean);
+        const { data: existingCredits, error: exErr2 } = await supabase
+          .from("vtex_clients")
+          .select("md_id, credit_limit, price_table_type")
+          .in("md_id", ids);
+        const creditById = (!exErr2 && Array.isArray(existingCredits))
+          ? new Map(existingCredits.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]))
+          : new Map<string, number>();
+        const priceTableById = (!exErr2 && Array.isArray(existingCredits))
+          ? new Map(existingCredits.map((x: any) => [String(x.md_id), String((x as any).price_table_type ?? "BR")]))
+          : new Map<string, string>();
+
+        for (const row of rows) {
+          const mdId = String((row as any).md_id ?? "");
+          const n = Number((row as any).credit_limit);
+          const hasCredit = (row as any).credit_limit != null && Number.isFinite(n);
+          if (hasCredit) continue;
+          const current = mdId ? Number(creditById.get(mdId) ?? 0) : 0;
+          (row as any).credit_limit = Number.isFinite(current) ? current : 0;
+        }
+
+        for (const row of rows) {
+          const cur = (row as any).price_table_type;
+          if (cur != null && String(cur).trim()) continue;
+          const mdId = String((row as any).md_id ?? "");
+          const current = mdId ? String(priceTableById.get(mdId) ?? "BR") : "BR";
+          (row as any).price_table_type = current || "BR";
+        }
+
         const { error: upErr } = await supabase
           .from("vtex_clients")
           .upsert(rows, { onConflict: "md_id" });
@@ -1235,7 +1383,9 @@ serve(async (req) => {
         if (!r.ok) return;
         if (r.credit == null) return;
 
-        (row as any).credit_limit = r.credit;
+        if (typeof r.credit === "number" && Number.isFinite(r.credit)) {
+          (row as any).credit_limit = r.credit;
+        }
 
         const raw = (row as any).raw ?? {};
         const prev = (raw && typeof raw === "object" && (raw as any).cl) ? raw : { cl: raw };
@@ -1248,6 +1398,38 @@ serve(async (req) => {
     if (missingOnly) {
       // Mantém o parâmetro por compatibilidade; se quiser de fato filtrar,
       // dá para consultar no Supabase antes — mas no rebuild normalmente não vale o custo.
+    }
+
+    // `credit_limit` é NOT NULL. Garantimos a coluna em *todas* as linhas do lote para evitar NULL no merge do PostgREST.
+    if (rows.length) {
+      const ids = rows.map((rr) => String((rr as any).md_id)).filter(Boolean);
+      const { data: existingCredits, error: exErr2 } = await supabase
+        .from("vtex_clients")
+        .select("md_id, credit_limit, price_table_type")
+        .in("md_id", ids);
+      const creditById = (!exErr2 && Array.isArray(existingCredits))
+        ? new Map(existingCredits.map((x: any) => [String(x.md_id), Number(x.credit_limit ?? 0)]))
+        : new Map<string, number>();
+      const priceTableById = (!exErr2 && Array.isArray(existingCredits))
+        ? new Map(existingCredits.map((x: any) => [String(x.md_id), String((x as any).price_table_type ?? "BR")]))
+        : new Map<string, string>();
+
+      for (const row of rows) {
+        const mdId = String((row as any).md_id ?? "");
+        const n = Number((row as any).credit_limit);
+        const hasCredit = (row as any).credit_limit != null && Number.isFinite(n);
+        if (hasCredit) continue;
+        const current = mdId ? Number(creditById.get(mdId) ?? 0) : 0;
+        (row as any).credit_limit = Number.isFinite(current) ? current : 0;
+      }
+
+      for (const row of rows) {
+        const cur = (row as any).price_table_type;
+        if (cur != null && String(cur).trim()) continue;
+        const mdId = String((row as any).md_id ?? "");
+        const current = mdId ? String(priceTableById.get(mdId) ?? "BR") : "BR";
+        (row as any).price_table_type = current || "BR";
+      }
     }
 
     const { error: upErr } = await supabase
