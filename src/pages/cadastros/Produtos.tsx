@@ -60,6 +60,7 @@ export default function ProdutosVtex() {
   const [onlyActive, setOnlyActive] = useState(true);
   const [showAllPolicies, setShowAllPolicies] = useState(true);
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
+  const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<number, Record<string, number | null>>>({});
   const [openSkuPolicies, setOpenSkuPolicies] = useState<number | null>(null);
 
   const { mode, tradePolicyId, setMode, setTradePolicyId, policies, loadPolicies } = useVtexPolicyStore();
@@ -103,6 +104,12 @@ export default function ProdutosVtex() {
     const rows = policyMatrix[skuId] ?? [];
     const row = rows.find((p: any) => String(p.tradePolicyId) === policyId);
     return typeof row?.effectivePrice === "number" ? row.effectivePrice : null;
+  };
+
+  const getPolicyEffectiveForQty = (skuId: number, policyId: string) => {
+    const bySku = policyMatrixQty[skuId] ?? {};
+    const price = bySku[policyId];
+    return typeof price === "number" ? price : null;
   };
 
   const off = useMemo(() => (page - 1) * pageSize, [page, pageSize]);
@@ -152,8 +159,31 @@ export default function ProdutosVtex() {
           map[Number(row.vtex_sku_id)] = (row.prices ?? []) as any[];
         }
         setPolicyMatrix(map);
+        const quantities = (data ?? []).map((r: any) => {
+          const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
+          return Math.max(1, Number(qty ?? 1));
+        });
+        const qtyMap: Record<number, Record<string, number | null>> = {};
+        const policies = POLICY_LABELS.map((p) => p.id);
+        await Promise.all(
+          policies.map(async (policyId) => {
+            const { data: rows } = await (supabase as any).rpc("get_vtex_effective_prices", {
+              sku_ids: skuIds,
+              quantities,
+              trade_policy_id: policyId,
+            });
+            for (const row of (rows ?? [])) {
+              const skuId = Number((row as any).vtex_sku_id);
+              if (!Number.isFinite(skuId)) continue;
+              if (!qtyMap[skuId]) qtyMap[skuId] = {};
+              qtyMap[skuId][policyId] = (row as any).effective_price ?? null;
+            }
+          })
+        );
+        setPolicyMatrixQty(qtyMap);
       } else {
         setPolicyMatrix({});
+        setPolicyMatrixQty({});
       }
       if (resetPage) setPage(1);
     } catch (e: any) {
@@ -338,16 +368,21 @@ export default function ProdutosVtex() {
                             {POLICY_LABELS.map((p) => {
                               const effective = getPolicyEffective(r.vtex_sku_id, p.id);
                               const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
-                              const total =
-                                qty && typeof effective === "number" ? formatCurrency(effective * qty) : null;
+                              const qtyEffective = getPolicyEffectiveForQty(r.vtex_sku_id, p.id);
+                              const totalValue =
+                                qty && typeof qtyEffective === "number"
+                                  ? qtyEffective * qty
+                                  : qty && typeof effective === "number"
+                                    ? effective * qty
+                                    : null;
                               return (
                                 <div key={p.id} className="flex items-center justify-between gap-2">
                                   <span className="text-muted-foreground">{p.label}</span>
                                   <span className="font-mono text-right">
                                     {typeof effective === "number" ? formatCurrency(effective) : "-"}
-                                    {total ? (
+                                    {typeof totalValue === "number" ? (
                                       <div className="text-[10px] text-muted-foreground">
-                                        emb {qty}: {total}
+                                        emb {qty}: {formatCurrency(totalValue)}
                                       </div>
                                     ) : null}
                                   </span>
@@ -438,8 +473,13 @@ export default function ProdutosVtex() {
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
-                              {openSkuQty && typeof p.effectivePrice === "number"
-                                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.effectivePrice * openSkuQty)
+                              {openSkuQty
+                                ? (() => {
+                                    const qtyEff = getPolicyEffectiveForQty(openSkuPolicies ?? 0, String(p.tradePolicyId));
+                                    return typeof qtyEff === "number"
+                                      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(qtyEff * openSkuQty)
+                                      : "-";
+                                  })()
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-xs">{p.priceSource ?? "-"}</TableCell>

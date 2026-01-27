@@ -103,6 +103,7 @@ export function VtexProductSelector({
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
+  const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<string, number | null>>({});
 
   const { toast } = useToast();
 
@@ -186,9 +187,32 @@ export function VtexProductSelector({
     }
   };
 
+  const loadPolicyMatrixQty = async (skuId: number) => {
+    const qty = getEmbalagemQty(selected?.embalagem, selected?.product_name, selected?.sku_name);
+    if (!qty) {
+      setPolicyMatrixQty({});
+      return;
+    }
+    const policies = POLICY_LABELS.map((p) => p.id);
+    const map: Record<string, number | null> = {};
+    await Promise.all(
+      policies.map(async (policyId) => {
+        const { data } = await (supabase as any).rpc("get_vtex_effective_prices", {
+          sku_ids: [skuId],
+          quantities: [qty],
+          trade_policy_id: policyId,
+        });
+        const row = (data ?? [])[0] as { effective_price?: number | null } | undefined;
+        map[policyId] = row?.effective_price ?? null;
+      })
+    );
+    setPolicyMatrixQty(map);
+  };
+
   useEffect(() => {
     if (!selected?.vtex_sku_id) return;
     loadPolicyMatrix(selected.vtex_sku_id);
+    loadPolicyMatrixQty(selected.vtex_sku_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.vtex_sku_id]);
 
@@ -465,8 +489,8 @@ export function VtexProductSelector({
                                       {typeof row?.effectivePrice === "number" ? formatCurrency(row.effectivePrice) : "-"}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-xs">
-                                      {qty && typeof row?.effectivePrice === "number"
-                                        ? formatCurrency(row.effectivePrice * qty)
+                                      {qty && typeof policyMatrixQty[p.id] === "number"
+                                        ? formatCurrency(policyMatrixQty[p.id] as number)
                                         : "-"}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-xs">
