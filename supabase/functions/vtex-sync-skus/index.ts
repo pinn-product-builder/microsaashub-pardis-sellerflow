@@ -71,6 +71,50 @@ function normalizeRef(input: unknown): string | null {
   return s;
 }
 
+function normalizeSpecValue(input: unknown): string | null {
+  if (input == null) return null;
+  if (Array.isArray(input)) {
+    const parts = input.map((v) => normalizeSpecValue(v)).filter(Boolean) as string[];
+    if (!parts.length) return null;
+    return parts.join(", ");
+  }
+  const s = String(input).trim();
+  if (!s || s.toLowerCase() === "null" || s.toLowerCase() === "undefined") return null;
+  return s;
+}
+
+function extractSpecValue(sku: any, keys: string[]): string | null {
+  const lowerKeys = keys.map((k) => k.toLowerCase());
+  const candidates = [
+    sku?.SkuSpecifications,
+    sku?.ProductSpecifications,
+    sku?.Specifications,
+    sku?.specifications,
+  ].filter(Boolean);
+
+  for (const specList of candidates) {
+    if (!Array.isArray(specList)) continue;
+    for (const spec of specList) {
+      const name = String(spec?.FieldName ?? spec?.Name ?? spec?.name ?? "").trim();
+      if (!name) continue;
+      const nameLower = name.toLowerCase();
+      if (!lowerKeys.some((k) => nameLower.includes(k))) continue;
+
+      const val =
+        spec?.FieldValues ??
+        spec?.Values ??
+        spec?.values ??
+        spec?.Value ??
+        spec?.value ??
+        null;
+      const normalized = normalizeSpecValue(val);
+      if (normalized) return normalized;
+    }
+  }
+
+  return null;
+}
+
 function pickRefFromAlternate(values: unknown, eanDigits: string | null): string | null {
   if (!Array.isArray(values)) return null;
 
@@ -386,6 +430,10 @@ serve(async (req) => {
       if (ean) row.ean = ean;
       if (ref_id) row.ref_id = ref_id;
       if (is_active !== null) row.is_active = is_active;
+      const embalagem = extractSpecValue(sku, ["embalagem", "embalagem (cx)", "caixa"]);
+      const gramatura = extractSpecValue(sku, ["gramatura", "gramagem"]);
+      if (embalagem) row.embalagem = embalagem;
+      if (gramatura) row.gramatura = gramatura;
 
       const { error: upErr } = await supabase
         .from("vtex_skus")
