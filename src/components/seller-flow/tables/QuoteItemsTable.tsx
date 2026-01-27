@@ -244,6 +244,7 @@ export function QuoteItemsTable({
                   {(() => {
                     const skuId = Number(item.product?.sku);
                     if (!Number.isFinite(skuId)) return <span className="text-muted-foreground">-</span>;
+                    const embalagemQty = Number((item as any).vtexEmbalagemQty || 0);
                     return (
                       <div className="space-y-1">
                         {POLICY_LABELS.map((p) => {
@@ -251,8 +252,13 @@ export function QuoteItemsTable({
                           return (
                             <div key={p.id} className="flex items-center justify-between gap-2">
                               <span className="text-muted-foreground">{p.label}</span>
-                              <span className="font-mono">
+                              <span className="font-mono text-right">
                                 {typeof effective === 'number' ? formatCurrency(effective) : '-'}
+                                {embalagemQty && typeof effective === 'number' ? (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    emb {embalagemQty}: {formatCurrency(effective * embalagemQty)}
+                                  </div>
+                                ) : null}
                               </span>
                             </div>
                           );

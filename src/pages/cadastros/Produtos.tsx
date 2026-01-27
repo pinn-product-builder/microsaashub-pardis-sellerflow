@@ -90,6 +90,11 @@ export default function ProdutosVtex() {
 
   const off = useMemo(() => (page - 1) * pageSize, [page, pageSize]);
   const hasNext = rows.length === pageSize;
+  const openSkuRow = useMemo(
+    () => (openSkuPolicies ? rows.find((r) => r.vtex_sku_id === openSkuPolicies) ?? null : null),
+    [openSkuPolicies, rows]
+  );
+  const openSkuQty = useMemo(() => getEmbalagemQty(openSkuRow?.embalagem), [openSkuRow]);
 
   const runSearch = async (query: string, resetPage = false) => {
     try {
@@ -312,11 +317,19 @@ export default function ProdutosVtex() {
                           <div className="space-y-1">
                             {POLICY_LABELS.map((p) => {
                               const effective = getPolicyEffective(r.vtex_sku_id, p.id);
+                              const qty = getEmbalagemQty(r.embalagem);
+                              const total =
+                                qty && typeof effective === "number" ? formatCurrency(effective * qty) : null;
                               return (
                                 <div key={p.id} className="flex items-center justify-between gap-2">
                                   <span className="text-muted-foreground">{p.label}</span>
-                                  <span className="font-mono">
+                                  <span className="font-mono text-right">
                                     {typeof effective === "number" ? formatCurrency(effective) : "-"}
+                                    {total ? (
+                                      <div className="text-[10px] text-muted-foreground">
+                                        emb {qty}: {total}
+                                      </div>
+                                    ) : null}
                                   </span>
                                 </div>
                               );
@@ -385,6 +398,9 @@ export default function ProdutosVtex() {
                         <TableRow>
                           <TableHead>Policy</TableHead>
                           <TableHead className="text-right">Efetivo</TableHead>
+                          <TableHead className="text-right">
+                            Efetivo (emb{openSkuQty ? ` x${openSkuQty}` : ""})
+                          </TableHead>
                           <TableHead>Fonte</TableHead>
                           <TableHead className="text-right">Selling</TableHead>
                           <TableHead className="text-right">Fixed</TableHead>
@@ -399,6 +415,11 @@ export default function ProdutosVtex() {
                             <TableCell className="text-right font-mono text-sm">
                               {typeof p.effectivePrice === "number"
                                 ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.effectivePrice)
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {openSkuQty && typeof p.effectivePrice === "number"
+                                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.effectivePrice * openSkuQty)
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-xs">{p.priceSource ?? "-"}</TableCell>

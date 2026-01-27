@@ -233,6 +233,7 @@ export function VtexProductSelector({
         selectedCustomer
       );
       (quoteItem as any).vtexTradePolicyId = policyMode === "fixed" ? String(tradePolicyId || "1") : (eff?.trade_policy_id ?? undefined);
+      (quoteItem as any).vtexEmbalagemQty = getEmbalagemQty(selected.embalagem) ?? undefined;
 
       onAddProduct(quoteItem);
       toast({
@@ -427,6 +428,7 @@ export function VtexProductSelector({
                               <TableRow>
                                 <TableHead>Policy</TableHead>
                                 <TableHead className="text-right">Efetivo</TableHead>
+                                <TableHead className="text-right">Efetivo (emb.)</TableHead>
                                 <TableHead className="text-right">Selling</TableHead>
                                 <TableHead className="text-right">Fixed</TableHead>
                                 <TableHead className="text-right">List</TableHead>
@@ -437,11 +439,17 @@ export function VtexProductSelector({
                               {POLICY_LABELS.map((p) => {
                                 const rows = policyMatrix[selected.vtex_sku_id] ?? [];
                                 const row = rows.find((r: any) => String(r.tradePolicyId) === p.id);
+                                const qty = getEmbalagemQty(selected.embalagem);
                                 return (
                                   <TableRow key={p.id}>
                                     <TableCell className="font-mono text-xs">{p.label}</TableCell>
                                     <TableCell className="text-right font-mono text-xs">
                                       {typeof row?.effectivePrice === "number" ? formatCurrency(row.effectivePrice) : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs">
+                                      {qty && typeof row?.effectivePrice === "number"
+                                        ? formatCurrency(row.effectivePrice * qty)
+                                        : "-"}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-xs">
                                       {typeof row?.sellingPrice === "number" ? formatCurrency(row.sellingPrice) : "-"}
