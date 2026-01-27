@@ -173,7 +173,10 @@ export class VtexQuoteService {
 
   static async validateCart(tradePolicyId: string | null | undefined, items: QuoteItem[]) {
     const sku_ids = items.map(parseSkuId);
-    const quantities = items.map((it) => it.quantity);
+    const quantities = items.map((it) => {
+      const embalagemQty = Number((it as any).vtexEmbalagemQty || 1);
+      return Math.max(1, Number(it.quantity) * embalagemQty);
+    });
     const rpcName = tradePolicyId ? "vtex_validate_cart" : "vtex_validate_cart_any_policy";
     const args: any = { sku_ids, quantities };
     if (tradePolicyId) args.trade_policy_id = String(tradePolicyId);

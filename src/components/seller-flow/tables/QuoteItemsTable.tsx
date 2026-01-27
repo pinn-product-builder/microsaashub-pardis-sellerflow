@@ -28,8 +28,8 @@ interface QuoteItemsTableProps {
 const POLICY_LABELS = [
   { id: '1', label: 'Principal' },
   { id: '2', label: 'B2C' },
-  { id: 'mgpbrclustera', label: 'MGP BR Cluster A' },
   { id: 'mgpmgclustera', label: 'MGP MG Cluster A' },
+  { id: 'mgpbrclustera', label: 'MGP BR Cluster A' },
 ];
 
 export function QuoteItemsTable({ 
@@ -87,11 +87,13 @@ export function QuoteItemsTable({
     if (newQuantity >= 1) {
       const item = items.find(i => i.id === itemId);
       if (item) {
-        // Itens VTEX: recalcular preço efetivo para a nova quantidade (policy 1) usando RPC.
-        // Isso evita ficar com preço incorreto em tiers (fixed/min_quantity) e nunca deixa preço "em branco".
+        // Itens VTEX: recalcular preço efetivo usando quantidade real (embalagem * qtd).
+        // Isso evita preço incorreto em tiers (fixed/min_quantity) e mantém o preço cheio por embalagem.
         const isVtex = String(item.product?.id || '').startsWith('vtex:');
         if (isVtex) {
           const skuId = Number(item.product.sku);
+          const embalagemQty = Number((item as any).vtexEmbalagemQty || 1);
+          const qtyUnits = Math.max(1, newQuantity * embalagemQty);
           if (!Number.isFinite(skuId)) {
             toast({
               title: 'SKU inválido',
@@ -103,30 +105,56 @@ export function QuoteItemsTable({
 
           setRepricingIds(prev => ({ ...prev, [itemId]: true }));
           try {
-            const rpcName = tradePolicyId ? 'get_vtex_effective_prices' : 'get_vtex_effective_prices_any_policy';
-            const args: any = { sku_ids: [skuId], quantities: [newQuantity] };
-            if (tradePolicyId) args.trade_policy_id = String(tradePolicyId);
-            const { data, error } = await (supabase as any).rpc(rpcName, args);
-            if (error) throw error;
+            const pickRow = async () => {
+              if (tradePolicyId) {
+                const { data, error } = await (supabase as any).rpc('get_vtex_effective_prices', {
+                  sku_ids: [skuId],
+                  quantities: [qtyUnits],
+                  trade_policy_id: String(tradePolicyId),
+                });
+                if (error) throw error;
+                const row = (data ?? [])[0] as { effective_price?: number | null; trade_policy_id?: string | null } | undefined;
+                return { row, policyId: String(tradePolicyId) };
+              }
 
-            const row = (data ?? [])[0] as { effective_price?: number | null; trade_policy_id?: string | null } | undefined;
-            const unit = row?.effective_price ?? null;
+              const results = await Promise.all(
+                POLICY_LABELS.map(async (p) => {
+                  const { data, error } = await (supabase as any).rpc('get_vtex_effective_prices', {
+                    sku_ids: [skuId],
+                    quantities: [qtyUnits],
+                    trade_policy_id: p.id,
+                  });
+                  if (error) throw error;
+                  const row = (data ?? [])[0] as { effective_price?: number | null; trade_policy_id?: string | null } | undefined;
+                  return { row, policyId: p.id };
+                })
+              );
+
+              for (const r of results) {
+                if (r.row?.effective_price && r.row.effective_price > 0) return r;
+              }
+              return results[0];
+            };
+
+            const picked = await pickRow();
+            const unit = picked?.row?.effective_price ?? null;
 
             if (!unit || unit <= 0) {
               toast({
                 title: 'SKU sem preço',
-                description: `Não encontramos preço para o SKU ${skuId} na quantidade ${newQuantity} (nenhuma policy).`,
+                description: `Não encontramos preço para o SKU ${skuId} na quantidade ${qtyUnits} (nenhuma policy).`,
                 variant: 'destructive',
               });
               return;
             }
+            const unitPrice = unit * embalagemQty;
 
             updateItem(itemId, {
               ...item,
               quantity: newQuantity,
-              unitPrice: unit,
-              totalPrice: unit * newQuantity,
-              vtexTradePolicyId: tradePolicyId ? String(tradePolicyId) : (row?.trade_policy_id ?? (item as any).vtexTradePolicyId),
+              unitPrice,
+              totalPrice: unitPrice * newQuantity,
+              vtexTradePolicyId: picked?.policyId ?? (item as any).vtexTradePolicyId,
             });
           } catch (e: any) {
             toast({

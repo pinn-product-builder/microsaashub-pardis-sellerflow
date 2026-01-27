@@ -40,8 +40,8 @@ type CatalogRow = {
 const POLICY_LABELS = [
   { id: "1", label: "Principal" },
   { id: "2", label: "B2C" },
-  { id: "mgpbrclustera", label: "MGP BR Cluster A" },
   { id: "mgpmgclustera", label: "MGP MG Cluster A" },
+  { id: "mgpbrclustera", label: "MGP BR Cluster A" },
 ];
 
 function useDebouncedValue<T>(value: T, delay = 350) {
@@ -63,7 +63,7 @@ export default function ProdutosVtex() {
   const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<number, Record<string, number | null>>>({});
   const [openSkuPolicies, setOpenSkuPolicies] = useState<number | null>(null);
 
-  const { mode, tradePolicyId, setMode, setTradePolicyId, policies, loadPolicies } = useVtexPolicyStore();
+  const { mode, tradePolicyId, setMode, setTradePolicyId } = useVtexPolicyStore();
 
   const [pageSize] = useState(30);
   const [page, setPage] = useState(1);
@@ -200,11 +200,6 @@ export default function ProdutosVtex() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ, onlyActive, showAllPolicies, mode, tradePolicyId]);
 
-  useEffect(() => {
-    // carrega policies para o dropdown quando necessário
-    if (mode === "fixed") loadPolicies();
-  }, [mode, loadPolicies]);
-
   // Paginação: refaz consulta mudando offset
   useEffect(() => {
     runSearch((debouncedQ || "").trim(), false);
@@ -265,17 +260,11 @@ export default function ProdutosVtex() {
                     value={tradePolicyId}
                     onChange={(e) => setTradePolicyId(e.target.value)}
                   >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    {policies
-                      .map((p) => p.trade_policy_id)
-                      .filter((p) => p !== "1" && p !== "2")
-                      .slice(0, 80)
-                      .map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
+                    {POLICY_LABELS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
                   </select>
                 )}
                 <div className="flex items-center gap-2">

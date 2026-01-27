@@ -34,7 +34,7 @@ export default function NovaQuotacao() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
-  const { mode: policyMode, tradePolicyId, setMode: setPolicyMode, setTradePolicyId, policies, loadPolicies } = useVtexPolicyStore();
+  const { mode: policyMode, tradePolicyId, setMode: setPolicyMode, setTradePolicyId } = useVtexPolicyStore();
   const [isRepricingAll, setIsRepricingAll] = useState(false);
   const { toast } = useToast();
   
@@ -109,9 +109,12 @@ export default function NovaQuotacao() {
     loadQuote();
   }, [isEditing, id]);
 
-  useEffect(() => {
-    if (policyMode === "fixed") loadPolicies();
-  }, [policyMode, loadPolicies]);
+  const POLICY_LABELS = [
+    { id: '1', label: 'Principal' },
+    { id: '2', label: 'B2C' },
+    { id: 'mgpmgclustera', label: 'MGP MG Cluster A' },
+    { id: 'mgpbrclustera', label: 'MGP BR Cluster A' },
+  ];
 
   useEffect(() => {
     // Se o usuário fixar policy, recalcula todos os itens VTEX no carrinho (uma chamada RPC com arrays)
@@ -125,7 +128,10 @@ export default function NovaQuotacao() {
       setIsRepricingAll(true);
       try {
         const sku_ids = vtexItems.map((it: any) => Number(it.product.sku));
-        const quantities = vtexItems.map((it: any) => Number(it.quantity));
+        const quantities = vtexItems.map((it: any) => {
+          const embalagemQty = Number((it as any).vtexEmbalagemQty || 1);
+          return Math.max(1, Number(it.quantity) * embalagemQty);
+        });
         const { data, error } = await (supabase as any).rpc("get_vtex_effective_prices", {
           sku_ids,
           quantities,
@@ -138,12 +144,14 @@ export default function NovaQuotacao() {
         vtexItems.forEach((it: any) => {
           const skuId = Number(it.product.sku);
           const row = map.get(skuId);
+          const embalagemQty = Number((it as any).vtexEmbalagemQty || 1);
           const unit = row?.effective_price ?? null;
           if (unit && unit > 0) {
+            const unitPrice = unit * embalagemQty;
             updateItem(it.id, {
               ...it,
-              unitPrice: unit,
-              totalPrice: unit * it.quantity,
+              unitPrice: unitPrice,
+              totalPrice: unitPrice * it.quantity,
               vtexTradePolicyId: String(tradePolicyId || "1"),
             } as any);
           }
@@ -567,23 +575,17 @@ export default function NovaQuotacao() {
                           value={tradePolicyId}
                           onChange={(e) => setTradePolicyId(e.target.value)}
                         >
-                          <option value="1">1</option>
-                          <option value="2">2</option>
-                          {policies
-                            .map((p) => p.trade_policy_id)
-                            .filter((p) => p !== "1" && p !== "2")
-                            .slice(0, 80)
-                            .map((p) => (
-                              <option key={p} value={p}>
-                                {p}
-                              </option>
-                            ))}
+                          {POLICY_LABELS.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.label}
+                            </option>
+                          ))}
                         </select>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-2">
                       {policyMode === "auto"
-                        ? "Automático: escolhe a policy com preço disponível (prioridade: 1 → 2 → demais)."
+                        ? "Automático: escolhe a policy com preço disponível (prioridade: 1 → 2 → mgpmgclustera → mgpbrclustera)."
                         : `Fixado: todos os preços serão recalculados usando "${tradePolicyId}".`}
                       {isRepricingAll ? " Recalculando itens..." : ""}
                     </div>

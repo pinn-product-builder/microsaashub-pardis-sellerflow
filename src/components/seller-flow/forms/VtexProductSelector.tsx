@@ -58,8 +58,8 @@ type EffectivePriceRow = {
 const POLICY_LABELS = [
   { id: "1", label: "Principal" },
   { id: "2", label: "B2C" },
-  { id: "mgpbrclustera", label: "MGP BR Cluster A" },
   { id: "mgpmgclustera", label: "MGP MG Cluster A" },
+  { id: "mgpbrclustera", label: "MGP BR Cluster A" },
 ];
 
 function useDebouncedValue<T>(value: T, delay = 350) {
@@ -164,14 +164,25 @@ export function VtexProductSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ, open, off]);
 
-  const fetchEffectivePrice = async (skuId: number, qty: number) => {
-    const rpcName = policyMode === "fixed" ? "get_vtex_effective_prices" : "get_vtex_effective_prices_any_policy";
-    const args: any = { sku_ids: [skuId], quantities: [qty] };
-    if (policyMode === "fixed") args.trade_policy_id = String(tradePolicyId || "1");
-    const { data, error } = await (supabase as any).rpc(rpcName, args);
+  const fetchEffectivePriceForPolicy = async (skuId: number, qtyUnits: number, policyId: string) => {
+    const args: any = { sku_ids: [skuId], quantities: [qtyUnits], trade_policy_id: policyId };
+    const { data, error } = await (supabase as any).rpc("get_vtex_effective_prices", args);
     if (error) throw error;
     const row = (data ?? [])[0] as EffectivePriceRow | undefined;
     return row;
+  };
+
+  const fetchEffectivePriceAuto = async (skuId: number, qtyUnits: number) => {
+    const results = await Promise.all(
+      POLICY_LABELS.map((policy) => fetchEffectivePriceForPolicy(skuId, qtyUnits, policy.id))
+    );
+    for (let i = 0; i < results.length; i += 1) {
+      const row = results[i];
+      if (row?.effective_price && row.effective_price > 0) {
+        return { row, policyId: POLICY_LABELS[i].id };
+      }
+    }
+    return { row: results[0], policyId: POLICY_LABELS[0].id };
   };
 
   const loadPolicyMatrix = async (skuId: number) => {
@@ -242,17 +253,23 @@ export function VtexProductSelector({
         }
       }
 
-      const eff = await fetchEffectivePrice(skuId, quantity);
-      const unit = eff?.effective_price ?? null;
+      const embalagemQty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
+      const qtyUnits = Math.max(1, quantity * embalagemQty);
+      const picked =
+        policyMode === "fixed"
+          ? { row: await fetchEffectivePriceForPolicy(skuId, qtyUnits, String(tradePolicyId || "1")), policyId: String(tradePolicyId || "1") }
+          : await fetchEffectivePriceAuto(skuId, qtyUnits);
+      const unit = picked.row?.effective_price ?? null;
 
       if (!unit || unit <= 0) {
         toast({
           title: "SKU sem preço",
-          description: `Não encontramos preço para o SKU ${skuId} na policy ${tradePolicyId}.`,
+          description: `Não encontramos preço para o SKU ${skuId} nas policies permitidas.`,
           variant: "destructive",
         });
         return;
       }
+      const unitPrice = unit * embalagemQty;
 
       const product: Product = {
         id: `vtex:${skuId}`,
@@ -261,8 +278,8 @@ export function VtexProductSelector({
         category: "VTEX",
         weight: 0.5,
         dimensions: { length: 10, width: 10, height: 10 },
-        // para margem/validações: usar cost_price quando disponível, senão o próprio preço
-        baseCost: eff?.cost_price ?? unit,
+        // para margem/validações: usar custo por embalagem quando disponível
+        baseCost: (picked.row?.cost_price ?? unit) * embalagemQty,
         description: selected.sku_name ?? undefined,
       };
 
@@ -270,17 +287,16 @@ export function VtexProductSelector({
         product,
         quantity,
         destinationUF,
-        unit,
+        unitPrice,
         selectedCustomer
       );
-      (quoteItem as any).vtexTradePolicyId = policyMode === "fixed" ? String(tradePolicyId || "1") : (eff?.trade_policy_id ?? undefined);
-      (quoteItem as any).vtexEmbalagemQty =
-        getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? undefined;
+      (quoteItem as any).vtexTradePolicyId = picked.policyId;
+      (quoteItem as any).vtexEmbalagemQty = embalagemQty;
 
       onAddProduct(quoteItem);
       toast({
         title: "Produto VTEX adicionado",
-        description: `${product.name} (${formatCurrency(unit)}) foi adicionado à cotação.`,
+        description: `${product.name} (${formatCurrency(unitPrice)}) foi adicionado à cotação.`,
         action: <CheckCircle className="h-4 w-4 text-green-600" />,
       });
 
