@@ -265,6 +265,58 @@ function toNumberLike(v: unknown): number | null {
   return null;
 }
 
+function toBoolLike(v: unknown): boolean | null {
+  if (v == null) return null;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number" && Number.isFinite(v)) return v > 0;
+  if (typeof v === "string") {
+    const t = v.trim().toLowerCase();
+    if (["true", "1", "sim", "s", "yes", "y"].includes(t)) return true;
+    if (["false", "0", "nao", "não", "n", "no"].includes(t)) return false;
+  }
+  return null;
+}
+
+const CL_BASE_FIELDS = [
+  "id",
+  "email",
+  "userId",
+  "firstName",
+  "lastName",
+  "document",
+  "phone",
+  "isCorporate",
+  "corporateName",
+  "tradeName",
+  "stateRegistration",
+  "createdIn",
+  "updatedIn",
+];
+
+const CL_CREDIT_FIELDS = ["creditLimit", "credit_limit", "credit_limit_value", "customerCredit", "customer_credit"];
+const CL_L2L_FIELDS = ["isLabToLab", "is_lab_to_lab", "labToLab", "lab_to_lab", "l2l", "isL2L", "is_l2l", "lab2lab", "lab2Lab"];
+
+function buildClFields(schema: Set<string> | null): string {
+  const extra = schema
+    ? [
+        ...CL_CREDIT_FIELDS.filter((c) => schema.has(c)),
+        ...CL_L2L_FIELDS.filter((c) => schema.has(c)),
+      ]
+    : [];
+  return [...CL_BASE_FIELDS, ...extra].join(",");
+}
+
+function pickCandidate(obj: any, candidates: string[]): unknown {
+  if (!obj) return null;
+  for (const key of candidates) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const val = obj[key];
+      if (val !== undefined && val !== null && String(val).trim() !== "") return val;
+    }
+  }
+  return null;
+}
+
 function extractCreditFromPayload(payload: any): number | null {
   const candidates = [
     payload?.availableCredit,
@@ -526,23 +578,10 @@ async function vtexFetchClientsPage(opts: {
 async function vtexScrollClientsPage(opts: {
   pageSize: number;
   token?: string | null;
+  fields?: string | null;
 }) {
   const { base, headers } = vtexBase();
-  const fields = [
-    "id",
-    "email",
-    "userId",
-    "firstName",
-    "lastName",
-    "document",
-    "phone",
-    "isCorporate",
-    "corporateName",
-    "tradeName",
-    "stateRegistration",
-    "createdIn",
-    "updatedIn",
-  ].join(",");
+  const fields = (opts.fields && opts.fields.trim()) ? opts.fields.trim() : CL_BASE_FIELDS.join(",");
 
   const u = new URL(`${base}/api/dataentities/CL/scroll`);
   u.searchParams.set("_fields", fields);
@@ -747,6 +786,9 @@ serve(async (req) => {
     // - all=false: mantém fluxo normal (range/search)
     const strategy = (normStr(u.searchParams.get("strategy")) ?? (all ? "windowed" : "scroll")).toLowerCase(); // scroll | windowed
 
+    const clSchema = await vtexFetchEntitySchemaFields("CL");
+    const clFields = buildClFields(clSchema);
+
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
     // para não estourar timeout do gateway.
@@ -757,28 +799,6 @@ serve(async (req) => {
         const stateKey = "clients_windowed_state";
         const nowIso = new Date().toISOString();
         const state = await readWindowedState(supabase, stateKey, nowIso);
-
-        const clSchema = await vtexFetchEntitySchemaFields("CL");
-        // tenta puxar também campos de crédito se existirem na CL
-        const creditCandidates = ["creditLimit", "credit_limit", "credit_limit_value", "customerCredit", "customer_credit"];
-        const extra = clSchema ? creditCandidates.filter((c) => clSchema.has(c)) : [];
-        const clFields =
-          [
-            "id",
-            "email",
-            "userId",
-            "firstName",
-            "lastName",
-            "document",
-            "phone",
-            "isCorporate",
-            "corporateName",
-            "tradeName",
-            "stateRegistration",
-            "createdIn",
-            "updatedIn",
-            ...extra,
-          ].join(",");
 
         // Importante: nesta conta VTEX o token 'AND' é rejeitado no _where.
         // Então evitamos estilos com operadores (>= ... AND < ...) e usamos apenas "between ... and ...".
@@ -912,6 +932,8 @@ serve(async (req) => {
             if (phone) row.phone = phone;
 
             if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
+            const l2l = toBoolLike(pickCandidate(c, CL_L2L_FIELDS));
+            if (l2l != null) row.is_lab_to_lab = l2l;
             if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
             if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
             if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
@@ -1103,7 +1125,7 @@ serve(async (req) => {
         }
       }
 
-      const r = await vtexScrollClientsPage({ pageSize: scrollSize, token });
+      const r = await vtexScrollClientsPage({ pageSize: scrollSize, token, fields: clFields });
       if (!r.ok) return json({ step: "vtex_scroll", strategy, all, ...r }, 502);
 
       const arr = Array.isArray(r.data) ? r.data : [];
@@ -1138,6 +1160,8 @@ serve(async (req) => {
           if (phone) row.phone = phone;
 
           if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
+          const l2l = toBoolLike(pickCandidate(c, CL_L2L_FIELDS));
+          if (l2l != null) row.is_lab_to_lab = l2l;
           if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
           if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
           if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
@@ -1282,7 +1306,7 @@ serve(async (req) => {
     }
 
     // modo paginado (search/range) — útil pra pequenos volumes (<10k)
-    const r = await vtexFetchClientsPage({ page, pageSize, where: null });
+    const r = await vtexFetchClientsPage({ page, pageSize, where: null, fields: clFields });
     if (!r.ok) {
       // evita duplicar "ok" (r já tem ok=false)
       return json({ step: "vtex_fetch", ...r }, 502);
@@ -1324,6 +1348,8 @@ serve(async (req) => {
         if (phone) row.phone = phone;
 
         if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
+        const l2l = toBoolLike(pickCandidate(c, CL_L2L_FIELDS));
+        if (l2l != null) row.is_lab_to_lab = l2l;
         if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
         if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
         if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
