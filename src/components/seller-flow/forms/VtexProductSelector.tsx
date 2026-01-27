@@ -55,6 +55,13 @@ type EffectivePriceRow = {
   list_price: number | null;
 };
 
+const POLICY_LABELS = [
+  { id: "1", label: "Principal" },
+  { id: "2", label: "B2C" },
+  { id: "mgpbrclustera", label: "MGP BR Cluster A" },
+  { id: "mgpmgclustera", label: "MGP MG Cluster A" },
+];
+
 function useDebouncedValue<T>(value: T, delay = 350) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -95,11 +102,20 @@ export function VtexProductSelector({
   const [selected, setSelected] = useState<CatalogRow | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
+  const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
 
   const { toast } = useToast();
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+  const getEmbalagemQty = (embalagem?: string | null) => {
+    if (!embalagem) return null;
+    const match = embalagem.match(/\d+/);
+    if (!match) return null;
+    const qty = Number.parseInt(match[0], 10);
+    return Number.isFinite(qty) && qty > 0 ? qty : null;
+  };
 
   const runSearch = async (query: string) => {
     try {
@@ -139,6 +155,25 @@ export function VtexProductSelector({
     const row = (data ?? [])[0] as EffectivePriceRow | undefined;
     return row;
   };
+
+  const loadPolicyMatrix = async (skuId: number) => {
+    try {
+      const { data } = await (supabase as any).rpc("get_vtex_prices_matrix", { sku_ids: [skuId] });
+      const map: Record<number, any[]> = {};
+      for (const row of (data ?? [])) {
+        map[Number(row.vtex_sku_id)] = (row.prices ?? []) as any[];
+      }
+      setPolicyMatrix(map);
+    } catch {
+      setPolicyMatrix({});
+    }
+  };
+
+  useEffect(() => {
+    if (!selected?.vtex_sku_id) return;
+    loadPolicyMatrix(selected.vtex_sku_id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.vtex_sku_id]);
 
   const handleAdd = async () => {
     if (!selected || !destinationUF || !selectedCustomer) {
@@ -365,11 +400,66 @@ export function VtexProductSelector({
                         <div className="text-lg font-semibold">
                           {typeof selected.selling_price === "number" ? formatCurrency(selected.selling_price) : "-"}
                         </div>
+                        {(() => {
+                          const qty = getEmbalagemQty(selected.embalagem);
+                          if (!qty || typeof selected.selling_price !== "number") return null;
+                          return (
+                            <div className="text-sm text-muted-foreground mt-1">
+                              Preço embalagem ({qty}):{" "}
+                              <span className="font-medium text-foreground">
+                                {formatCurrency(selected.selling_price * qty)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         <div className="text-xs text-muted-foreground mt-1">
                           Fonte:{" "}
                           <span className="font-mono">
                             {selected.price_source ?? (selected.price_available === false ? "missing" : "-")}
                           </span>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Preços por policy</Label>
+                        <div className="rounded-md border mt-2 overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Policy</TableHead>
+                                <TableHead className="text-right">Efetivo</TableHead>
+                                <TableHead className="text-right">Selling</TableHead>
+                                <TableHead className="text-right">Fixed</TableHead>
+                                <TableHead className="text-right">List</TableHead>
+                                <TableHead className="text-right">Cost</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {POLICY_LABELS.map((p) => {
+                                const rows = policyMatrix[selected.vtex_sku_id] ?? [];
+                                const row = rows.find((r: any) => String(r.tradePolicyId) === p.id);
+                                return (
+                                  <TableRow key={p.id}>
+                                    <TableCell className="font-mono text-xs">{p.label}</TableCell>
+                                    <TableCell className="text-right font-mono text-xs">
+                                      {typeof row?.effectivePrice === "number" ? formatCurrency(row.effectivePrice) : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs">
+                                      {typeof row?.sellingPrice === "number" ? formatCurrency(row.sellingPrice) : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs">
+                                      {typeof row?.fixedValue === "number" ? formatCurrency(row.fixedValue) : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs">
+                                      {typeof row?.listPrice === "number" ? formatCurrency(row.listPrice) : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs">
+                                      {typeof row?.costPrice === "number" ? formatCurrency(row.costPrice) : "-"}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
                         </div>
                       </div>
                     </>

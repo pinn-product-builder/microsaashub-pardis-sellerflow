@@ -16,7 +16,7 @@ import { MarginIndicator } from '@/components/seller-flow/display/MarginIndicato
 import { AuthorizationBadge } from '@/components/seller-flow/display/AuthorizationBadge';
 import { usePardisQuote } from '@/hooks/usePardisQuote';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface QuoteItemsTableProps {
   items: QuoteItem[];
@@ -24,6 +24,13 @@ interface QuoteItemsTableProps {
   showPardisIndicators?: boolean;
   tradePolicyId?: string; // legado (não usado com auto-policy)
 }
+
+const POLICY_LABELS = [
+  { id: '1', label: 'Principal' },
+  { id: '2', label: 'B2C' },
+  { id: 'mgpbrclustera', label: 'MGP BR Cluster A' },
+  { id: 'mgpmgclustera', label: 'MGP MG Cluster A' },
+];
 
 export function QuoteItemsTable({ 
   items, 
@@ -34,12 +41,47 @@ export function QuoteItemsTable({
   const { removeItem, updateItem, selectedCustomer } = useSellerFlowStore();
   const { toast } = useToast();
   const [repricingIds, setRepricingIds] = useState<Record<string, boolean>>({});
+  const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
   
   // Use customer from props or from store
   const effectiveCustomer = customer || selectedCustomer;
   
   // Calculate Pardis margins
   const { itemCalculations } = usePardisQuote(items, effectiveCustomer);
+
+  const getPolicyEffective = (skuId: number, policyId: string) => {
+    const rows = policyMatrix[skuId] ?? [];
+    const row = rows.find((p: any) => String(p.tradePolicyId) === policyId);
+    return typeof row?.effectivePrice === 'number' ? row.effectivePrice : null;
+  };
+
+  const loadPolicyMatrix = async (skuIds: number[]) => {
+    if (!skuIds.length) {
+      setPolicyMatrix({});
+      return;
+    }
+    try {
+      const { data } = await (supabase as any).rpc('get_vtex_prices_matrix', { sku_ids: skuIds });
+      const map: Record<number, any[]> = {};
+      for (const row of (data ?? [])) {
+        map[Number(row.vtex_sku_id)] = (row.prices ?? []) as any[];
+      }
+      setPolicyMatrix(map);
+    } catch {
+      setPolicyMatrix({});
+    }
+  };
+
+  // Carrega preços por policy para itens VTEX da cotação
+  // (apenas para exibição; não altera precificação do item)
+  const vtexSkuIds = useMemo(
+    () =>
+      items
+        .filter((item) => String(item.product?.id || '').startsWith('vtex:'))
+        .map((item) => Number(item.product?.sku))
+        .filter((skuId) => Number.isFinite(skuId)),
+    [items],
+  );
 
   const handleQuantityChange = async (itemId: string, newQuantity: number) => {
     if (newQuantity >= 1) {
@@ -115,6 +157,11 @@ export function QuoteItemsTable({
     }).format(value);
   };
 
+  useEffect(() => {
+    loadPolicyMatrix(vtexSkuIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vtexSkuIds.join(',')]);
+
   // Get Pardis calculation for an item
   const getItemCalc = (itemId: string) => {
     return itemCalculations.find(c => c.itemId === itemId);
@@ -136,6 +183,7 @@ export function QuoteItemsTable({
             <TableHead>Produto</TableHead>
             <TableHead className="text-center">Qtd</TableHead>
             <TableHead className="text-right">Preço Unit.</TableHead>
+            <TableHead>Policies (efetivo)</TableHead>
             {showPardisIndicators && (
               <>
                 <TableHead className="text-right">Preço Mín.</TableHead>
@@ -191,6 +239,27 @@ export function QuoteItemsTable({
                 </TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(item.unitPrice)}
+                </TableCell>
+                <TableCell className="text-xs">
+                  {(() => {
+                    const skuId = Number(item.product?.sku);
+                    if (!Number.isFinite(skuId)) return <span className="text-muted-foreground">-</span>;
+                    return (
+                      <div className="space-y-1">
+                        {POLICY_LABELS.map((p) => {
+                          const effective = getPolicyEffective(skuId, p.id);
+                          return (
+                            <div key={p.id} className="flex items-center justify-between gap-2">
+                              <span className="text-muted-foreground">{p.label}</span>
+                              <span className="font-mono">
+                                {typeof effective === 'number' ? formatCurrency(effective) : '-'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </TableCell>
                 
                 {showPardisIndicators && (
