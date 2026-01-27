@@ -314,8 +314,8 @@ export default function ProdutosVtex() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>SKU</TableHead>
-                      <TableHead>Produto</TableHead>
-                      <TableHead>SKU Nome</TableHead>
+                      <TableHead className="min-w-[260px]">Produto</TableHead>
+                      {/* SKU Nome oculto para dar mais espaço à coluna Produto */}
                       <TableHead>EAN</TableHead>
                       <TableHead>Ref</TableHead>
                       <TableHead>Embalagem</TableHead>
@@ -353,7 +353,7 @@ export default function ProdutosVtex() {
                       <TableRow key={r.vtex_sku_id}>
                         <TableCell className="font-mono text-sm">{r.vtex_sku_id}</TableCell>
                         <TableCell className="font-medium">{r.product_name ?? "-"}</TableCell>
-                        <TableCell>{r.sku_name ?? "-"}</TableCell>
+                        {/* SKU Nome oculto */}
                         <TableCell className="font-mono text-xs">{r.ean ?? "-"}</TableCell>
                         <TableCell className="font-mono text-xs">{r.ref_id ?? "-"}</TableCell>
                         <TableCell>{r.embalagem ?? "-"}</TableCell>
