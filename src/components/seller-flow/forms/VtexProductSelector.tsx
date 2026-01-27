@@ -109,12 +109,29 @@ export function VtexProductSelector({
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-  const getEmbalagemQty = (embalagem?: string | null) => {
-    if (!embalagem) return null;
-    const match = embalagem.match(/\d+/);
-    if (!match) return null;
-    const qty = Number.parseInt(match[0], 10);
-    return Number.isFinite(qty) && qty > 0 ? qty : null;
+  const getEmbalagemQtyFromText = (text?: string | null) => {
+    if (!text) return null;
+    const direct = text.match(/(?:caixa|cx)\s*(\d+)/i);
+    if (direct?.[1]) {
+      const qty = Number.parseInt(direct[1], 10);
+      return Number.isFinite(qty) && qty > 0 ? qty : null;
+    }
+    const unidades = text.match(/(\d+)\s*(?:unidades?|unid\.?|un\.?)\b/i);
+    if (unidades?.[1]) {
+      const qty = Number.parseInt(unidades[1], 10);
+      return Number.isFinite(qty) && qty > 0 ? qty : null;
+    }
+    return null;
+  };
+
+  const getEmbalagemQty = (embalagem?: string | null, ...fallbacks: Array<string | null | undefined>) => {
+    const base = getEmbalagemQtyFromText(embalagem);
+    if (base) return base;
+    for (const text of fallbacks) {
+      const qty = getEmbalagemQtyFromText(text);
+      if (qty) return qty;
+    }
+    return null;
   };
 
   const runSearch = async (query: string) => {
@@ -233,7 +250,8 @@ export function VtexProductSelector({
         selectedCustomer
       );
       (quoteItem as any).vtexTradePolicyId = policyMode === "fixed" ? String(tradePolicyId || "1") : (eff?.trade_policy_id ?? undefined);
-      (quoteItem as any).vtexEmbalagemQty = getEmbalagemQty(selected.embalagem) ?? undefined;
+      (quoteItem as any).vtexEmbalagemQty =
+        getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? undefined;
 
       onAddProduct(quoteItem);
       toast({
@@ -402,7 +420,7 @@ export function VtexProductSelector({
                           {typeof selected.selling_price === "number" ? formatCurrency(selected.selling_price) : "-"}
                         </div>
                         {(() => {
-                          const qty = getEmbalagemQty(selected.embalagem);
+                          const qty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name);
                           if (!qty || typeof selected.selling_price !== "number") return null;
                           return (
                             <div className="text-sm text-muted-foreground mt-1">
@@ -439,7 +457,7 @@ export function VtexProductSelector({
                               {POLICY_LABELS.map((p) => {
                                 const rows = policyMatrix[selected.vtex_sku_id] ?? [];
                                 const row = rows.find((r: any) => String(r.tradePolicyId) === p.id);
-                                const qty = getEmbalagemQty(selected.embalagem);
+                                const qty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name);
                                 return (
                                   <TableRow key={p.id}>
                                     <TableCell className="font-mono text-xs">{p.label}</TableCell>

@@ -74,12 +74,29 @@ export default function ProdutosVtex() {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-  const getEmbalagemQty = (embalagem?: string | null) => {
-    if (!embalagem) return null;
-    const match = embalagem.match(/\d+/);
-    if (!match) return null;
-    const qty = Number.parseInt(match[0], 10);
-    return Number.isFinite(qty) && qty > 0 ? qty : null;
+  const getEmbalagemQtyFromText = (text?: string | null) => {
+    if (!text) return null;
+    const direct = text.match(/(?:caixa|cx)\s*(\d+)/i);
+    if (direct?.[1]) {
+      const qty = Number.parseInt(direct[1], 10);
+      return Number.isFinite(qty) && qty > 0 ? qty : null;
+    }
+    const unidades = text.match(/(\d+)\s*(?:unidades?|unid\.?|un\.?)\b/i);
+    if (unidades?.[1]) {
+      const qty = Number.parseInt(unidades[1], 10);
+      return Number.isFinite(qty) && qty > 0 ? qty : null;
+    }
+    return null;
+  };
+
+  const getEmbalagemQty = (embalagem?: string | null, ...fallbacks: Array<string | null | undefined>) => {
+    const base = getEmbalagemQtyFromText(embalagem);
+    if (base) return base;
+    for (const text of fallbacks) {
+      const qty = getEmbalagemQtyFromText(text);
+      if (qty) return qty;
+    }
+    return null;
   };
 
   const getPolicyEffective = (skuId: number, policyId: string) => {
@@ -94,7 +111,10 @@ export default function ProdutosVtex() {
     () => (openSkuPolicies ? rows.find((r) => r.vtex_sku_id === openSkuPolicies) ?? null : null),
     [openSkuPolicies, rows]
   );
-  const openSkuQty = useMemo(() => getEmbalagemQty(openSkuRow?.embalagem), [openSkuRow]);
+  const openSkuQty = useMemo(
+    () => getEmbalagemQty(openSkuRow?.embalagem, openSkuRow?.product_name, openSkuRow?.sku_name),
+    [openSkuRow]
+  );
 
   const runSearch = async (query: string, resetPage = false) => {
     try {
@@ -317,7 +337,7 @@ export default function ProdutosVtex() {
                           <div className="space-y-1">
                             {POLICY_LABELS.map((p) => {
                               const effective = getPolicyEffective(r.vtex_sku_id, p.id);
-                              const qty = getEmbalagemQty(r.embalagem);
+                              const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
                               const total =
                                 qty && typeof effective === "number" ? formatCurrency(effective * qty) : null;
                               return (
