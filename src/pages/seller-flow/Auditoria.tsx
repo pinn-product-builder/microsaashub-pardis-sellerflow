@@ -47,6 +47,8 @@ type QuoteDetails = {
   total_discount: number;
   total: number;
   notes: string | null;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -65,6 +67,16 @@ type ClientLite = {
   corporate_name: string | null;
   email: string | null;
   document: string | null;
+};
+type ApprovalRequest = {
+  id: string;
+  status: string;
+  requested_by: string;
+  approved_by: string | null;
+  reason: string | null;
+  comments: string | null;
+  requested_at: string;
+  decided_at: string | null;
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -97,6 +109,8 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
   pending_approval: "Pendente de aprovação",
   rejected: "Reprovado",
+  pending: "Pendente",
+  expired: "Expirada",
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -105,6 +119,8 @@ const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-800 border-slate-200",
   pending_approval: "bg-amber-100 text-amber-800 border-amber-200",
   rejected: "bg-red-100 text-red-800 border-red-200",
+  pending: "bg-amber-100 text-amber-800 border-amber-200",
+  expired: "bg-gray-100 text-gray-800 border-gray-200",
 };
 
 function formatEventLabel(ev: QuoteEvent) {
@@ -138,6 +154,12 @@ function getSnapshotName(snapshot?: Record<string, unknown>) {
   return (raw.product_name as string) || (raw.name as string) || "";
 }
 
+function getUserLabel(userId: string | null | undefined, map: Map<string, ProfileLite>) {
+  if (!userId) return "Sistema";
+  const user = map.get(userId);
+  return user?.full_name || user?.email || userId;
+}
+
 export default function Auditoria() {
   const [searchTerm, setSearchTerm] = useState("");
   const [eventFilter, setEventFilter] = useState("all");
@@ -150,6 +172,8 @@ export default function Auditoria() {
   const [selectedQuote, setSelectedQuote] = useState<QuoteDetails | null>(null);
   const [selectedItems, setSelectedItems] = useState<QuoteItem[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientLite | null>(null);
+  const [selectedApprovals, setSelectedApprovals] = useState<ApprovalRequest[]>([]);
+  const [detailsUsers, setDetailsUsers] = useState<Map<string, ProfileLite>>(new Map());
   const pageSize = 50;
   const { role, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -248,10 +272,12 @@ export default function Auditoria() {
     setSelectedQuote(null);
     setSelectedItems([]);
     setSelectedClient(null);
+    setSelectedApprovals([]);
+    setDetailsUsers(new Map());
     try {
       const { data: quote, error: quoteError } = await (supabase as any)
         .from("vtex_quotes")
-        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, created_at, updated_at")
+        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, created_by, updated_by, created_at, updated_at")
         .eq("id", ev.quote_id)
         .maybeSingle();
       if (quoteError) throw quoteError;
@@ -270,6 +296,31 @@ export default function Auditoria() {
           .eq("md_id", quote.vtex_client_id)
           .maybeSingle();
         if (client) setSelectedClient(client as ClientLite);
+
+        const { data: approvals } = await (supabase as any)
+          .from("vtex_approval_requests")
+          .select("id, status, requested_by, approved_by, reason, comments, requested_at, decided_at")
+          .eq("quote_id", ev.quote_id)
+          .order("requested_at", { ascending: false });
+        setSelectedApprovals((approvals ?? []) as ApprovalRequest[]);
+
+        const userIds = new Set<string>();
+        if (quote.created_by) userIds.add(quote.created_by);
+        if (quote.updated_by) userIds.add(quote.updated_by);
+        approvals?.forEach((req: ApprovalRequest) => {
+          if (req.requested_by) userIds.add(req.requested_by);
+          if (req.approved_by) userIds.add(req.approved_by);
+        });
+        if (ev.created_by) userIds.add(ev.created_by);
+        if (userIds.size > 0) {
+          const { data: detailProfiles } = await (supabase as any)
+            .from("profiles")
+            .select("user_id, full_name, email")
+            .in("user_id", Array.from(userIds));
+          const map = new Map<string, ProfileLite>();
+          (detailProfiles ?? []).forEach((p: ProfileLite) => map.set(p.user_id, p));
+          setDetailsUsers(map);
+        }
       }
     } catch {
       // falhas de carregamento não devem quebrar a tela
@@ -563,6 +614,17 @@ export default function Auditoria() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Criada por</p>
+                  <p className="font-medium">{getUserLabel(selectedQuote?.created_by, detailsUsers)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Última atualização</p>
+                  <p className="font-medium">{getUserLabel(selectedQuote?.updated_by, detailsUsers)}</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Subtotal</p>
@@ -627,6 +689,9 @@ export default function Auditoria() {
                         {new Date(selectedEvent.created_at).toLocaleString("pt-BR")}
                       </span>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Ação por: {getUserLabel(selectedEvent.created_by, detailsUsers)}
+                    </p>
                     <p className="text-sm">{selectedEvent.message ?? "Sem mensagem"}</p>
                     {(selectedEvent.from_status || selectedEvent.to_status) && (
                       <p className="text-xs text-muted-foreground">
@@ -642,6 +707,43 @@ export default function Auditoria() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Aprovações</p>
+                {selectedApprovals.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma aprovação registrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedApprovals.map((req) => (
+                      <div key={req.id} className="rounded border p-3 text-sm space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className={`border ${statusBadgeClass(req.status)}`}>
+                            {formatStatusLabel(req.status)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(req.requested_at).toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Solicitado por: {getUserLabel(req.requested_by, detailsUsers)}
+                        </p>
+                        {req.approved_by && (
+                          <p className="text-xs text-muted-foreground">
+                            Decidido por: {getUserLabel(req.approved_by, detailsUsers)}
+                          </p>
+                        )}
+                        {req.reason && <p>Motivo: {req.reason}</p>}
+                        {req.comments && <p>Comentário: {req.comments}</p>}
+                        {req.decided_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Decidido em: {new Date(req.decided_at).toLocaleString("pt-BR")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end">
                 {selectedEvent && (
