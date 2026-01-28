@@ -283,6 +283,7 @@ export function QuoteItemsTable({
               </>
             )}
             <TableHead className="text-right">Total</TableHead>
+            {enablePriceEdit && <TableHead className="text-right">Preço Manual</TableHead>}
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
@@ -329,22 +330,7 @@ export function QuoteItemsTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  {enablePriceEdit && pricingMode === 'manual' ? (
-                    <div className="flex justify-end">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="h-8 w-28 text-right"
-                        value={Number(item.unitPrice ?? 0)}
-                        onChange={(e) => handleManualUnitPriceChange(item.id, e.target.value)}
-                      />
-                    </div>
-                  ) : (
-                    <span className={enablePriceEdit && pricingMode === 'percent' ? 'text-muted-foreground' : ''}>
-                      {formatCurrency(item.unitPrice)}
-                    </span>
-                  )}
+                  {formatCurrency(item.unitPrice)}
                 </TableCell>
                 <TableCell className="text-xs">
                   {(() => {
@@ -413,6 +399,24 @@ export function QuoteItemsTable({
                 <TableCell className="text-right font-medium">
                   {formatCurrency(item.totalPrice)}
                 </TableCell>
+                {enablePriceEdit && (
+                  <TableCell className="text-right">
+                    {pricingMode === 'manual' ? (
+                      <div className="flex justify-end">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="h-8 w-32 text-right"
+                          value={Number(item.unitPrice ?? 0)}
+                          onChange={(e) => handleManualUnitPriceChange(item.id, e.target.value)}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell>
                   <Button
                     variant="ghost"

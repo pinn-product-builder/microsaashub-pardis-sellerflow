@@ -132,8 +132,8 @@ export function PriceSummary({ items, discount, totals, customer }: PriceSummary
             <span>{formatCurrency(totals.totalTaxes)}</span>
           </div>
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Frete:</span>
-            <span>{formatCurrency(totals.totalFreight)}</span>
+            <span>Frete (desativado):</span>
+            <span>{formatCurrency(0)}</span>
           </div>
           {totals.discount > 0 && (
             <div className="flex justify-between text-sm text-green-600">

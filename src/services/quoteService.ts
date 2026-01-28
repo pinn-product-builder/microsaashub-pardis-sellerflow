@@ -87,9 +87,11 @@ export class QuoteService {
   static calculateQuoteTotals(items: QuoteItem[], discount: number = 0) {
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
     const totalTaxes = items.reduce((sum, item) => sum + (item.taxes?.total || 0) * item.quantity, 0);
-    const totalFreight = items.reduce((sum, item) => sum + (item.freight || 0), 0);
+    // Temporariamente desabilitado (será reativado depois).
+    // Mantemos o campo por compatibilidade, mas sempre 0.
+    const totalFreight = 0;
     const discountAmount = (subtotal * discount) / 100;
-    const total = subtotal + totalTaxes + totalFreight - discountAmount;
+    const total = subtotal + totalTaxes - discountAmount;
 
     return { subtotal, totalTaxes, totalFreight, discount: discountAmount, total };
   }
