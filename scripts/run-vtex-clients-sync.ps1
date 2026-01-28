@@ -54,6 +54,11 @@ function Get-ObjProp([object]$obj, [string]$name, [string]$def = "") {
   return $v
 }
 
+function Has-ObjProp([object]$obj, [string]$name) {
+  if ($null -eq $obj) { return $false }
+  return ($obj.PSObject.Properties.Name -contains $name)
+}
+
 function CurlJson([string]$url, [hashtable]$headers) {
   # -sS: silent but show errors
   # --max-time: evita travar indefinidamente se o gateway/edge demorar ou a conexão ficar pendurada
@@ -262,11 +267,15 @@ if ($Mode -eq "local") {
     if ($L2lOnly.IsPresent) {
       $json = $null
       try { $json = ($body | ConvertFrom-Json) } catch {}
+      if ($json -and (Has-ObjProp $json "ok") -and ($json.ok -eq $false)) {
+        Info "Erro do sync: $($body)"
+        break
+      }
       if ($json -and ($json.PSObject.Properties.Name -contains "total") -and $json.total -and $json.pageSize -and $json.page) {
         $done = [math]::Min([int]$json.total, [int]$json.page * [int]$json.pageSize)
         $remaining = [math]::Max(0, [int]$json.total - $done)
         Info "Progresso: $done/$($json.total) (faltam $remaining)"
-      } elseif ($json -and $json.pageSize -and $json.page) {
+      } elseif ($json -and (Has-ObjProp $json "pageSize") -and (Has-ObjProp $json "page") -and $json.pageSize -and $json.page) {
         $done = [int]$json.page * [int]$json.pageSize
         Info "Progresso: $done (total desconhecido)"
       }
@@ -317,11 +326,15 @@ if ($Mode -eq "cloud") {
     if ($L2lOnly.IsPresent) {
       $json = $null
       try { $json = ($body | ConvertFrom-Json) } catch {}
+      if ($json -and (Has-ObjProp $json "ok") -and ($json.ok -eq $false)) {
+        Info "Erro do sync: $($body)"
+        break
+      }
       if ($json -and ($json.PSObject.Properties.Name -contains "total") -and $json.total -and $json.pageSize -and $json.page) {
         $done = [math]::Min([int]$json.total, [int]$json.page * [int]$json.pageSize)
         $remaining = [math]::Max(0, [int]$json.total - $done)
         Info "Progresso: $done/$($json.total) (faltam $remaining)"
-      } elseif ($json -and $json.pageSize -and $json.page) {
+      } elseif ($json -and (Has-ObjProp $json "pageSize") -and (Has-ObjProp $json "page") -and $json.pageSize -and $json.page) {
         $done = [int]$json.page * [int]$json.pageSize
         Info "Progresso: $done (total desconhecido)"
       }
