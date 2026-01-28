@@ -46,6 +46,7 @@ export class VtexQuoteService {
     status: VtexQuoteStatus;
     subtotal: number;
     discount: number;
+    discountReason?: string;
     total: number;
     totalMarginPercent?: number | null;
     requiresApproval?: boolean;
@@ -74,6 +75,7 @@ export class VtexQuoteService {
       status: params.status,
       subtotal: params.subtotal,
       total_discount: params.discount,
+      discount_reason: params.discountReason ?? null,
       total: params.total,
       total_margin_percent: params.totalMarginPercent ?? null,
       requires_approval: !!params.requiresApproval,
@@ -128,9 +130,26 @@ export class VtexQuoteService {
       payload: {
         tradePolicyId: params.tradePolicyId,
         items: params.items.length,
+        discount: params.discount,
+        discountReason: params.discountReason ?? null,
       },
       createdBy: user.id,
     });
+
+    if (params.discount > 0 && params.discountReason?.trim()) {
+      await this.logEvent({
+        quoteId,
+        eventType: "discount",
+        fromStatus: previousStatus,
+        toStatus: params.status,
+        message: "Desconto concedido",
+        payload: {
+          discount: params.discount,
+          reason: params.discountReason.trim(),
+        },
+        createdBy: user.id,
+      });
+    }
 
     return { id: quoteId, number: String(quoteRow.quote_number) };
   }
@@ -199,6 +218,7 @@ export class VtexQuoteService {
       updatedAt: new Date(q.updated_at),
       createdBy: q.created_by,
       notes: q.notes ?? undefined,
+      discountReason: q.discount_reason ?? undefined,
       tradePolicyId: String(q.trade_policy_id ?? "1"),
     };
 

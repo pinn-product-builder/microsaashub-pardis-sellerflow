@@ -115,6 +115,7 @@ export default function VisualizarCotacao() {
       status: "draft",
       subtotal: quote.subtotal,
       discount: quote.discount,
+      discountReason: (quote as any).discountReason ?? undefined,
       total: quote.total,
       notes: quote.notes,
     });

@@ -303,7 +303,7 @@ export default function Aprovacoes() {
             </DialogTitle>
             <DialogDescription>
               {actionType === 'approve' 
-                ? 'Confirme a aprovação desta cotação. O vendedor será notificado.'
+                ? 'Informe a justificativa da aprovação. O vendedor será notificado.'
                 : 'Informe o motivo da rejeição. O vendedor será notificado.'}
             </DialogDescription>
           </DialogHeader>
@@ -324,11 +324,11 @@ export default function Aprovacoes() {
 
             <div>
               <label className="text-sm font-medium">
-                Comentários {actionType === 'reject' && <span className="text-destructive">*</span>}
+                Justificativa <span className="text-destructive">*</span>
               </label>
               <Textarea
                 placeholder={actionType === 'approve' 
-                  ? 'Comentários opcionais...'
+                  ? 'Informe o motivo da aprovação...'
                   : 'Informe o motivo da rejeição...'}
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
@@ -347,7 +347,7 @@ export default function Aprovacoes() {
             </Button>
             <Button
               onClick={handleAction}
-              disabled={actionType === 'reject' && !comments.trim()}
+              disabled={!comments.trim()}
               className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
             >
               {actionType === 'approve' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'}

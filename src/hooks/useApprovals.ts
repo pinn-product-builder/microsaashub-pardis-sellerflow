@@ -107,16 +107,17 @@ export function useApproveRequest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, comments }: { id: string; comments?: string }) => {
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
+      if (!comments?.trim()) throw new Error('Justificativa obrigatória para aprovar');
 
       const { data, error } = await supabase
         .from('vtex_approval_requests')
         .update({
           status: 'approved',
           approved_by: user.id,
-          comments,
+          comments: comments.trim(),
           decided_at: new Date().toISOString(),
         })
         .eq('id', id)

@@ -47,6 +47,7 @@ type QuoteDetails = {
   total_discount: number;
   total: number;
   notes: string | null;
+  discount_reason: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -89,6 +90,7 @@ const EVENT_LABELS: Record<string, string> = {
   failed: "Falhou",
   status_change: "Status",
   approval: "Aprovação",
+  discount: "Desconto",
 };
 
 const EVENT_STYLES: Record<string, string> = {
@@ -101,6 +103,7 @@ const EVENT_STYLES: Record<string, string> = {
   failed: "bg-red-100 text-red-800 border-red-200",
   status_change: "bg-gray-100 text-gray-800 border-gray-200",
   approval: "bg-purple-100 text-purple-800 border-purple-200",
+  discount: "bg-rose-100 text-rose-800 border-rose-200",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -283,7 +286,7 @@ export default function Auditoria() {
     try {
       const { data: quote, error: quoteError } = await (supabase as any)
         .from("vtex_quotes")
-        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, created_by, updated_by, created_at, updated_at")
+        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, discount_reason, created_by, updated_by, created_at, updated_at")
         .eq("id", ev.quote_id)
         .maybeSingle();
       if (quoteError) throw quoteError;
@@ -651,6 +654,13 @@ export default function Auditoria() {
                   <p className="font-medium">{formatCurrency(selectedQuote?.total)}</p>
                 </div>
               </div>
+
+              {selectedQuote?.discount_reason && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground">Justificativa do desconto</p>
+                  <p className="whitespace-pre-wrap">{selectedQuote.discount_reason}</p>
+                </div>
+              )}
 
               {selectedQuote?.notes && (
                 <div className="text-sm">

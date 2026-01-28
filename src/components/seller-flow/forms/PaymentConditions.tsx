@@ -15,6 +15,8 @@ interface PaymentConditionsProps {
   onPaymentChange: (value: string) => void;
   discount: number;
   onDiscountChange: (value: number) => void;
+  discountReason: string;
+  onDiscountReasonChange: (value: string) => void;
   notes: string;
   onNotesChange: (value: string) => void;
   customerPaymentTerms: string[];
@@ -25,6 +27,8 @@ export function PaymentConditions({
   onPaymentChange,
   discount,
   onDiscountChange,
+  discountReason,
+  onDiscountReasonChange,
   notes,
   onNotesChange,
   customerPaymentTerms
@@ -67,6 +71,24 @@ export function PaymentConditions({
             Desconto máximo permitido: 20%
           </p>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        {discount > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="discountReason">Justificativa do desconto <span className="text-destructive">*</span></Label>
+            <Textarea
+              id="discountReason"
+              placeholder="Explique o motivo do desconto concedido..."
+              value={discountReason}
+              onChange={(e) => onDiscountReasonChange(e.target.value)}
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              Obrigatório quando houver desconto.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

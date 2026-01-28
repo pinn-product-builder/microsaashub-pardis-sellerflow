@@ -43,6 +43,7 @@ export default function NovaQuotacao() {
     destinationUF,
     items,
     discount,
+    discountReason,
     paymentConditions,
     notes,
     setSelectedCustomer,
@@ -50,6 +51,7 @@ export default function NovaQuotacao() {
     addItem,
     updateItem,
     setDiscount,
+    setDiscountReason,
     setPaymentConditions,
     setNotes,
     clearQuote,
@@ -57,6 +59,12 @@ export default function NovaQuotacao() {
   } = useSellerFlowStore();
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
+
+  useEffect(() => {
+    if (discount <= 0 && discountReason) {
+      setDiscountReason('');
+    }
+  }, [discount, discountReason, setDiscountReason]);
   
   // Pardis margin calculations
   const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer);
@@ -84,6 +92,7 @@ export default function NovaQuotacao() {
           setCurrentQuote(quote);
           setSelectedCustomer(quote.customer);
           setDiscount(quote.discount);
+          setDiscountReason((quote as any).discountReason || '');
           setPaymentConditions(quote.paymentConditions);
           setNotes(quote.notes || '');
           // mantém valor legacy apenas; modo padrão continua auto
@@ -202,6 +211,14 @@ export default function NovaQuotacao() {
       });
       return;
     }
+    if (totals.discount > 0 && !discountReason.trim()) {
+      toast({
+        title: "Justificativa obrigatória",
+        description: "Informe o motivo do desconto antes de salvar.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -214,6 +231,7 @@ export default function NovaQuotacao() {
         status: "draft",
         subtotal: totals.subtotal,
         discount: totals.discount,
+        discountReason: discountReason.trim(),
         total: totals.total,
         totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
         requiresApproval: pardisSummary.requiresApproval,
@@ -248,6 +266,14 @@ export default function NovaQuotacao() {
       });
       return;
     }
+    if (totals.discount > 0 && !discountReason.trim()) {
+      toast({
+        title: "Justificativa obrigatória",
+        description: "Informe o motivo do desconto antes de finalizar.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -260,6 +286,7 @@ export default function NovaQuotacao() {
         status: "calculated",
         subtotal: totals.subtotal,
         discount: totals.discount,
+        discountReason: discountReason.trim(),
         total: totals.total,
         totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
         requiresApproval: pardisSummary.requiresApproval,
@@ -327,6 +354,14 @@ export default function NovaQuotacao() {
       });
       return;
     }
+    if (totals.discount > 0 && !discountReason.trim()) {
+      toast({
+        title: "Justificativa obrigatória",
+        description: "Informe o motivo do desconto antes de enviar.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsSendingToVTEX(true);
     try {
@@ -339,6 +374,7 @@ export default function NovaQuotacao() {
         status: "calculated",
         subtotal: totals.subtotal,
         discount: totals.discount,
+        discountReason: discountReason.trim(),
         total: totals.total,
         totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
         requiresApproval: pardisSummary.requiresApproval,
@@ -645,6 +681,8 @@ export default function NovaQuotacao() {
                   onPaymentChange={setPaymentConditions}
                   discount={discount}
                   onDiscountChange={setDiscount}
+                  discountReason={discountReason}
+                  onDiscountReasonChange={setDiscountReason}
                   notes={notes}
                   onNotesChange={setNotes}
                   customerPaymentTerms={selectedCustomer?.paymentTerms || []}

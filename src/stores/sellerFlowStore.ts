@@ -9,6 +9,7 @@ interface SellerFlowStore {
   destinationUF: string;
   items: QuoteItem[];
   discount: number;
+  discountReason: string;
   paymentConditions: string;
   notes: string;
 
@@ -20,6 +21,7 @@ interface SellerFlowStore {
   updateItem: (id: string, updates: Partial<QuoteItem>) => void;
   removeItem: (id: string) => void;
   setDiscount: (discount: number) => void;
+  setDiscountReason: (reason: string) => void;
   setPaymentConditions: (conditions: string) => void;
   setNotes: (notes: string) => void;
   clearQuote: () => void;
@@ -45,6 +47,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
   destinationUF: '',
   items: [],
   discount: 0,
+  discountReason: '',
   paymentConditions: 'À vista',
   notes: '',
   isCalculating: false,
@@ -91,6 +94,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
   })),
   
   setDiscount: (discount) => set({ discount }),
+  setDiscountReason: (reason) => set({ discountReason: reason }),
   setPaymentConditions: (conditions) => set({ paymentConditions: conditions }),
   setNotes: (notes) => set({ notes }),
   
@@ -100,6 +104,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
     destinationUF: '',
     items: [],
     discount: 0,
+    discountReason: '',
     paymentConditions: 'À vista',
     notes: ''
   }),

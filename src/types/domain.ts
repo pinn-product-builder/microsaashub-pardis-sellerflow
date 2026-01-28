@@ -173,6 +173,7 @@ export interface QuoteLegacy {
   totalTaxes: number;
   totalFreight: number;
   discount: number;
+  discountReason?: string;
   total: number;
   status: 'draft' | 'calculated' | 'approved' | 'sent' | 'expired' | 'pending' | 'processing';
   paymentConditions: string;
