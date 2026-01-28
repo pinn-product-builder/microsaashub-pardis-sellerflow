@@ -47,12 +47,25 @@ const EVENT_STYLES: Record<string, string> = {
   approval: "bg-purple-100 text-purple-800 border-purple-200",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  approved: "Aprovado",
+  calculated: "Calculado",
+  draft: "Rascunho",
+  pending_approval: "Pendente de aprovação",
+  rejected: "Reprovado",
+};
+
 function formatEventLabel(ev: QuoteEvent) {
   return EVENT_LABELS[ev.event_type] ?? ev.event_type;
 }
 
 function eventBadgeClass(ev: QuoteEvent) {
   return EVENT_STYLES[ev.event_type] ?? "bg-gray-100 text-gray-800 border-gray-200";
+}
+
+function formatStatusLabel(status?: string | null) {
+  if (!status) return "";
+  return STATUS_LABELS[status] ?? status;
 }
 
 export default function Auditoria() {
@@ -253,7 +266,7 @@ export default function Auditoria() {
                   <SelectItem value="all">Todos os status</SelectItem>
                   {statusOptions.map((status) => (
                     <SelectItem key={status} value={status}>
-                      {status}
+                      {formatStatusLabel(status)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -318,7 +331,9 @@ export default function Auditoria() {
                     {ev.created_by ? (profiles.get(ev.created_by)?.full_name || profiles.get(ev.created_by)?.email || ev.created_by) : "Sistema"}
                   </span>
                   <span className="text-muted-foreground truncate">
-                    {ev.from_status || ev.to_status ? `${ev.from_status ?? ""}${ev.from_status ? " → " : ""}${ev.to_status ?? ""}` : "-"}
+                    {ev.from_status || ev.to_status
+                      ? `${formatStatusLabel(ev.from_status)}${ev.from_status ? " → " : ""}${formatStatusLabel(ev.to_status)}`
+                      : "-"}
                   </span>
                   <span className="text-xs text-muted-foreground text-right">
                     {new Date(ev.created_at).toLocaleString("pt-BR")}
