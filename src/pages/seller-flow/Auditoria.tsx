@@ -4,10 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Activity, Download, Search } from "lucide-react";
+import { Activity, Download, Eye, MoreHorizontal, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type QuoteEvent = {
@@ -76,6 +83,7 @@ export default function Auditoria() {
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const { role, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   const { data: auditData, isLoading } = useQuery({
     queryKey: ["audit", "vtex_quote_events"],
@@ -309,17 +317,18 @@ export default function Auditoria() {
             <p className="text-sm text-muted-foreground">Nenhum evento encontrado.</p>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-5 gap-4 text-xs font-semibold text-muted-foreground px-3">
+              <div className="grid grid-cols-6 gap-4 text-xs font-semibold text-muted-foreground px-3">
                 <span>Evento</span>
                 <span>Cotação</span>
                 <span>Usuário</span>
                 <span>Status</span>
                 <span className="text-right">Data/Hora</span>
+                <span className="text-right">Ações</span>
               </div>
               {paged.map((ev) => (
-                <div key={ev.id} className="grid grid-cols-5 gap-4 items-center rounded border px-3 py-2 text-sm">
+                <div key={ev.id} className="grid grid-cols-6 gap-4 items-center rounded border px-3 py-2 text-sm">
                   <div className="flex items-center gap-2">
-                    <Badge className={`border ${eventBadgeClass(ev)}`}>
+                    <Badge variant="outline" className={`border ${eventBadgeClass(ev)}`}>
                       {formatEventLabel(ev)}
                     </Badge>
                     <span className="truncate">{ev.message ?? "Sem mensagem"}</span>
@@ -338,6 +347,26 @@ export default function Auditoria() {
                   <span className="text-xs text-muted-foreground text-right">
                     {new Date(ev.created_at).toLocaleString("pt-BR")}
                   </span>
+                  <div className="flex justify-end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            navigate(`/seller-flow/cotacao/${ev.quote_id}`);
+                          }}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          Abrir cotação
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               ))}
               <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
