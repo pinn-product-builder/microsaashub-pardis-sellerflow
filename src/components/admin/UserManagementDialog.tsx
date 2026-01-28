@@ -81,54 +81,18 @@ export function UserManagementDialog({
     try {
       setIsLoading(true);
 
-      // Atualizar perfil - region pode ser null
+      // Atualizar perfil/role/grupos via RPC (bypass RLS com checagem de permissão)
       const regionValue = formData.region === '' ? null : formData.region as "BR" | "MG";
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.full_name,
-          region: regionValue,
-          is_active: formData.is_active,
-        })
-        .eq('user_id', user.id);
+      const { error: updateError } = await (supabase as any).rpc('admin_update_user', {
+        _target_user_id: user.id,
+        _full_name: formData.full_name,
+        _region: regionValue,
+        _is_active: formData.is_active,
+        _role: formData.role,
+        _group_ids: formData.group_ids,
+      });
 
-      if (profileError) throw profileError;
-
-      // Atualizar role (mantém apenas 1 role por usuário)
-      const { error: deleteRoleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (deleteRoleError) throw deleteRoleError;
-
-      const { error: insertRoleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: user.id, role: formData.role as any });
-
-      if (insertRoleError) throw insertRoleError;
-
-      // Atualizar grupos - remover todos e adicionar novos
-      const { error: deleteError } = await supabase
-        .from('user_group_memberships')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (deleteError) throw deleteError;
-
-      if (formData.group_ids.length > 0) {
-        const memberships = formData.group_ids.map(groupId => ({
-          user_id: user.id,
-          group_id: groupId,
-          assigned_by: currentUser?.id,
-        }));
-
-        const { error: insertError } = await supabase
-          .from('user_group_memberships')
-          .insert(memberships);
-
-        if (insertError) throw insertError;
-      }
+      if (updateError) throw updateError;
 
       toast.success('Usuário atualizado com sucesso');
       onSave();
