@@ -279,10 +279,10 @@ if ($Mode -eq "local") {
         $done = [int]$json.page * [int]$json.pageSize
         Info "Progresso: $done (total desconhecido)"
       }
-      if ($json -and $json.next -and $json.next.page) {
+      if ($json -and (Has-ObjProp $json "nextToken") -and $json.nextToken) {
+        # scroll: continua até nextToken ficar vazio (token é persistido no Supabase)
+      } elseif ($json -and (Has-ObjProp $json "next") -and $json.next -and (Has-ObjProp $json.next "page") -and $json.next.page) {
         $currentPage = [int]$json.next.page
-      } elseif ($json -and $json.nextToken) {
-        # scroll: continua até nextToken ficar vazio
       } else {
         break
       }
@@ -338,10 +338,10 @@ if ($Mode -eq "cloud") {
         $done = [int]$json.page * [int]$json.pageSize
         Info "Progresso: $done (total desconhecido)"
       }
-      if ($json -and $json.next -and $json.next.page) {
+      if ($json -and (Has-ObjProp $json "nextToken") -and $json.nextToken) {
+        # scroll: continua até nextToken ficar vazio (token é persistido no Supabase)
+      } elseif ($json -and (Has-ObjProp $json "next") -and $json.next -and (Has-ObjProp $json.next "page") -and $json.next.page) {
         $currentPage = [int]$json.next.page
-      } elseif ($json -and $json.nextToken) {
-        # scroll: continua até nextToken ficar vazio
       } else {
         break
       }
