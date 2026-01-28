@@ -92,3 +92,17 @@ Checar:
 - se existe registro em `vtex_approval_requests`
 - se o usuário tem role para aprovar (RLS bloqueia update por usuário comum)
 
+---
+
+## Política de desconto e aprovação (justificativa obrigatória)
+Para garantir rastreabilidade completa:
+- **Desconto concedido pelo vendedor** exige **justificativa obrigatória**.
+- **Aprovação de cotação** exige **justificativa obrigatória** do aprovador.
+
+Onde fica registrado:
+- Justificativa de desconto em `vtex_quotes.discount_reason`.
+- Aprovações em `vtex_approval_requests.comments`.
+- Eventos em `vtex_quote_events` (event_type `discount` e eventos de aprovação).
+
+Observação:
+- Sem justificativa, o fluxo bloqueia o avanço (salvar/finalizar/enviar/aprovar).

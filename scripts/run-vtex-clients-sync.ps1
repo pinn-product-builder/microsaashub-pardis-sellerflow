@@ -24,6 +24,9 @@ param(
   [switch]$WithCredit = $true,
   [switch]$OverwriteCredit = $false,
   [switch]$L2lOnly = $false,
+  # Backfill: preenche UF/Cidade para clientes que já estão no banco com uf/city nulos.
+  # Neste modo, não precisa rodar o "all/windowed" completo.
+  [switch]$BackfillAddresses = $false,
   [ValidateSet("windowed", "scroll")]
   [string]$Strategy = "windowed"
 )
@@ -245,6 +248,7 @@ if ($Mode -eq "local") {
   )
   $base = Resolve-FunctionsBase $candidates $syncSecret
   $allParam = if ($L2lOnly.IsPresent) { "false" } else { "true" }
+  if ($BackfillAddresses.IsPresent) { $allParam = "false" }
   $baseUrl =
     "$base/vtex-sync-clients" +
     "?all=$allParam" +
@@ -254,17 +258,18 @@ if ($Mode -eq "local") {
     "&withCredit=$([int]$WithCredit.IsPresent)" +
     "&overwriteCredit=$([int]$OverwriteCredit.IsPresent)" +
     "&concurrency=$Concurrency" +
-    "&l2lOnly=$([int]$L2lOnly.IsPresent)"
+    "&l2lOnly=$([int]$L2lOnly.IsPresent)" +
+    "&backfillMissingAddress=$([int]$BackfillAddresses.IsPresent)"
 
   $currentPage = 1
   Info "Chamando local: $baseUrl"
 
   for ($i = 1; $i -le $MaxCalls; $i++) {
-    $url = if ($L2lOnly.IsPresent) { "$baseUrl&page=$currentPage" } else { $baseUrl }
+    $url = if ($BackfillAddresses.IsPresent -or $L2lOnly.IsPresent) { "$baseUrl&page=$currentPage" } else { $baseUrl }
     $body = CurlJson $url @{ "x-vtex-sync-secret" = $syncSecret }
     Info "$i) $body"
     if ($body -match '"done"\s*:\s*true') { break }
-    if ($L2lOnly.IsPresent) {
+    if ($BackfillAddresses.IsPresent -or $L2lOnly.IsPresent) {
       $json = $null
       try { $json = ($body | ConvertFrom-Json) } catch {}
       if ($json -and (Has-ObjProp $json "ok") -and ($json.ok -eq $false)) {
@@ -299,6 +304,7 @@ if ($Mode -eq "cloud") {
   Require-NonEmpty "SUPABASE_ADMIN_JWT" $SUPABASE_ADMIN_JWT
 
   $allParam = if ($L2lOnly.IsPresent) { "false" } else { "true" }
+  if ($BackfillAddresses.IsPresent) { $allParam = "false" }
   $baseUrl =
     "$SUPABASE_URL/functions/v1/vtex-sync-clients" +
     "?all=$allParam" +
@@ -308,14 +314,15 @@ if ($Mode -eq "cloud") {
     "&withCredit=$([int]$WithCredit.IsPresent)" +
     "&overwriteCredit=$([int]$OverwriteCredit.IsPresent)" +
     "&concurrency=$Concurrency" +
-    "&l2lOnly=$([int]$L2lOnly.IsPresent)"
+    "&l2lOnly=$([int]$L2lOnly.IsPresent)" +
+    "&backfillMissingAddress=$([int]$BackfillAddresses.IsPresent)"
 
   $currentPage = 1
   Info "Chamando cloud: $baseUrl"
   Info "Obs.: se receber Unauthorized/Forbidden, gere um access_token novo e garanta role admin em public.user_roles."
 
   for ($i = 1; $i -le $MaxCalls; $i++) {
-    $url = if ($L2lOnly.IsPresent) { "$baseUrl&page=$currentPage" } else { $baseUrl }
+    $url = if ($BackfillAddresses.IsPresent -or $L2lOnly.IsPresent) { "$baseUrl&page=$currentPage" } else { $baseUrl }
     $body = CurlJson $url @{
       apikey = $SUPABASE_ANON_KEY
       Authorization = "Bearer $SUPABASE_ADMIN_JWT"
@@ -323,7 +330,7 @@ if ($Mode -eq "cloud") {
     Info "$i) $body"
     if ($body -match '"done"\s*:\s*true') { break }
     if ($body -match 'Unauthorized|Forbidden') { break }
-    if ($L2lOnly.IsPresent) {
+    if ($BackfillAddresses.IsPresent -or $L2lOnly.IsPresent) {
       $json = $null
       try { $json = ($body | ConvertFrom-Json) } catch {}
       if ($json -and (Has-ObjProp $json "ok") -and ($json.ok -eq $false)) {

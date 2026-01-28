@@ -114,6 +114,16 @@ function extractBestAddress(arr: any[]): { city: string | null; uf: string | nul
   return { city: best?.city ?? null, uf: best?.uf ?? null, raw: best?.x ?? null };
 }
 
+function resolveAddressIdentity(row: any): { identity: string | null; email: string | null } {
+  const email = normStr(row?.email);
+  const identity =
+    normStr(row?.vtex_user_id) ??
+    normStr(row?.user_id) ??
+    normStr(row?.md_id) ??
+    email;
+  return { identity, email };
+}
+
 async function vtexFetchProfileSystemAddress(userIdOrEmail: string) {
   const { base, headers } = vtexBase();
   const safe = String(userIdOrEmail || "").trim();
@@ -171,42 +181,42 @@ async function vtexFetchAddressByUserId(userId: string, email?: string | null) {
       `userId=\"${cand.replace(/\"/g, '\\"')}\"`,
     ];
     for (const where of whereVariants) {
-      const url =
-        `${base}/api/dataentities/AD/search` +
-        `?_fields=${encodeURIComponent(fields)}` +
+  const url =
+    `${base}/api/dataentities/AD/search` +
+    `?_fields=${encodeURIComponent(fields)}` +
         `&_where=${encodeURIComponent(where)}` +
         `&_page=1&_pageSize=10`;
 
-      let attempt = 0;
-      while (true) {
-        attempt++;
-        const res = await fetch(url, { headers });
-        const text = await res.text();
-        if (res.ok) {
-          try {
-            const data = JSON.parse(text);
-            const arr = Array.isArray(data) ? data : [];
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    const res = await fetch(url, { headers });
+    const text = await res.text();
+    if (res.ok) {
+      try {
+        const data = JSON.parse(text);
+        const arr = Array.isArray(data) ? data : [];
             const best = extractBestAddress(arr);
             // Se essa busca não achou nada útil, tenta o próximo candidato (ex.: email).
             if (!best.city && !best.uf) break;
-            return {
-              ok: true as const,
+        return {
+          ok: true as const,
               city: best.city,
               uf: best.uf,
               raw: best.raw,
-            };
-          } catch {
-            return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
-          }
-        }
+        };
+      } catch {
+        return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+      }
+    }
 
-        const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
-        if (!retryable || attempt >= maxRetries) {
+    const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+    if (!retryable || attempt >= maxRetries) {
           lastErr = { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
           break;
-        }
-        await sleep(500 * attempt);
-      }
+    }
+    await sleep(500 * attempt);
+  }
     }
 
     // Fallback: Profile System (muito mais confiável para endereços em várias lojas VTEX).
@@ -785,6 +795,7 @@ serve(async (req) => {
     const withCredit = l2lOnly ? true : toBool(u.searchParams.get("withCredit"), false);
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
     const debugAddress = toBool(u.searchParams.get("debugAddress"), false);
+    const backfillMissingAddress = toBool(u.searchParams.get("backfillMissingAddress"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
     const useStateToken = toBool(u.searchParams.get("useStateToken"), true);
     // Estratégia default:
@@ -806,6 +817,113 @@ serve(async (req) => {
     const l2lCandidates = l2lFieldOverride ? [...CL_L2L_FIELDS, l2lFieldOverride] : CL_L2L_FIELDS;
     const useAll = all && !l2lOnly;
     const useScroll = strategy === "scroll";
+
+    // Backfill direto no Supabase: preenche UF/Cidade para quem já está no banco mas ficou sem localização.
+    // Útil quando rodaram sync sem endereços no passado, ou quando houve rate-limit e parte do lote ficou sem UF/Cidade.
+    if (backfillMissingAddress) {
+      // IMPORTANTE: não paginar por offset aqui.
+      // Conforme vamos preenchendo UF/Cidade, o conjunto "faltante" muda e offsets podem pular registros.
+      // Então sempre pegamos os primeiros N faltantes e repetimos até zerar.
+      const from = 0;
+      const to = Math.min(1000, Math.max(1, pageSize)) - 1;
+
+      const { data: missing, error: missErr } = await supabase
+        .from("vtex_clients")
+        .select("md_id, email, user_id, vtex_user_id, uf, city, price_table_type")
+        .or("uf.is.null,city.is.null")
+        .order("updated_at", { ascending: true })
+        .range(from, to);
+
+      if (missErr) return json({ ok: false, step: "backfill_select", error: missErr.message }, 500);
+
+      const rows = (Array.isArray(missing) ? missing : []) as any[];
+      if (!rows.length) {
+        return json({
+          ok: true,
+          mode: "backfill_missing_address",
+          batchSize: 0,
+          filled: 0,
+          stillMissing: 0,
+          done: true,
+        });
+      }
+
+      let attempted = 0;
+      let filled = 0;
+      let stillMissing = 0;
+      const missingSamples: string[] = [];
+      let errorSample: any = null;
+
+      await mapLimit(rows, Math.min(concurrency, 6), async (row) => {
+        attempted++;
+        const { identity, email } = resolveAddressIdentity(row);
+        if (!identity) {
+          stillMissing++;
+          if (missingSamples.length < 10) missingSamples.push(String(row?.md_id ?? ""));
+          return;
+        }
+
+        const ad = await vtexFetchAddressByUserId(identity, email);
+        if (!ad.ok) {
+          stillMissing++;
+          if (!errorSample) {
+            errorSample = {
+              status: (ad as any).status ?? null,
+              statusText: (ad as any).statusText ?? null,
+              url: (ad as any).url ?? null,
+              bodyPreview: (ad as any).bodyPreview ?? null,
+            };
+          }
+          if (missingSamples.length < 10) missingSamples.push(String(row?.md_id ?? ""));
+          return;
+        }
+
+        const uf = ad.uf ? String(ad.uf).trim() : "";
+        const city = ad.city ? String(ad.city).trim() : "";
+
+        if (!uf && !city) {
+          stillMissing++;
+          if (missingSamples.length < 10) missingSamples.push(String(row?.md_id ?? ""));
+          return;
+        }
+
+        const updates: Record<string, unknown> = {
+          last_sync_at: new Date().toISOString(),
+        };
+        if (uf) updates.uf = uf;
+        if (city) updates.city = city;
+        if (uf) updates.price_table_type = uf.toUpperCase() === "MG" ? "MG" : "BR";
+
+        const { error: upErr } = await supabase
+          .from("vtex_clients")
+          .update(updates)
+          .eq("md_id", String(row.md_id));
+
+        if (upErr) {
+          stillMissing++;
+          if (!errorSample) errorSample = { step: "backfill_update", error: upErr.message };
+          if (missingSamples.length < 10) missingSamples.push(String(row?.md_id ?? ""));
+          return;
+        }
+
+        filled++;
+      });
+
+      const done = rows.length === 0;
+      return json({
+        ok: true,
+        mode: "backfill_missing_address",
+        batchSize: rows.length,
+        attempted,
+        filled,
+        stillMissing,
+        missingSamples: missingSamples.filter(Boolean),
+        errorSample: debugAddress ? errorSample : undefined,
+        done,
+        // Mantém loop simples: sempre page=1 até não sobrar faltante.
+        next: { page: 1, pageSize },
+      });
+    }
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
@@ -1229,12 +1347,9 @@ serve(async (req) => {
 
       if (withAddress) {
         await mapLimit(rows, concurrency, async (row) => {
-          const userId =
-            normStr((row as any).vtex_user_id) ??
-            normStr((row as any).user_id) ??
-            normStr((row as any).email);
-          if (!userId) return;
-          const ad = await vtexFetchAddressByUserId(userId);
+          const { identity, email } = resolveAddressIdentity(row);
+          if (!identity) return;
+          const ad = await vtexFetchAddressByUserId(identity, email);
           if (!ad.ok) return;
           if (ad.city) (row as any).city = ad.city;
           if (ad.uf) {
@@ -1429,12 +1544,9 @@ serve(async (req) => {
 
     if (withAddress) {
       await mapLimit(rows, concurrency, async (row) => {
-        const userId =
-          normStr((row as any).vtex_user_id) ??
-          normStr((row as any).user_id) ??
-          normStr((row as any).email);
-        if (!userId) return;
-        const ad = await vtexFetchAddressByUserId(userId);
+        const { identity, email } = resolveAddressIdentity(row);
+        if (!identity) return;
+        const ad = await vtexFetchAddressByUserId(identity, email);
         if (!ad.ok) return;
         if (ad.city) (row as any).city = ad.city;
         if (ad.uf) {
