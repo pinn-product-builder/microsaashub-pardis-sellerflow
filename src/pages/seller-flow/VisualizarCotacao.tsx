@@ -156,7 +156,11 @@ export default function VisualizarCotacao() {
     if (!quote) return;
     try {
       const tradePolicyId = (quote as any).tradePolicyId ?? null;
-      const validation = await VtexQuoteService.validateCart(tradePolicyId, quote.items as any);
+      const validation = await VtexQuoteService.validateCart(
+        tradePolicyId,
+        quote.items as any,
+        quote.id,
+      );
       setValidationResults(validation ?? []);
       const failures = validation.filter((r) => !r.ok);
       if (failures.length) {
@@ -186,7 +190,11 @@ export default function VisualizarCotacao() {
     setIsSendingToVTEX(true);
     try {
       const tradePolicyId = (quote as any).tradePolicyId ?? null;
-      const validation = await VtexQuoteService.validateCart(tradePolicyId, quote.items as any);
+      const validation = await VtexQuoteService.validateCart(
+        tradePolicyId,
+        quote.items as any,
+        quote.id,
+      );
       setValidationResults(validation ?? []);
       const failures = validation.filter((r) => !r.ok);
       if (failures.length) {

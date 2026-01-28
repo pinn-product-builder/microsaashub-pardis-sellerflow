@@ -57,6 +57,12 @@ const cotacoesItems = [
     icon: History,
   },
   {
+    title: "Auditoria",
+    url: "/seller-flow/auditoria",
+    icon: Shield,
+    adminOnly: true,
+  },
+  {
     title: "Aprovações",
     url: "/seller-flow/aprovacoes",
     icon: CheckCircle,
@@ -142,16 +148,28 @@ export function AppSidebar() {
           <SidebarGroupLabel>Cotações</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {cotacoesItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {cotacoesItems.map((item) => {
+                const content = (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+
+                if (item.adminOnly) {
+                  return (
+                    <PermissionGate key={item.title} permission="users.manage">
+                      {content}
+                    </PermissionGate>
+                  );
+                }
+
+                return content;
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

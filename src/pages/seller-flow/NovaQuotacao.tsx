@@ -347,7 +347,11 @@ export default function NovaQuotacao() {
       });
 
       // Validação server-side: preço + estoque
-      const validation = await VtexQuoteService.validateCart(policyMode === "fixed" ? tradePolicyId : null, items as any);
+      const validation = await VtexQuoteService.validateCart(
+        policyMode === "fixed" ? tradePolicyId : null,
+        items as any,
+        saved.id,
+      );
       const failures = validation.filter((r) => !r.ok);
       if (failures.length) {
         toast({

@@ -117,7 +117,8 @@ serve(async (req) => {
     if (!ofResp.ok) {
       await supabaseAdmin.from("vtex_quote_events").insert({
         quote_id: body.quoteId,
-        event_type: "vtex_send",
+        event_type: "failed",
+        from_status: quote.status,
         message: "Falha ao criar orderForm na VTEX",
         payload: { status: ofResp.status, response: ofJson },
         created_by: userData.user.id,
@@ -154,7 +155,8 @@ serve(async (req) => {
     if (!addItemsResp.ok) {
       await supabaseAdmin.from("vtex_quote_events").insert({
         quote_id: body.quoteId,
-        event_type: "vtex_send",
+        event_type: "failed",
+        from_status: quote.status,
         message: "Falha ao adicionar itens no orderForm",
         payload: { status: addItemsResp.status, response: addItemsJson, orderFormId },
         created_by: userData.user.id,
@@ -178,7 +180,7 @@ serve(async (req) => {
 
     await supabaseAdmin.from("vtex_quote_events").insert({
       quote_id: body.quoteId,
-      event_type: "vtex_send",
+      event_type: "sent",
       from_status: quote.status,
       to_status: "sent",
       message: `OrderForm criado na VTEX: ${orderFormId}`,
@@ -197,6 +199,26 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in vtex-create-orderform:", error);
     const errMessage = error instanceof Error ? error.message : String(error);
+    try {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const supabaseAdmin = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+      const { data: userData } = await createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_ANON_KEY"), {
+        global: { headers: { Authorization: authHeader } },
+      }).auth.getUser();
+      const userId = userData?.user?.id ?? null;
+      const body = await req.json().catch(() => ({} as Body));
+      if (body?.quoteId) {
+        await supabaseAdmin.from("vtex_quote_events").insert({
+          quote_id: body.quoteId,
+          event_type: "failed",
+          message: "Erro interno ao enviar para VTEX",
+          payload: { error: errMessage },
+          created_by: userId,
+        });
+      }
+    } catch {
+      // best-effort
+    }
     return new Response(JSON.stringify({ error: "Erro interno no servidor", details: errMessage }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

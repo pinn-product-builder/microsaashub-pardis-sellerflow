@@ -23,6 +23,7 @@ import Aprovacoes from '@/pages/seller-flow/Aprovacoes';
 import Configuracoes from '@/pages/seller-flow/Configuracoes';
 import Importacao from '@/pages/seller-flow/Importacao';
 import Documentacao from '@/pages/seller-flow/Documentacao';
+import Auditoria from '@/pages/seller-flow/Auditoria';
 
 // Cadastros Pages (MÓDULO ATIVO)
 import Clientes from '@/pages/cadastros/Clientes';
@@ -97,6 +98,16 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <Historico />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/seller-flow/auditoria"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Auditoria />
                     </AppLayout>
                   </ProtectedRoute>
                 }

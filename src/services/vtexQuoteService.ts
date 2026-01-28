@@ -13,6 +13,30 @@ function parseSkuId(item: QuoteItem): number {
 }
 
 export class VtexQuoteService {
+  private static async logEvent(input: {
+    quoteId: string;
+    eventType: string;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    message?: string;
+    payload?: Record<string, unknown>;
+    createdBy?: string;
+  }) {
+    try {
+      await (supabase as any).from("vtex_quote_events").insert({
+        quote_id: input.quoteId,
+        event_type: input.eventType,
+        from_status: input.fromStatus ?? null,
+        to_status: input.toStatus ?? null,
+        message: input.message ?? null,
+        payload: input.payload ?? {},
+        created_by: input.createdBy ?? null,
+      });
+    } catch (error) {
+      console.warn("Falha ao registrar evento de auditoria:", error);
+    }
+  }
+
   static async createOrUpdateQuote(params: {
     quoteId?: string;
     customer: Customer;
@@ -31,6 +55,16 @@ export class VtexQuoteService {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
     if (!user) throw new Error("Usuário não autenticado");
+
+    let previousStatus: string | null = null;
+    if (params.quoteId) {
+      const { data: existing } = await (supabase as any)
+        .from("vtex_quotes")
+        .select("status")
+        .eq("id", params.quoteId)
+        .maybeSingle();
+      previousStatus = (existing?.status ?? null) as string | null;
+    }
 
     const quoteUpsert: any = {
       id: params.quoteId,
@@ -85,17 +119,17 @@ export class VtexQuoteService {
       if (itemsErr) throw itemsErr;
     }
 
-    await (supabase as any).from("vtex_quote_events").insert({
-      quote_id: quoteId,
-      event_type: params.quoteId ? "note" : "status_change",
-      from_status: params.quoteId ? undefined : null,
-      to_status: params.status,
-      message: params.quoteId ? "Cotação atualizada" : "Cotação criada",
+    await this.logEvent({
+      quoteId,
+      eventType: params.quoteId ? "edited" : "created",
+      fromStatus: previousStatus,
+      toStatus: params.status,
+      message: params.quoteId ? "Cotação editada" : "Cotação criada",
       payload: {
         tradePolicyId: params.tradePolicyId,
         items: params.items.length,
       },
-      created_by: user.id,
+      createdBy: user.id,
     });
 
     return { id: quoteId, number: String(quoteRow.quote_number) };
@@ -171,7 +205,11 @@ export class VtexQuoteService {
     return quote;
   }
 
-  static async validateCart(tradePolicyId: string | null | undefined, items: QuoteItem[]) {
+  static async validateCart(
+    tradePolicyId: string | null | undefined,
+    items: QuoteItem[],
+    quoteId?: string,
+  ) {
     const sku_ids = items.map(parseSkuId);
     const quantities = items.map((it) => {
       const embalagemQty = Number((it as any).vtexEmbalagemQty || 1);
@@ -181,8 +219,19 @@ export class VtexQuoteService {
     const args: any = { sku_ids, quantities };
     if (tradePolicyId) args.trade_policy_id = String(tradePolicyId);
     const { data, error } = await (supabase as any).rpc(rpcName, args);
-    if (error) throw error;
-    return (data ?? []) as Array<{
+    if (error) {
+      if (quoteId) {
+        await this.logEvent({
+          quoteId,
+          eventType: "failed",
+          message: "Falha na validação do carrinho",
+          payload: { error: error.message ?? String(error) },
+        });
+      }
+      throw error;
+    }
+
+    const results = (data ?? []) as Array<{
       vtex_sku_id: number;
       quantity: number;
       trade_policy_id: string;
@@ -193,6 +242,27 @@ export class VtexQuoteService {
       ok: boolean;
       reason: string | null;
     }>;
+
+    if (quoteId) {
+      const failures = results.filter((r) => !r.ok);
+      if (failures.length) {
+        await this.logEvent({
+          quoteId,
+          eventType: "failed",
+          message: `Validação falhou (${failures.length} item(ns))`,
+          payload: { failures: failures.slice(0, 10) },
+        });
+      } else {
+        await this.logEvent({
+          quoteId,
+          eventType: "validated",
+          message: "Carrinho validado com sucesso",
+          payload: { items: results.length },
+        });
+      }
+    }
+
+    return results;
   }
 }
 

@@ -82,7 +82,7 @@ export function useCreateApprovalRequest() {
       // Registrar evento (best-effort)
       await supabase.from('vtex_quote_events').insert({
         quote_id: input.quote_id,
-        event_type: 'approval',
+        event_type: 'approval_requested',
         from_status: null,
         to_status: 'pending_approval',
         message: input.reason ?? 'Solicitação de aprovação criada',
@@ -138,7 +138,7 @@ export function useApproveRequest() {
         // Evento (best-effort)
         await supabase.from('vtex_quote_events').insert({
           quote_id: data.quote_id,
-          event_type: 'approval',
+          event_type: 'approved',
           from_status: 'pending_approval',
           to_status: 'approved',
           message: comments ?? 'Aprovada',
@@ -197,7 +197,7 @@ export function useRejectRequest() {
         // Evento (best-effort)
         await supabase.from('vtex_quote_events').insert({
           quote_id: data.quote_id,
-          event_type: 'approval',
+          event_type: 'failed',
           from_status: 'pending_approval',
           to_status: 'rejected',
           message: comments,
