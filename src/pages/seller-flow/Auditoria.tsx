@@ -99,6 +99,14 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "Reprovado",
 };
 
+const STATUS_STYLES: Record<string, string> = {
+  approved: "bg-green-100 text-green-800 border-green-200",
+  calculated: "bg-blue-100 text-blue-800 border-blue-200",
+  draft: "bg-slate-100 text-slate-800 border-slate-200",
+  pending_approval: "bg-amber-100 text-amber-800 border-amber-200",
+  rejected: "bg-red-100 text-red-800 border-red-200",
+};
+
 function formatEventLabel(ev: QuoteEvent) {
   return EVENT_LABELS[ev.event_type] ?? ev.event_type;
 }
@@ -110,6 +118,11 @@ function eventBadgeClass(ev: QuoteEvent) {
 function formatStatusLabel(status?: string | null) {
   if (!status) return "";
   return STATUS_LABELS[status] ?? status;
+}
+
+function statusBadgeClass(status?: string | null) {
+  if (!status) return "bg-gray-100 text-gray-800 border-gray-200";
+  return STATUS_STYLES[status] ?? "bg-gray-100 text-gray-800 border-gray-200";
 }
 
 function formatCurrency(value?: number | null) {
@@ -432,11 +445,23 @@ export default function Auditoria() {
                   <span className="text-muted-foreground truncate">
                     {ev.created_by ? (profiles.get(ev.created_by)?.full_name || profiles.get(ev.created_by)?.email || ev.created_by) : "Sistema"}
                   </span>
-                  <span className="text-muted-foreground truncate">
-                    {ev.from_status || ev.to_status
-                      ? `${formatStatusLabel(ev.from_status)}${ev.from_status ? " → " : ""}${formatStatusLabel(ev.to_status)}`
-                      : "-"}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {ev.from_status ? (
+                      <Badge variant="outline" className={`border ${statusBadgeClass(ev.from_status)}`}>
+                        {formatStatusLabel(ev.from_status)}
+                      </Badge>
+                    ) : null}
+                    {ev.to_status ? (
+                      <>
+                        {ev.from_status ? <span className="text-muted-foreground">→</span> : null}
+                        <Badge variant="outline" className={`border ${statusBadgeClass(ev.to_status)}`}>
+                          {formatStatusLabel(ev.to_status)}
+                        </Badge>
+                      </>
+                    ) : (
+                      !ev.from_status && <span className="text-muted-foreground">-</span>
+                    )}
+                  </div>
                   <span className="text-xs text-muted-foreground text-right">
                     {new Date(ev.created_at).toLocaleString("pt-BR")}
                   </span>
