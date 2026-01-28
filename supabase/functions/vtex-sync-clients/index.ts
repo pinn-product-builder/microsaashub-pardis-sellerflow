@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
 // Bump this when deploying changes you need to verify in Cloud responses.
-const CODE_VERSION = "2026-01-28.l2l-debug.v1";
+const CODE_VERSION = "2026-01-28.address-backfill.v2";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -769,6 +769,43 @@ function splitWindow(w: Window): [Window, Window] | null {
   ];
 }
 
+async function vtexFetchClientIdentityByMdId(mdId: string) {
+  const { base, headers } = vtexBase();
+  const safe = String(mdId || "").trim();
+  if (!safe) return { ok: true as const, userId: null as string | null, email: null as string | null, raw: null as any };
+
+  // Prefer doc-by-id (rápido e barato). Em algumas contas o campo é `id` (UUID) e essa rota resolve direto.
+  const url = `${base}/api/dataentities/CL/documents/${encodeURIComponent(safe)}?_fields=${encodeURIComponent("userId,email,id")}`;
+
+  const maxRetries = 4;
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    const res = await fetch(url, { headers });
+    const text = await res.text();
+    if (res.ok) {
+      try {
+        const payload = JSON.parse(text);
+        return {
+          ok: true as const,
+          userId: normStr(payload?.userId) ?? null,
+          email: normStr(payload?.email) ?? null,
+          raw: payload,
+        };
+      } catch {
+        return { ok: false as const, status: 500, statusText: "JSON parse error", url, bodyPreview: text.slice(0, 800) };
+      }
+    }
+
+    // 404 significa "não existe" (não adianta retry)
+    const retryable = res.status === 429 || (res.status >= 500 && res.status <= 599);
+    if (!retryable || attempt >= maxRetries) {
+      return { ok: false as const, status: res.status, statusText: res.statusText, url, bodyPreview: text.slice(0, 800) };
+    }
+    await sleep(400 * attempt);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
@@ -856,7 +893,32 @@ serve(async (req) => {
 
       await mapLimit(rows, Math.min(concurrency, 6), async (row) => {
         attempted++;
-        const { identity, email } = resolveAddressIdentity(row);
+        let { identity, email } = resolveAddressIdentity(row);
+
+        // Se só temos md_id (UUID), tenta resolver userId/email no CL antes de buscar endereços.
+        const mdId = normStr(row?.md_id);
+        const looksLikeUuid = !!mdId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mdId);
+        const identityIsJustMdId = !!mdId && identity === mdId && looksLikeUuid;
+
+        if ((!email && identityIsJustMdId) || (!identity && mdId)) {
+          const clId = await vtexFetchClientIdentityByMdId(mdId ?? "");
+          if (clId.ok) {
+            const userIdFromCl = normStr((clId as any).userId);
+            const emailFromCl = normStr((clId as any).email);
+            // Prefer userId; fallback para email
+            identity = userIdFromCl ?? emailFromCl ?? identity;
+            email = emailFromCl ?? email;
+          } else if (debugAddress && !errorSample) {
+            errorSample = {
+              step: "backfill_fetch_cl_identity",
+              status: (clId as any).status ?? null,
+              statusText: (clId as any).statusText ?? null,
+              url: (clId as any).url ?? null,
+              bodyPreview: (clId as any).bodyPreview ?? null,
+            };
+          }
+        }
+
         if (!identity) {
           stillMissing++;
           if (missingSamples.length < 10) missingSamples.push(String(row?.md_id ?? ""));

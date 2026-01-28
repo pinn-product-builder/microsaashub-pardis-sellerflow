@@ -27,6 +27,8 @@ param(
   # Backfill: preenche UF/Cidade para clientes que já estão no banco com uf/city nulos.
   # Neste modo, não precisa rodar o "all/windowed" completo.
   [switch]$BackfillAddresses = $false,
+  # Loga detalhes de erro do backfill/sync de endereços (status/url/bodyPreview quando disponível)
+  [switch]$DebugAddress = $false,
   [ValidateSet("windowed", "scroll")]
   [string]$Strategy = "windowed"
 )
@@ -259,7 +261,8 @@ if ($Mode -eq "local") {
     "&overwriteCredit=$([int]$OverwriteCredit.IsPresent)" +
     "&concurrency=$Concurrency" +
     "&l2lOnly=$([int]$L2lOnly.IsPresent)" +
-    "&backfillMissingAddress=$([int]$BackfillAddresses.IsPresent)"
+    "&backfillMissingAddress=$([int]$BackfillAddresses.IsPresent)" +
+    "&debugAddress=$([int]$DebugAddress.IsPresent)"
 
   $currentPage = 1
   Info "Chamando local: $baseUrl"
@@ -315,7 +318,8 @@ if ($Mode -eq "cloud") {
     "&overwriteCredit=$([int]$OverwriteCredit.IsPresent)" +
     "&concurrency=$Concurrency" +
     "&l2lOnly=$([int]$L2lOnly.IsPresent)" +
-    "&backfillMissingAddress=$([int]$BackfillAddresses.IsPresent)"
+    "&backfillMissingAddress=$([int]$BackfillAddresses.IsPresent)" +
+    "&debugAddress=$([int]$DebugAddress.IsPresent)"
 
   $currentPage = 1
   Info "Chamando cloud: $baseUrl"
