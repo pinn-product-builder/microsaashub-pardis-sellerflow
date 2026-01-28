@@ -15,6 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type QuoteEvent = {
@@ -24,11 +30,42 @@ type QuoteEvent = {
   message: string | null;
   from_status: string | null;
   to_status: string | null;
+  payload: Record<string, unknown>;
   created_at: string;
   created_by: string | null;
   quote?: { id: string; quote_number: number | null };
 };
 type ProfileLite = { user_id: string; full_name: string; email: string };
+type QuoteDetails = {
+  id: string;
+  quote_number: number | null;
+  vtex_client_id: string;
+  trade_policy_id: string | null;
+  destination_uf: string | null;
+  status: string;
+  subtotal: number;
+  total_discount: number;
+  total: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type QuoteItem = {
+  id: string;
+  vtex_sku_id: number;
+  quantity: number;
+  unit_price: number | null;
+  line_total: number | null;
+  snapshot: Record<string, unknown>;
+};
+type ClientLite = {
+  md_id: string;
+  full_name: string | null;
+  trade_name: string | null;
+  corporate_name: string | null;
+  email: string | null;
+  document: string | null;
+};
 
 const EVENT_LABELS: Record<string, string> = {
   created: "Criou",
@@ -75,12 +112,31 @@ function formatStatusLabel(status?: string | null) {
   return STATUS_LABELS[status] ?? status;
 }
 
+function formatCurrency(value?: number | null) {
+  const safe = typeof value === "number" ? value : 0;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(safe);
+}
+
+function getSnapshotName(snapshot?: Record<string, unknown>) {
+  const raw = (snapshot ?? {}) as Record<string, unknown>;
+  return (raw.product_name as string) || (raw.name as string) || "";
+}
+
 export default function Auditoria() {
   const [searchTerm, setSearchTerm] = useState("");
   const [eventFilter, setEventFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<QuoteEvent | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteDetails | null>(null);
+  const [selectedItems, setSelectedItems] = useState<QuoteItem[]>([]);
+  const [selectedClient, setSelectedClient] = useState<ClientLite | null>(null);
   const pageSize = 50;
   const { role, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -90,7 +146,7 @@ export default function Auditoria() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("vtex_quote_events")
-        .select("id, quote_id, event_type, message, from_status, to_status, created_at, created_by, quote:vtex_quotes(id, quote_number)")
+        .select("id, quote_id, event_type, message, from_status, to_status, payload, created_at, created_by, quote:vtex_quotes(id, quote_number)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -171,6 +227,43 @@ export default function Auditoria() {
     const start = (page - 1) * pageSize;
     return filteredByUser.slice(start, start + pageSize);
   }, [filteredByUser, page, pageSize]);
+
+  const loadDetails = async (ev: QuoteEvent) => {
+    setDetailsOpen(true);
+    setSelectedEvent(ev);
+    setDetailsLoading(true);
+    setSelectedQuote(null);
+    setSelectedItems([]);
+    setSelectedClient(null);
+    try {
+      const { data: quote, error: quoteError } = await (supabase as any)
+        .from("vtex_quotes")
+        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, created_at, updated_at")
+        .eq("id", ev.quote_id)
+        .maybeSingle();
+      if (quoteError) throw quoteError;
+      if (quote) {
+        setSelectedQuote(quote as QuoteDetails);
+        const { data: items } = await (supabase as any)
+          .from("vtex_quote_items")
+          .select("id, vtex_sku_id, quantity, unit_price, line_total, snapshot")
+          .eq("quote_id", ev.quote_id)
+          .order("created_at", { ascending: true });
+        setSelectedItems((items ?? []) as QuoteItem[]);
+
+        const { data: client } = await (supabase as any)
+          .from("vtex_clients")
+          .select("md_id, full_name, trade_name, corporate_name, email, document")
+          .eq("md_id", quote.vtex_client_id)
+          .maybeSingle();
+        if (client) setSelectedClient(client as ClientLite);
+      }
+    } catch {
+      // falhas de carregamento não devem quebrar a tela
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
 
   const handleExport = () => {
     const rows = filteredByUser.map((ev) => {
@@ -358,6 +451,14 @@ export default function Auditoria() {
                         <DropdownMenuItem
                           onSelect={(e) => {
                             e.preventDefault();
+                            loadDetails(ev);
+                          }}
+                        >
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
                             navigate(`/seller-flow/cotacao/${ev.quote_id}`);
                           }}
                         >
@@ -396,6 +497,139 @@ export default function Auditoria() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedQuote?.quote_number ? `Cotação #${selectedQuote.quote_number}` : "Detalhes da cotação"}
+            </DialogTitle>
+          </DialogHeader>
+          {detailsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-6 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Cliente</p>
+                  <p className="font-medium">
+                    {selectedClient?.trade_name ||
+                      selectedClient?.corporate_name ||
+                      selectedClient?.full_name ||
+                      selectedQuote?.vtex_client_id ||
+                      "-"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedClient?.email || selectedClient?.document || ""}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="font-medium">{formatStatusLabel(selectedQuote?.status ?? "")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedQuote?.created_at
+                      ? new Date(selectedQuote.created_at).toLocaleString("pt-BR")
+                      : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Subtotal</p>
+                  <p className="font-medium">{formatCurrency(selectedQuote?.subtotal)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Desconto</p>
+                  <p className="font-medium">{formatCurrency(selectedQuote?.total_discount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="font-medium">{formatCurrency(selectedQuote?.total)}</p>
+                </div>
+              </div>
+
+              {selectedQuote?.notes && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground">Observações</p>
+                  <p className="whitespace-pre-wrap">{selectedQuote.notes}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Itens</p>
+                {selectedItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum item encontrado.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium">{getSnapshotName(item.snapshot) || `SKU ${item.vtex_sku_id}`}</p>
+                          <p className="text-xs text-muted-foreground">SKU {item.vtex_sku_id}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Qtd</p>
+                          <p className="font-medium">{item.quantity}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Unitário</p>
+                          <p className="font-medium">{formatCurrency(item.unit_price)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Total</p>
+                          <p className="font-medium">{formatCurrency(item.line_total)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedEvent && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Evento selecionado</p>
+                  <div className="rounded border p-3 text-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className={`border ${eventBadgeClass(selectedEvent)}`}>
+                        {formatEventLabel(selectedEvent)}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(selectedEvent.created_at).toLocaleString("pt-BR")}
+                      </span>
+                    </div>
+                    <p className="text-sm">{selectedEvent.message ?? "Sem mensagem"}</p>
+                    {(selectedEvent.from_status || selectedEvent.to_status) && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatStatusLabel(selectedEvent.from_status)}
+                        {selectedEvent.from_status ? " → " : ""}
+                        {formatStatusLabel(selectedEvent.to_status)}
+                      </p>
+                    )}
+                    <div className="text-xs text-muted-foreground">Payload</div>
+                    <pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
+{JSON.stringify(selectedEvent.payload ?? {}, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                {selectedEvent && (
+                  <Button variant="outline" onClick={() => navigate(`/seller-flow/cotacao/${selectedEvent.quote_id}`)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Abrir cotação completa
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
