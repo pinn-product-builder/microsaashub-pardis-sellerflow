@@ -31,6 +31,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Regra de negócio: L2L = cliente com crédito/saldo > 0.
+# Então em modo L2lOnly precisamos sempre enriquecer crédito.
+if ($L2lOnly.IsPresent) {
+  $WithCredit = $true
+}
+
 function Require-NonEmpty([string]$name, [string]$value) {
   if ([string]::IsNullOrWhiteSpace($value)) {
     throw "Missing required parameter: $name"
@@ -234,7 +240,7 @@ if ($Mode -eq "local") {
   )
   $base = Resolve-FunctionsBase $candidates $syncSecret
   $allParam = if ($L2lOnly.IsPresent) { "false" } else { "true" }
-  $url =
+  $baseUrl =
     "$base/vtex-sync-clients" +
     "?all=$allParam" +
     "&strategy=$Strategy" +
@@ -245,12 +251,33 @@ if ($Mode -eq "local") {
     "&concurrency=$Concurrency" +
     "&l2lOnly=$([int]$L2lOnly.IsPresent)"
 
-  Info "Chamando local: $url"
+  $currentPage = 1
+  Info "Chamando local: $baseUrl"
 
   for ($i = 1; $i -le $MaxCalls; $i++) {
+    $url = if ($L2lOnly.IsPresent) { "$baseUrl&page=$currentPage" } else { $baseUrl }
     $body = CurlJson $url @{ "x-vtex-sync-secret" = $syncSecret }
     Info "$i) $body"
     if ($body -match '"done"\s*:\s*true') { break }
+    if ($L2lOnly.IsPresent) {
+      $json = $null
+      try { $json = ($body | ConvertFrom-Json) } catch {}
+      if ($json -and ($json.PSObject.Properties.Name -contains "total") -and $json.total -and $json.pageSize -and $json.page) {
+        $done = [math]::Min([int]$json.total, [int]$json.page * [int]$json.pageSize)
+        $remaining = [math]::Max(0, [int]$json.total - $done)
+        Info "Progresso: $done/$($json.total) (faltam $remaining)"
+      } elseif ($json -and $json.pageSize -and $json.page) {
+        $done = [int]$json.page * [int]$json.pageSize
+        Info "Progresso: $done (total desconhecido)"
+      }
+      if ($json -and $json.next -and $json.next.page) {
+        $currentPage = [int]$json.next.page
+      } elseif ($json -and $json.nextToken) {
+        # scroll: continua até nextToken ficar vazio
+      } else {
+        break
+      }
+    }
     Start-Sleep -Seconds $SleepSeconds
   }
 
@@ -263,7 +290,7 @@ if ($Mode -eq "cloud") {
   Require-NonEmpty "SUPABASE_ADMIN_JWT" $SUPABASE_ADMIN_JWT
 
   $allParam = if ($L2lOnly.IsPresent) { "false" } else { "true" }
-  $url =
+  $baseUrl =
     "$SUPABASE_URL/functions/v1/vtex-sync-clients" +
     "?all=$allParam" +
     "&strategy=$Strategy" +
@@ -274,10 +301,12 @@ if ($Mode -eq "cloud") {
     "&concurrency=$Concurrency" +
     "&l2lOnly=$([int]$L2lOnly.IsPresent)"
 
-  Info "Chamando cloud: $url"
+  $currentPage = 1
+  Info "Chamando cloud: $baseUrl"
   Info "Obs.: se receber Unauthorized/Forbidden, gere um access_token novo e garanta role admin em public.user_roles."
 
   for ($i = 1; $i -le $MaxCalls; $i++) {
+    $url = if ($L2lOnly.IsPresent) { "$baseUrl&page=$currentPage" } else { $baseUrl }
     $body = CurlJson $url @{
       apikey = $SUPABASE_ANON_KEY
       Authorization = "Bearer $SUPABASE_ADMIN_JWT"
@@ -285,6 +314,25 @@ if ($Mode -eq "cloud") {
     Info "$i) $body"
     if ($body -match '"done"\s*:\s*true') { break }
     if ($body -match 'Unauthorized|Forbidden') { break }
+    if ($L2lOnly.IsPresent) {
+      $json = $null
+      try { $json = ($body | ConvertFrom-Json) } catch {}
+      if ($json -and ($json.PSObject.Properties.Name -contains "total") -and $json.total -and $json.pageSize -and $json.page) {
+        $done = [math]::Min([int]$json.total, [int]$json.page * [int]$json.pageSize)
+        $remaining = [math]::Max(0, [int]$json.total - $done)
+        Info "Progresso: $done/$($json.total) (faltam $remaining)"
+      } elseif ($json -and $json.pageSize -and $json.page) {
+        $done = [int]$json.page * [int]$json.pageSize
+        Info "Progresso: $done (total desconhecido)"
+      }
+      if ($json -and $json.next -and $json.next.page) {
+        $currentPage = [int]$json.next.page
+      } elseif ($json -and $json.nextToken) {
+        # scroll: continua até nextToken ficar vazio
+      } else {
+        break
+      }
+    }
     Start-Sleep -Seconds $SleepSeconds
   }
 

@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
 // Bump this when deploying changes you need to verify in Cloud responses.
-const CODE_VERSION = "2026-01-26.windowed-range100-1based.v4";
+const CODE_VERSION = "2026-01-28.l2l-debug.v1";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -778,8 +778,11 @@ serve(async (req) => {
     const missingOnly = toBool(u.searchParams.get("missingOnly"), false);
     const all = toBool(u.searchParams.get("all"), false);
     const l2lOnly = toBool(u.searchParams.get("l2lOnly"), false);
+    const debugL2l = toBool(u.searchParams.get("debugL2l"), false);
     const withAddress = toBool(u.searchParams.get("withAddress"), true);
-    const withCredit = toBool(u.searchParams.get("withCredit"), false);
+    // Regra de negócio: L2L = cliente com crédito/saldo > 0.
+    // Logo, em modo l2lOnly, precisamos sempre ter crédito disponível.
+    const withCredit = l2lOnly ? true : toBool(u.searchParams.get("withCredit"), false);
     const overwriteCredit = toBool(u.searchParams.get("overwriteCredit"), false);
     const debugAddress = toBool(u.searchParams.get("debugAddress"), false);
     const concurrency = Math.min(12, Math.max(1, toInt(u.searchParams.get("concurrency"), 4)));
@@ -790,21 +793,24 @@ serve(async (req) => {
     const strategy = (normStr(u.searchParams.get("strategy")) ?? (all ? "windowed" : "scroll")).toLowerCase(); // scroll | windowed
 
     const clSchema = await vtexFetchEntitySchemaFields("CL");
-    const clFields = buildClFields(clSchema);
-    const l2lField = clSchema ? CL_L2L_FIELDS.find((f) => clSchema.has(f)) ?? null : null;
-    const l2lWhere = l2lOnly && l2lField ? `${l2lField}=true` : null;
-    if (l2lOnly && !l2lField) {
-      return json(
-        { ok: false, step: "l2l_field_missing", error: "Campo L2L não encontrado no schema CL.", l2lOnly },
-        400,
-      );
+    let clFields = buildClFields(clSchema);
+    // L2L agora é derivado de crédito/saldo. Não dependemos de campo L2L no Master Data.
+    // Mantemos override/candidates apenas para debug (não filtra mais na VTEX).
+    const l2lFieldOverride = normStr(u.searchParams.get("l2lField"));
+    const l2lFieldFromSchema = clSchema ? CL_L2L_FIELDS.find((f) => clSchema.has(f)) ?? null : null;
+    const l2lField = l2lFieldOverride ?? l2lFieldFromSchema;
+    if (l2lFieldOverride && !clFields.split(",").includes(l2lFieldOverride)) {
+      clFields = `${clFields},${l2lFieldOverride}`;
     }
+    const l2lWhere = null;
+    const l2lCandidates = l2lFieldOverride ? [...CL_L2L_FIELDS, l2lFieldOverride] : CL_L2L_FIELDS;
     const useAll = all && !l2lOnly;
+    const useScroll = strategy === "scroll";
 
     // Modo ALL: usa /scroll para pegar acima de 10k (search bloqueia).
     // IMPORTANTE: aqui fazemos APENAS 1 lote por chamada (com token),
     // para não estourar timeout do gateway.
-    if (useAll) {
+    if (useAll && strategy === "windowed") {
       // Estratégia windowed: usa /search com filtros de createdIn (janelas <=10k),
       // persistindo estado em vtex_sync_state. Evita o limite do /scroll e o limite de 10k do search (por janela).
       if (strategy === "windowed") {
@@ -944,8 +950,7 @@ serve(async (req) => {
             if (phone) row.phone = phone;
 
             if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
-            const l2l = toBoolLike(pickCandidate(c, CL_L2L_FIELDS));
-            if (l2l != null) row.is_lab_to_lab = l2l;
+            // L2L passa a ser derivado do crédito/saldo (> 0). O campo em CL (quando existir) vira apenas informativo.
             if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
             if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
             if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
@@ -1066,6 +1071,15 @@ serve(async (req) => {
             (row as any).credit_limit = Number.isFinite(current) ? current : 0;
           }
 
+          // Regra de negócio: cliente com crédito/saldo > 0 é L2L.
+          for (const row of rows) {
+            const n = Number((row as any).credit_limit ?? 0);
+            (row as any).is_lab_to_lab = Number.isFinite(n) && n > 0;
+          }
+
+          // Em modo L2L-only, persistimos apenas quem tem crédito/saldo.
+          const finalRows = l2lOnly ? rows.filter((r) => Number((r as any).credit_limit ?? 0) > 0) : rows;
+
           // `price_table_type` também é NOT NULL (default 'BR'), mas pode virar NULL no merge do PostgREST
           // se o lote misturar linhas com/sem a coluna. Garantimos sempre.
           for (const row of rows) {
@@ -1078,7 +1092,7 @@ serve(async (req) => {
 
           const { error: upErr } = await supabase
             .from("vtex_clients")
-            .upsert(rows, { onConflict: "md_id" });
+            .upsert(finalRows, { onConflict: "md_id" });
           if (upErr) return json({ ok: false, step: "supabase_upsert", error: upErr.message }, 500);
         }
 
@@ -1116,6 +1130,9 @@ serve(async (req) => {
         });
       }
 
+    }
+
+    if (useAll || useScroll) {
       // Edge runtime tem limite de CPU por request; lote menor evita 502 sem body.
       const scrollSize = Math.min(100, Math.max(10, pageSize));
       const stateKey = "clients_scroll_token";
@@ -1141,6 +1158,28 @@ serve(async (req) => {
       if (!r.ok) return json({ step: "vtex_scroll", strategy, all, ...r }, 502);
 
       const arr = Array.isArray(r.data) ? r.data : [];
+      let l2lDebug: Record<string, unknown> | undefined;
+      if (debugL2l) {
+        const counts = { true: 0, false: 0, null: 0 };
+        const samples: unknown[] = [];
+        for (const c of arr) {
+          const raw = pickCandidate(c, l2lCandidates);
+          const boolish = toBoolLike(raw);
+          if (boolish === true) counts.true += 1;
+          else if (boolish === false) counts.false += 1;
+          else counts.null += 1;
+          if (raw != null && samples.length < 10) samples.push(raw);
+        }
+        l2lDebug = {
+          l2lField,
+          l2lFieldOverride,
+          l2lFieldFromSchema,
+          l2lWhere,
+          candidates: l2lCandidates,
+          counts,
+          samples,
+        };
+      }
       const rows = arr
         .map((c: any) => {
           const md_id = normStr(c?.id) ?? normStr(c?.userId) ?? normStr(c?.email);
@@ -1172,8 +1211,7 @@ serve(async (req) => {
           if (phone) row.phone = phone;
 
           if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
-          const l2l = toBoolLike(pickCandidate(c, CL_L2L_FIELDS));
-          if (l2l != null) row.is_lab_to_lab = l2l;
+          // L2L passa a ser derivado do crédito/saldo (> 0). O campo em CL (quando existir) vira apenas informativo.
           if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
           if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
           if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
@@ -1272,6 +1310,12 @@ serve(async (req) => {
           (row as any).credit_limit = Number.isFinite(current) ? current : 0;
         }
 
+        // Regra de negócio: cliente com crédito/saldo > 0 é L2L.
+        for (const row of rows) {
+          const n = Number((row as any).credit_limit ?? 0);
+          (row as any).is_lab_to_lab = Number.isFinite(n) && n > 0;
+        }
+
         for (const row of rows) {
           const cur = (row as any).price_table_type;
           if (cur != null && String(cur).trim()) continue;
@@ -1280,9 +1324,10 @@ serve(async (req) => {
           (row as any).price_table_type = current || "BR";
         }
 
+        const finalRows = l2lOnly ? rows.filter((r) => Number((r as any).credit_limit ?? 0) > 0) : rows;
         const { error: upErr } = await supabase
           .from("vtex_clients")
-          .upsert(rows, { onConflict: "md_id" });
+          .upsert(finalRows, { onConflict: "md_id" });
         if (upErr) return json({ ok: false, step: "supabase_upsert", error: upErr.message }, 500);
       }
 
@@ -1312,12 +1357,19 @@ serve(async (req) => {
         reusedStateToken,
         batchSize: rows.length,
         upserted: rows.length,
+        l2lDebug,
         nextToken: r.nextToken,
         done,
       });
     }
 
     // modo paginado (search/range) — útil pra pequenos volumes (<10k)
+    if (useScroll) {
+      return json(
+        { ok: false, step: "scroll_required", error: "Use strategy=scroll para volumes grandes." },
+        400,
+      );
+    }
     const r = await vtexFetchClientsPage({ page, pageSize, where: l2lWhere, fields: clFields });
     if (!r.ok) {
       // evita duplicar "ok" (r já tem ok=false)
@@ -1360,8 +1412,7 @@ serve(async (req) => {
         if (phone) row.phone = phone;
 
         if (typeof c?.isCorporate === "boolean") row.is_corporate = c.isCorporate;
-        const l2l = toBoolLike(pickCandidate(c, CL_L2L_FIELDS));
-        if (l2l != null) row.is_lab_to_lab = l2l;
+        // L2L passa a ser derivado do crédito/saldo (> 0). O campo em CL (quando existir) vira apenas informativo.
         if (normStr(c?.corporateName)) row.corporate_name = normStr(c.corporateName);
         if (normStr(c?.tradeName)) row.trade_name = normStr(c.tradeName);
         if (normStr(c?.stateRegistration)) row.state_registration = normStr(c.stateRegistration);
@@ -1461,6 +1512,12 @@ serve(async (req) => {
         (row as any).credit_limit = Number.isFinite(current) ? current : 0;
       }
 
+      // Regra de negócio: cliente com crédito/saldo > 0 é L2L.
+      for (const row of rows) {
+        const n = Number((row as any).credit_limit ?? 0);
+        (row as any).is_lab_to_lab = Number.isFinite(n) && n > 0;
+      }
+
       for (const row of rows) {
         const cur = (row as any).price_table_type;
         if (cur != null && String(cur).trim()) continue;
@@ -1470,9 +1527,10 @@ serve(async (req) => {
       }
     }
 
+    const finalRows = l2lOnly ? rows.filter((r) => Number((r as any).credit_limit ?? 0) > 0) : rows;
     const { error: upErr } = await supabase
       .from("vtex_clients")
-      .upsert(rows, { onConflict: "md_id" });
+      .upsert(finalRows, { onConflict: "md_id" });
 
     if (upErr) {
       return json({ ok: false, step: "supabase_upsert", error: upErr.message }, 500);
