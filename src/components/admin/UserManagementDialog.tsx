@@ -94,13 +94,19 @@ export function UserManagementDialog({
 
       if (profileError) throw profileError;
 
-      // Atualizar role
-      const { error: roleError } = await supabase
+      // Atualizar role (mantém apenas 1 role por usuário)
+      const { error: deleteRoleError } = await supabase
         .from('user_roles')
-        .update({ role: formData.role as any })
+        .delete()
         .eq('user_id', user.id);
 
-      if (roleError) throw roleError;
+      if (deleteRoleError) throw deleteRoleError;
+
+      const { error: insertRoleError } = await supabase
+        .from('user_roles')
+        .insert({ user_id: user.id, role: formData.role as any });
+
+      if (insertRoleError) throw insertRoleError;
 
       // Atualizar grupos - remover todos e adicionar novos
       const { error: deleteError } = await supabase
