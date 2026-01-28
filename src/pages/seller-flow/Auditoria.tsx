@@ -48,6 +48,8 @@ type QuoteDetails = {
   total: number;
   notes: string | null;
   discount_reason: string | null;
+  duplicated_from_quote_id: string | null;
+  duplicated_from?: { id: string; quote_number: number | null } | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -327,7 +329,7 @@ export default function Auditoria() {
     try {
       const { data: quote, error: quoteError } = await (supabase as any)
         .from("vtex_quotes")
-        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, discount_reason, created_by, updated_by, created_at, updated_at")
+        .select("id, quote_number, vtex_client_id, trade_policy_id, destination_uf, status, subtotal, total_discount, total, notes, discount_reason, duplicated_from_quote_id, duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number), created_by, updated_by, created_at, updated_at")
         .eq("id", ev.quote_id)
         .maybeSingle();
       if (quoteError) throw quoteError;
@@ -682,6 +684,23 @@ export default function Auditoria() {
             </div>
           ) : (
             <div className="space-y-6">
+              {selectedQuote?.duplicated_from_quote_id && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground">Origem</p>
+                  <p className="font-medium">
+                    Duplicada de{" "}
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() => navigate(`/seller-flow/cotacao/${selectedQuote.duplicated_from_quote_id}`)}
+                    >
+                      {selectedQuote?.duplicated_from?.quote_number != null
+                        ? `#${selectedQuote.duplicated_from.quote_number}`
+                        : selectedQuote.duplicated_from_quote_id}
+                    </button>
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Cliente</p>
