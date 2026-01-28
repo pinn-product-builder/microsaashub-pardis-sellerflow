@@ -168,6 +168,8 @@ export default function Auditoria() {
   const [eventFilter, setEventFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
+  const [sellerFilter, setSellerFilter] = useState("all");
+  const [approverFilter, setApproverFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -247,6 +249,28 @@ export default function Auditoria() {
     return filteredByStatus.filter((ev) => ev.created_by === userFilter);
   }, [filteredByStatus, userFilter]);
 
+  const filteredBySeller = useMemo(() => {
+    if (sellerFilter === "all") return filteredByUser;
+    return filteredByUser.filter((ev) => ev.quote?.created_by === sellerFilter);
+  }, [filteredByUser, sellerFilter]);
+
+  const filteredByApprover = useMemo(() => {
+    if (approverFilter === "all") return filteredBySeller;
+    // "Aprovador" = usuário que decidiu (aprovou/reprovou).
+    // Ao filtrar, mostramos TODA a trilha das cotações que foram decididas por esse aprovador.
+    const decidedQuoteIds = new Set(
+      events
+        .filter((ev) => {
+          const isDecision =
+            ev.event_type === "approved" ||
+            (ev.event_type === "failed" && (ev.from_status === "pending_approval" || ev.to_status === "rejected"));
+          return isDecision && ev.created_by === approverFilter;
+        })
+        .map((ev) => ev.quote_id),
+    );
+    return filteredBySeller.filter((ev) => decidedQuoteIds.has(ev.quote_id));
+  }, [approverFilter, events, filteredBySeller]);
+
   const eventTypes = useMemo(() => {
     const set = new Set<string>();
     for (const ev of events) set.add(ev.event_type);
@@ -268,11 +292,28 @@ export default function Auditoria() {
     return Array.from(set).sort();
   }, [events]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredByUser.length / pageSize));
+  const sellerOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const ev of events) if (ev.quote?.created_by) set.add(ev.quote.created_by);
+    return Array.from(set).sort();
+  }, [events]);
+
+  const approverOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const ev of events) {
+      const isDecision =
+        ev.event_type === "approved" ||
+        (ev.event_type === "failed" && (ev.from_status === "pending_approval" || ev.to_status === "rejected"));
+      if (isDecision && ev.created_by) set.add(ev.created_by);
+    }
+    return Array.from(set).sort();
+  }, [events]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredByApprover.length / pageSize));
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filteredByUser.slice(start, start + pageSize);
-  }, [filteredByUser, page, pageSize]);
+    return filteredByApprover.slice(start, start + pageSize);
+  }, [filteredByApprover, page, pageSize]);
 
   const loadDetails = async (ev: QuoteEvent) => {
     setDetailsOpen(true);
@@ -339,10 +380,14 @@ export default function Auditoria() {
   };
 
   const handleExport = () => {
-    const rows = filteredByUser.map((ev) => {
+    const rows = filteredByApprover.map((ev) => {
       const quoteNumber = ev.quote?.quote_number ? `#${ev.quote.quote_number}` : ev.quote_id;
       const user = ev.created_by ? profiles.get(ev.created_by) : null;
       const seller = ev.quote?.created_by ? profiles.get(ev.quote.created_by) : null;
+      const isDecision =
+        ev.event_type === "approved" ||
+        (ev.event_type === "failed" && (ev.from_status === "pending_approval" || ev.to_status === "rejected"));
+      const approver = isDecision && ev.created_by ? profiles.get(ev.created_by) : null;
       return {
         created_at: new Date(ev.created_at).toISOString(),
         quote_number: quoteNumber,
@@ -352,9 +397,10 @@ export default function Auditoria() {
         to_status: ev.to_status ?? "",
         created_by: user?.full_name ?? user?.email ?? ev.created_by ?? "",
         seller: seller?.full_name ?? seller?.email ?? ev.quote?.created_by ?? "",
+        approver: approver?.full_name ?? approver?.email ?? "",
       };
     });
-    const header = ["created_at", "quote_number", "event_type", "message", "from_status", "to_status", "created_by", "seller"];
+    const header = ["created_at", "quote_number", "event_type", "message", "from_status", "to_status", "created_by", "seller", "approver"];
     const csv = [
       header.join(","),
       ...rows.map((r) =>
@@ -405,8 +451,8 @@ export default function Auditoria() {
               <Activity className="h-5 w-5" />
               Eventos recentes
             </CardTitle>
-            <div className="flex items-center gap-3">
-              <div className="relative w-80">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-72">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por evento, mensagem ou nº da cotação..."
@@ -427,6 +473,22 @@ export default function Auditoria() {
                   {eventTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {EVENT_LABELS[type] ?? type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={sellerFilter} onValueChange={(v) => {
+                setSellerFilter(v);
+                setPage(1);
+              }}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Todos os vendedores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os vendedores</SelectItem>
+                  {sellerOptions.map((userId) => (
+                    <SelectItem key={userId} value={userId}>
+                      {getUserLabel(userId, profiles)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -467,6 +529,22 @@ export default function Auditoria() {
                   })}
                 </SelectContent>
               </Select>
+              <Select value={approverFilter} onValueChange={(v) => {
+                setApproverFilter(v);
+                setPage(1);
+              }}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Todos os aprovadores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os aprovadores</SelectItem>
+                  {approverOptions.map((userId) => (
+                    <SelectItem key={userId} value={userId}>
+                      {getUserLabel(userId, profiles)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar CSV
@@ -481,7 +559,7 @@ export default function Auditoria() {
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
-          ) : filteredByUser.length === 0 ? (
+          ) : filteredByApprover.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum evento encontrado.</p>
           ) : (
             <div className="space-y-3">
@@ -563,7 +641,7 @@ export default function Auditoria() {
               ))}
               <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
                 <span>
-                  Página {page} de {totalPages} • {filteredByUser.length} eventos
+                  Página {page} de {totalPages} • {filteredByApprover.length} eventos
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
