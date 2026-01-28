@@ -55,6 +55,7 @@ export function UserManagementDialog({
 }: UserManagementDialogProps) {
   const { user: currentUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     full_name: '',
     region: '',
@@ -80,6 +81,7 @@ export function UserManagementDialog({
 
     try {
       setIsLoading(true);
+      setSaveError(null);
 
       // Atualizar perfil/role/grupos via RPC (bypass RLS com checagem de permissão)
       const regionValue = formData.region === '' ? null : formData.region as "BR" | "MG";
@@ -98,7 +100,15 @@ export function UserManagementDialog({
       onSave();
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error('Erro ao atualizar usuário');
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      let friendly = 'Erro ao atualizar usuário';
+      if (rawMessage.toLowerCase().includes('admin_update_user')) {
+        friendly = 'Função de administração não encontrada. Precisamos aplicar a migration no Supabase.';
+      } else if (rawMessage.toLowerCase().includes('forbidden')) {
+        friendly = 'Você não tem permissão para alterar este usuário.';
+      }
+      setSaveError(friendly);
+      toast.error(friendly);
     } finally {
       setIsLoading(false);
     }
@@ -237,6 +247,10 @@ export function UserManagementDialog({
             </div>
           </TabsContent>
         </Tabs>
+
+        {saveError && (
+          <p className="text-sm text-destructive mt-2">{saveError}</p>
+        )}
 
         <div className="flex justify-end gap-2 mt-4">
           <Button
