@@ -67,7 +67,7 @@ export default function NovaQuotacao() {
   }, [discount, discountReason, setDiscountReason]);
   
   // Pardis margin calculations
-  const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer);
+  const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer, discount);
 
   // Debug logs
   useEffect(() => {
@@ -655,7 +655,11 @@ export default function NovaQuotacao() {
                 {items.length > 0 && (
                   <>
                     <Separator />
-                    <QuoteItemsTable items={items} tradePolicyId={policyMode === "fixed" ? tradePolicyId : undefined} />
+                    <QuoteItemsTable
+                      items={items}
+                      discountPercent={discount}
+                      tradePolicyId={policyMode === "fixed" ? tradePolicyId : undefined}
+                    />
                   </>
                 )}
                 {items.length > 0 && currentStep < 3 && (

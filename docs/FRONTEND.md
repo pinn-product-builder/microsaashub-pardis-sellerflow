@@ -36,6 +36,16 @@ O que acontece:
 - grava cotação em `vtex_quotes` + itens em `vtex_quote_items`
 - se precisar de aprovação, cria `vtex_approval_requests` e muda status para `pending_approval`
 
+#### Margem em tempo real e aprovação automática
+Regras:
+- A margem por item e a margem total são recalculadas **em tempo real** sempre que houver alteração de **quantidade**, **preço unitário** (inclui reprecificação VTEX) ou **desconto global**.
+- Se a pior margem ficar **abaixo do limite autorizado** (configurado em `pricing_engine_config.margin_authorized_threshold`) ou **negativa**, a cotação fica com **requer aprovação** automaticamente.
+
+Onde aparece no UI:
+- Badge no header (autorizado / requer aprovação)
+- Banner de aviso quando requer aprovação
+- Colunas de margem/status na tabela de itens
+
 ### Aprovações
 Arquivo: `src/pages/seller-flow/Aprovacoes.tsx`
 

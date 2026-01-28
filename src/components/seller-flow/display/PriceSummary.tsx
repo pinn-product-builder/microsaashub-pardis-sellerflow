@@ -25,7 +25,7 @@ export function PriceSummary({ items, discount, totals, customer }: PriceSummary
   const { selectedCustomer } = useSellerFlowStore();
   const effectiveCustomer = customer || selectedCustomer;
   
-  const { summary, isLoading } = usePardisQuote(items, effectiveCustomer);
+  const { summary, isLoading } = usePardisQuote(items, effectiveCustomer, discount);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

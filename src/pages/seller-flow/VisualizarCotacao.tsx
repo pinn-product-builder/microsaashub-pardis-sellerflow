@@ -369,7 +369,7 @@ export default function VisualizarCotacao() {
               <CardTitle>Produtos</CardTitle>
             </CardHeader>
             <CardContent>
-              <QuoteItemsTable items={quote.items} />
+              <QuoteItemsTable items={quote.items} discountPercent={quote.discount} />
             </CardContent>
           </Card>
 

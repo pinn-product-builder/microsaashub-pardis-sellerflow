@@ -79,7 +79,8 @@ export function usePardisQuote(
     paymentTerms?: string[];
     isLabToLab?: boolean;
     priceTableType?: 'MG' | 'BR';
-  } | null
+  } | null,
+  discountPercent: number = 0
 ): UsePardisQuoteResult {
   const region = customer?.uf === 'MG' ? 'MG' : 'BR';
   const { data: pricingConfigData, isLoading: isLoadingPricing } = usePricingConfig(region as 'MG' | 'BR');
@@ -126,7 +127,9 @@ export function usePardisQuote(
       const calculation = PardisMarginEngine.calculateItemMargin(
         pardisProduct,
         item.quantity,
-        item.unitPrice,
+        // Desconto global (%): aplicamos sobre o preço ofertado para cálculo de margem.
+        // Descontos unitários já refletidos em `item.unitPrice` continuam funcionando.
+        item.unitPrice * (1 - Math.min(100, Math.max(0, Number(discountPercent) || 0)) / 100),
         pardisCustomer,
         pricingConfig,
         engineConfigData,
@@ -140,7 +143,7 @@ export function usePardisQuote(
         quantity: item.quantity,
       };
     });
-  }, [items, pardisCustomer, pricingConfig, engineConfigData, approvalRulesData]);
+  }, [items, pardisCustomer, pricingConfig, engineConfigData, approvalRulesData, discountPercent]);
 
   const summary = useMemo((): QuoteSummary => {
     if (itemCalculations.length === 0) {

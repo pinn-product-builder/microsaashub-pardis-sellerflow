@@ -23,6 +23,7 @@ interface QuoteItemsTableProps {
   customer?: Customer | null;
   showPardisIndicators?: boolean;
   tradePolicyId?: string; // legado (não usado com auto-policy)
+  discountPercent?: number;
 }
 
 const POLICY_LABELS = [
@@ -37,6 +38,7 @@ export function QuoteItemsTable({
   customer,
   showPardisIndicators = true,
   tradePolicyId,
+  discountPercent = 0,
 }: QuoteItemsTableProps) {
   const { removeItem, updateItem, selectedCustomer } = useSellerFlowStore();
   const { toast } = useToast();
@@ -48,7 +50,7 @@ export function QuoteItemsTable({
   const effectiveCustomer = customer || selectedCustomer;
   
   // Calculate Pardis margins
-  const { itemCalculations } = usePardisQuote(items, effectiveCustomer);
+  const { itemCalculations } = usePardisQuote(items, effectiveCustomer, discountPercent);
 
   const getPolicyEffective = (skuId: number, policyId: string) => {
     const rows = policyMatrix[skuId] ?? [];
