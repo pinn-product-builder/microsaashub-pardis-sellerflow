@@ -33,7 +33,7 @@ type QuoteEvent = {
   payload: Record<string, unknown>;
   created_at: string;
   created_by: string | null;
-  quote?: { id: string; quote_number: number | null };
+  quote?: { id: string; quote_number: number | null; created_by: string | null };
 };
 type ProfileLite = { user_id: string; full_name: string; email: string };
 type QuoteDetails = {
@@ -183,12 +183,18 @@ export default function Auditoria() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("vtex_quote_events")
-        .select("id, quote_id, event_type, message, from_status, to_status, payload, created_at, created_by, quote:vtex_quotes(id, quote_number)")
+        .select("id, quote_id, event_type, message, from_status, to_status, payload, created_at, created_by, quote:vtex_quotes(id, quote_number, created_by)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
       const events = (data ?? []) as QuoteEvent[];
-      const userIds = Array.from(new Set(events.map((ev) => ev.created_by).filter(Boolean))) as string[];
+      const userIds = Array.from(
+        new Set(
+          events
+            .flatMap((ev) => [ev.created_by, ev.quote?.created_by])
+            .filter(Boolean),
+        ),
+      ) as string[];
       if (!userIds.length) {
         return { events, profiles: new Map<string, ProfileLite>() };
       }
@@ -333,6 +339,7 @@ export default function Auditoria() {
     const rows = filteredByUser.map((ev) => {
       const quoteNumber = ev.quote?.quote_number ? `#${ev.quote.quote_number}` : ev.quote_id;
       const user = ev.created_by ? profiles.get(ev.created_by) : null;
+      const seller = ev.quote?.created_by ? profiles.get(ev.quote.created_by) : null;
       return {
         created_at: new Date(ev.created_at).toISOString(),
         quote_number: quoteNumber,
@@ -341,9 +348,10 @@ export default function Auditoria() {
         from_status: ev.from_status ?? "",
         to_status: ev.to_status ?? "",
         created_by: user?.full_name ?? user?.email ?? ev.created_by ?? "",
+        seller: seller?.full_name ?? seller?.email ?? ev.quote?.created_by ?? "",
       };
     });
-    const header = ["created_at", "quote_number", "event_type", "message", "from_status", "to_status", "created_by"];
+    const header = ["created_at", "quote_number", "event_type", "message", "from_status", "to_status", "created_by", "seller"];
     const csv = [
       header.join(","),
       ...rows.map((r) =>
@@ -474,16 +482,17 @@ export default function Auditoria() {
             <p className="text-sm text-muted-foreground">Nenhum evento encontrado.</p>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-6 gap-4 text-xs font-semibold text-muted-foreground px-3">
+              <div className="grid grid-cols-7 gap-4 text-xs font-semibold text-muted-foreground px-3">
                 <span>Evento</span>
                 <span>Cotação</span>
+                <span>Vendedor</span>
                 <span>Usuário</span>
                 <span>Status</span>
                 <span className="text-right">Data/Hora</span>
                 <span className="text-right">Ações</span>
               </div>
               {paged.map((ev) => (
-                <div key={ev.id} className="grid grid-cols-6 gap-4 items-center rounded border px-3 py-2 text-sm">
+                <div key={ev.id} className="grid grid-cols-7 gap-4 items-center rounded border px-3 py-2 text-sm">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className={`border ${eventBadgeClass(ev)}`}>
                       {formatEventLabel(ev)}
@@ -492,6 +501,9 @@ export default function Auditoria() {
                   </div>
                   <span className="text-muted-foreground">
                     {ev.quote?.quote_number ? `#${ev.quote.quote_number}` : ev.quote_id}
+                  </span>
+                  <span className="text-muted-foreground truncate">
+                    {getUserLabel(ev.quote?.created_by, profiles)}
                   </span>
                   <span className="text-muted-foreground truncate">
                     {ev.created_by ? (profiles.get(ev.created_by)?.full_name || profiles.get(ev.created_by)?.email || ev.created_by) : "Sistema"}
