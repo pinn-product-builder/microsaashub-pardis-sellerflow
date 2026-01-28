@@ -108,6 +108,7 @@ export default function VisualizarCotacao() {
 
     // Duplicação simplificada: cria nova vtex_quote com os mesmos itens
     const duplicated = await VtexQuoteService.createOrUpdateQuote({
+      duplicatedFromQuoteId: quote.id,
       customer: quote.customer as any,
       destinationUF: quote.destinationUF,
       tradePolicyId: (quote as any).tradePolicyId ?? "1",
@@ -122,11 +123,11 @@ export default function VisualizarCotacao() {
 
     toast({
       title: "Cotação Duplicada",
-      description: `Nova cotação ${duplicated?.number || 'criada'} com sucesso!`
+      description: `Criamos a cotação ${duplicated?.number || 'nova'} como Rascunho. Ela ficará no Histórico em “Rascunhos” para você editar e reenviar.`
     });
 
     if (duplicated?.id) {
-      navigate(`/seller-flow/cotacao/${duplicated.id}`);
+      navigate(`/seller-flow/editar/${duplicated.id}`);
     }
   };
 
@@ -277,6 +278,17 @@ export default function VisualizarCotacao() {
             <p className="text-muted-foreground">
               Criada em {formatDate(quote.createdAt)} por {quote.createdBy}
             </p>
+            {(quote as any).duplicatedFromQuoteNumber && (
+              <p className="text-xs text-muted-foreground">
+                Duplicada da cotação{" "}
+                <Link
+                  to={`/seller-flow/cotacao/${(quote as any).duplicatedFromQuoteId}`}
+                  className="text-primary hover:underline"
+                >
+                  {(quote as any).duplicatedFromQuoteNumber}
+                </Link>
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -329,6 +341,24 @@ export default function VisualizarCotacao() {
           )}
         </div>
       </div>
+
+      {(quote.status === 'rejected' || quote.status === 'expired') && (
+        <div className="p-4 bg-muted border rounded-lg">
+          <p className="text-sm">
+            Esta cotação foi <strong>{quote.status === 'rejected' ? 'reprovada' : 'expirada'}</strong>. Você pode
+            <strong> duplicar</strong>, ajustar os itens/preços e <strong>enviar novamente</strong>.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            A cópia será criada como <strong>Rascunho</strong> e ficará no <strong>Histórico → Rascunhos</strong>.
+          </p>
+          <div className="mt-3">
+            <Button variant="outline" onClick={handleDuplicate}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicar para ajustar
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}

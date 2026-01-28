@@ -39,6 +39,7 @@ export class VtexQuoteService {
 
   static async createOrUpdateQuote(params: {
     quoteId?: string;
+    duplicatedFromQuoteId?: string;
     customer: Customer;
     destinationUF: string;
     tradePolicyId: string; // legado (mantido no header da quote)
@@ -81,6 +82,7 @@ export class VtexQuoteService {
       requires_approval: !!params.requiresApproval,
       is_authorized: !!params.isAuthorized,
       notes: params.notes ?? null,
+      duplicated_from_quote_id: params.duplicatedFromQuoteId ?? null,
       created_by: user.id,
       updated_by: user.id,
     };
@@ -135,9 +137,20 @@ export class VtexQuoteService {
         items: params.items.length,
         discount: params.discount,
         discountReason: params.discountReason ?? null,
+        duplicatedFrom: params.duplicatedFromQuoteId ?? null,
       },
       createdBy: user.id,
     });
+
+    if (!params.quoteId && params.duplicatedFromQuoteId) {
+      await this.logEvent({
+        quoteId,
+        eventType: "duplicated",
+        message: "Cotação duplicada",
+        payload: { fromQuoteId: params.duplicatedFromQuoteId },
+        createdBy: user.id,
+      });
+    }
 
     if (params.discount > 0 && params.discountReason?.trim()) {
       await this.logEvent({
@@ -164,7 +177,8 @@ export class VtexQuoteService {
         `
         *,
         client:vtex_clients(*),
-        items:vtex_quote_items(*)
+        items:vtex_quote_items(*),
+        duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number)
       `,
       )
       .eq("id", quoteId)
@@ -223,6 +237,8 @@ export class VtexQuoteService {
       notes: q.notes ?? undefined,
       discountReason: q.discount_reason ?? undefined,
       tradePolicyId: String(q.trade_policy_id ?? "1"),
+      duplicatedFromQuoteId: q.duplicated_from_quote_id ?? undefined,
+      duplicatedFromQuoteNumber: q.duplicated_from?.quote_number != null ? String(q.duplicated_from.quote_number) : undefined,
     };
 
     return quote;

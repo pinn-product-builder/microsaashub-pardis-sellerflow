@@ -10,7 +10,7 @@ export function useQuotes(filters?: QuoteFilters) {
     queryFn: async () => {
       let query = supabase
         .from('vtex_quotes')
-        .select('*, client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
+        .select('*, duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number), client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
         .order('created_at', { ascending: false });
 
       if (filters?.status?.length) {
@@ -46,7 +46,7 @@ export function useQuote(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vtex_quotes')
-        .select('*, client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
+        .select('*, duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number), client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
         .eq('id', id)
         .maybeSingle();
 

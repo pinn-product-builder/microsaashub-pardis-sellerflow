@@ -93,7 +93,9 @@ export default function Historico() {
       createdAt: new Date(quote.created_at),
       updatedAt: new Date(quote.updated_at),
       createdBy: quote.created_by,
-      marginPercent: (quote as any).total_margin_percent || 0
+      marginPercent: (quote as any).total_margin_percent || 0,
+      duplicatedFromQuoteId: (quote as any).duplicated_from_quote_id ?? undefined,
+      duplicatedFromQuoteNumber: (quote as any).duplicated_from?.quote_number != null ? String((quote as any).duplicated_from.quote_number) : undefined,
     }));
   }, [filteredQuotes]);
 

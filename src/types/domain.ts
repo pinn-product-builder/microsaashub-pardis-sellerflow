@@ -182,6 +182,8 @@ export interface QuoteLegacy {
   updatedAt: Date;
   createdBy: string;
   notes?: string;
+  duplicatedFromQuoteId?: string;
+  duplicatedFromQuoteNumber?: string;
 }
 
 /** Item de Cotação - modelo de banco (snake_case) */

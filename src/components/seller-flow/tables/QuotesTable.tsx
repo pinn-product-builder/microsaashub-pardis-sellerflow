@@ -101,12 +101,25 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
           {quotes.map((quote) => (
             <TableRow key={quote.id}>
               <TableCell className="font-medium">
-                <Link 
-                  to={`/seller-flow/cotacao/${quote.id}`}
-                  className="text-primary hover:underline"
-                >
-                  {quote.number}
-                </Link>
+                <div>
+                  <Link
+                    to={`/seller-flow/cotacao/${quote.id}`}
+                    className="text-primary hover:underline"
+                  >
+                    {quote.number}
+                  </Link>
+                  {(quote as any).duplicatedFromQuoteNumber && (
+                    <div className="text-xs text-muted-foreground">
+                      Duplicada de{" "}
+                      <Link
+                        to={`/seller-flow/cotacao/${(quote as any).duplicatedFromQuoteId}`}
+                        className="text-primary hover:underline"
+                      >
+                        {(quote as any).duplicatedFromQuoteNumber}
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <div>
