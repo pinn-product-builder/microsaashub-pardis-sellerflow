@@ -101,18 +101,21 @@ export class VtexQuoteService {
     if (params.items.length > 0) {
       const rows = params.items.map((it) => {
         const skuId = parseSkuId(it);
+        const isManual = !!(it as any).manualUnitPrice;
         return {
           quote_id: quoteId,
           vtex_sku_id: skuId,
           quantity: it.quantity,
           trade_policy_id: (it as any).vtexTradePolicyId ?? null,
           unit_price: it.unitPrice,
-          price_source: "effective",
+          price_source: isManual ? "manual" : "effective",
           line_total: it.totalPrice,
           snapshot: {
             product_name: it.product?.name,
             sku: it.product?.sku,
             base_cost: it.product?.baseCost,
+            original_unit_price: (it as any).originalUnitPrice ?? null,
+            manual_unit_price: isManual,
           },
         };
       });

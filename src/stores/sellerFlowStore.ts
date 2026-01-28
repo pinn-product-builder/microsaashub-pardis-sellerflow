@@ -8,6 +8,7 @@ interface SellerFlowStore {
   selectedCustomer: Customer | null;
   destinationUF: string;
   items: QuoteItem[];
+  pricingMode: 'percent' | 'manual';
   discount: number;
   discountReason: string;
   paymentConditions: string;
@@ -20,6 +21,7 @@ interface SellerFlowStore {
   addItem: (item: QuoteItem) => void;
   updateItem: (id: string, updates: Partial<QuoteItem>) => void;
   removeItem: (id: string) => void;
+  setPricingMode: (mode: 'percent' | 'manual') => void;
   setDiscount: (discount: number) => void;
   setDiscountReason: (reason: string) => void;
   setPaymentConditions: (conditions: string) => void;
@@ -46,6 +48,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
   selectedCustomer: null,
   destinationUF: '',
   items: [],
+  pricingMode: 'percent',
   discount: 0,
   discountReason: '',
   paymentConditions: 'À vista',
@@ -93,6 +96,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
     items: state.items.filter(item => item.id !== id)
   })),
   
+  setPricingMode: (mode) => set({ pricingMode: mode }),
   setDiscount: (discount) => set({ discount }),
   setDiscountReason: (reason) => set({ discountReason: reason }),
   setPaymentConditions: (conditions) => set({ paymentConditions: conditions }),
@@ -103,6 +107,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
     selectedCustomer: null,
     destinationUF: '',
     items: [],
+    pricingMode: 'percent',
     discount: 0,
     discountReason: '',
     paymentConditions: 'À vista',

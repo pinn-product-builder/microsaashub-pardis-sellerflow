@@ -42,6 +42,7 @@ export default function NovaQuotacao() {
     selectedCustomer,
     destinationUF,
     items,
+    pricingMode,
     discount,
     discountReason,
     paymentConditions,
@@ -50,6 +51,7 @@ export default function NovaQuotacao() {
     setDestinationUF,
     addItem,
     updateItem,
+    setPricingMode,
     setDiscount,
     setDiscountReason,
     setPaymentConditions,
@@ -65,6 +67,32 @@ export default function NovaQuotacao() {
       setDiscountReason('');
     }
   }, [discount, discountReason, setDiscountReason]);
+
+  const handlePricingModeChange = (mode: 'percent' | 'manual') => {
+    if (mode === pricingMode) return;
+
+    if (mode === 'manual') {
+      // manual por item: desabilita desconto percentual
+      if (discount > 0) setDiscount(0);
+      if (discountReason) setDiscountReason('');
+      setPricingMode('manual');
+      return;
+    }
+
+    // percent: restaura preços originais caso o vendedor tenha editado manualmente
+    for (const it of items as any[]) {
+      if (it?.manualUnitPrice && typeof it?.originalUnitPrice === 'number' && Number.isFinite(it.originalUnitPrice)) {
+        const restoredUnit = Number(it.originalUnitPrice);
+        updateItem(it.id, {
+          ...it,
+          unitPrice: restoredUnit,
+          totalPrice: restoredUnit * Number(it.quantity || 1),
+          manualUnitPrice: false,
+        } as any);
+      }
+    }
+    setPricingMode('percent');
+  };
   
   // Pardis margin calculations
   const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer, discount);
@@ -658,6 +686,8 @@ export default function NovaQuotacao() {
                     <QuoteItemsTable
                       items={items}
                       discountPercent={discount}
+                      pricingMode={pricingMode}
+                      enablePriceEdit
                       tradePolicyId={policyMode === "fixed" ? tradePolicyId : undefined}
                     />
                   </>
@@ -681,6 +711,8 @@ export default function NovaQuotacao() {
               </CardHeader>
               <CardContent>
                 <PaymentConditions
+                  pricingMode={pricingMode}
+                  onPricingModeChange={handlePricingModeChange}
                   paymentConditions={paymentConditions}
                   onPaymentChange={setPaymentConditions}
                   discount={discount}

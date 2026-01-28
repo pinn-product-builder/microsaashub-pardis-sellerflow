@@ -225,6 +225,10 @@ export interface QuoteItemLegacy {
   taxAlerts?: TaxAlert[];
   /** Para itens VTEX: policy efetivamente usada para precificar este item (auditoria) */
   vtexTradePolicyId?: string;
+  /** Modo manual: vendedor alterou o preço unitário */
+  manualUnitPrice?: boolean;
+  /** Preço original antes do override manual (para voltar ao modo percentual) */
+  originalUnitPrice?: number;
 }
 
 // -----------------------------------------------------------------------------
