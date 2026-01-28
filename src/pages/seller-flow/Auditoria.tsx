@@ -31,10 +31,28 @@ const EVENT_LABELS: Record<string, string> = {
   approved: "Aprovou",
   sent: "Enviou",
   failed: "Falhou",
+  status_change: "Status",
+  approval: "Aprovação",
+};
+
+const EVENT_STYLES: Record<string, string> = {
+  created: "bg-blue-100 text-blue-800 border-blue-200",
+  edited: "bg-slate-100 text-slate-800 border-slate-200",
+  validated: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  approval_requested: "bg-amber-100 text-amber-800 border-amber-200",
+  approved: "bg-green-100 text-green-800 border-green-200",
+  sent: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  failed: "bg-red-100 text-red-800 border-red-200",
+  status_change: "bg-gray-100 text-gray-800 border-gray-200",
+  approval: "bg-purple-100 text-purple-800 border-purple-200",
 };
 
 function formatEventLabel(ev: QuoteEvent) {
   return EVENT_LABELS[ev.event_type] ?? ev.event_type;
+}
+
+function eventBadgeClass(ev: QuoteEvent) {
+  return EVENT_STYLES[ev.event_type] ?? "bg-gray-100 text-gray-800 border-gray-200";
 }
 
 export default function Auditoria() {
@@ -278,33 +296,33 @@ export default function Auditoria() {
             <p className="text-sm text-muted-foreground">Nenhum evento encontrado.</p>
           ) : (
             <div className="space-y-3">
+              <div className="grid grid-cols-5 gap-4 text-xs font-semibold text-muted-foreground px-3">
+                <span>Evento</span>
+                <span>Cotação</span>
+                <span>Usuário</span>
+                <span>Status</span>
+                <span className="text-right">Data/Hora</span>
+              </div>
               {paged.map((ev) => (
-                <div key={ev.id} className="flex flex-col gap-1 rounded border p-3 text-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={ev.event_type === "failed" ? "destructive" : "secondary"}>
-                        {formatEventLabel(ev)}
-                      </Badge>
-                      <span className="font-medium">{ev.message ?? "Sem mensagem"}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(ev.created_at).toLocaleString("pt-BR")}
-                    </span>
+                <div key={ev.id} className="grid grid-cols-5 gap-4 items-center rounded border px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge className={`border ${eventBadgeClass(ev)}`}>
+                      {formatEventLabel(ev)}
+                    </Badge>
+                    <span className="truncate">{ev.message ?? "Sem mensagem"}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      Cotação: {ev.quote?.quote_number ? `#${ev.quote.quote_number}` : ev.quote_id}
-                    </span>
-                    <span>
-                      {ev.created_by ? (profiles.get(ev.created_by)?.full_name || profiles.get(ev.created_by)?.email || ev.created_by) : "Sistema"}
-                    </span>
-                    {(ev.from_status || ev.to_status) && (
-                      <span>
-                        {ev.from_status ? `${ev.from_status} → ` : ""}
-                        {ev.to_status ?? ""}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-muted-foreground">
+                    {ev.quote?.quote_number ? `#${ev.quote.quote_number}` : ev.quote_id}
+                  </span>
+                  <span className="text-muted-foreground truncate">
+                    {ev.created_by ? (profiles.get(ev.created_by)?.full_name || profiles.get(ev.created_by)?.email || ev.created_by) : "Sistema"}
+                  </span>
+                  <span className="text-muted-foreground truncate">
+                    {ev.from_status || ev.to_status ? `${ev.from_status ?? ""}${ev.from_status ? " → " : ""}${ev.to_status ?? ""}` : "-"}
+                  </span>
+                  <span className="text-xs text-muted-foreground text-right">
+                    {new Date(ev.created_at).toLocaleString("pt-BR")}
+                  </span>
                 </div>
               ))}
               <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
