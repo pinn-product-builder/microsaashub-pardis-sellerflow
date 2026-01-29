@@ -10,7 +10,7 @@ export function useQuotes(filters?: QuoteFilters) {
     queryFn: async () => {
       let query = supabase
         .from('vtex_quotes')
-        .select('*, duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number), client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
+        .select('*, client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
         .order('created_at', { ascending: false });
 
       if (filters?.status?.length) {
@@ -46,7 +46,7 @@ export function useQuote(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vtex_quotes')
-        .select('*, duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number), client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
+        .select('*, client:vtex_clients(md_id, company_name, trade_name, cnpj, city, uf)')
         .eq('id', id)
         .maybeSingle();
 
@@ -186,8 +186,8 @@ export function useQuoteStats() {
         sent: quotes.filter((q: any) => q.status === 'sent').length,
         converted: quotes.filter((q: any) => q.status === 'converted').length,
         totalValue: quotes.reduce((acc: number, q: any) => acc + (q.total || 0), 0),
-        avgMargin: quotes.length > 0 
-          ? quotes.reduce((acc: number, q: any) => acc + (q.total_margin_percent || 0), 0) / quotes.length 
+        avgMargin: quotes.length > 0
+          ? quotes.reduce((acc: number, q: any) => acc + (q.total_margin_percent || 0), 0) / quotes.length
           : 0,
         todayCount: quotes.filter((q: any) => q.created_at?.startsWith(today)).length,
         weekCount: quotes.filter((q: any) => q.created_at >= weekAgo).length,
