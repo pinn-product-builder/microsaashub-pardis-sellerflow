@@ -177,8 +177,7 @@ export class VtexQuoteService {
         `
         *,
         client:vtex_clients(*),
-        items:vtex_quote_items(*),
-        duplicated_from:vtex_quotes!vtex_quotes_duplicated_from_quote_id_fkey(id, quote_number)
+        items:vtex_quote_items(*)
       `,
       )
       .eq("id", quoteId)
