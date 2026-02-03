@@ -57,7 +57,9 @@ export function QuoteItemRow({
         return typeof row?.effectivePrice === 'number' ? row.effectivePrice : null;
     };
 
-    const policyPrice = getPolicyPrice(selectedPolicyId);
+    const policyPriceRaw = getPolicyPrice(selectedPolicyId);
+    // Ajuste: A política também deve ser exibida como preço de caixa (Unit * Embalagem)
+    const policyPrice = policyPriceRaw ? policyPriceRaw * embalagemQty : null;
 
     return (
         <TableRow className="group hover:bg-muted/30 transition-colors">
@@ -122,7 +124,7 @@ export function QuoteItemRow({
                     </span>
                     {policyPrice && embalagemQty > 1 && (
                         <span className="text-[9px] text-muted-foreground font-bold">
-                            Total {embalagemQty}un: {formatCurrency(policyPrice * embalagemQty)}
+                            Cx {embalagemQty}
                         </span>
                     )}
                 </div>
