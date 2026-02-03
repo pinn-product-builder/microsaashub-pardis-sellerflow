@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ApprovalStatsCards } from '@/components/seller-flow/approvals/ApprovalStatsCards';
 import { ApprovalCardItem } from '@/components/seller-flow/approvals/ApprovalCardItem';
 import { ApprovalActionDialog } from '@/components/seller-flow/approvals/ApprovalActionDialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * PÁGINA: Gerenciamento de Aprovações
@@ -29,6 +32,40 @@ export default function Aprovacoes() {
   const approveRequest = useApproveRequest();
   const rejectRequest = useRejectRequest();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // IDENTIFICAÇÃO: Auto-Refresh com Realtime
+  useEffect(() => {
+    console.log('⚡ Iniciando subscription de Aprovações');
+    const channel = supabase
+      .channel('approval-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuta INSERT, UPDATE e DELETE
+          schema: 'public',
+          table: 'vtex_approval_requests'
+        },
+        (payload) => {
+          console.log('🔄 Mudança detectada em aprovações:', payload);
+          // Invalida cache para forçar recarregamento
+          queryClient.invalidateQueries({ queryKey: ['approvals'] });
+          queryClient.invalidateQueries({ queryKey: ['approval-stats'] });
+
+          toast({
+            title: "Lista Atualizada",
+            description: "Novas informações de aprovação recebidas.",
+            duration: 3000
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔌 Desconectando subscription de Aprovações');
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, toast]);
 
   // IDENTIFICAÇÃO: Lógica de Filtragem
   const filteredApprovals = pendingApprovals.filter(approval => {
