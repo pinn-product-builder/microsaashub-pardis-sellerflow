@@ -165,6 +165,24 @@ export function QuoteItemsTable({
 
   const { discountMode, setDiscountMode } = useSellerFlowStore();
 
+  const handlePriceChange = (itemId: string, newPrice: number) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Preserva o preço original se ainda não estiver salvo
+    const originalPrice = item.originalUnitPrice ?? item.unitPrice;
+
+    updateItem(itemId, {
+      ...item,
+      unitPrice: newPrice,
+      manualUnitPrice: true,
+      originalUnitPrice: originalPrice,
+      totalPrice: newPrice * item.quantity,
+      // Se alterou preço manualmente, remove descontos manuais percentuais para evitar confusão de cálculo
+      discounts: []
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* IDENTIFICAÇÃO: Seletor de Modo de Desconto */}
@@ -208,6 +226,8 @@ export function QuoteItemsTable({
                 onNotesClick={handleNotesClick}
                 onRemove={removeItem}
                 formatCurrency={formatCurrency}
+                discountMode={discountMode}
+                onPriceChange={handlePriceChange}
               />
             ))}
           </TableBody>

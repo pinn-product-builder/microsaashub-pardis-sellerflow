@@ -20,6 +20,8 @@ interface QuoteItemRowProps {
     onNotesClick: (item: QuoteItem) => void;
     onRemove: (id: string) => void;
     formatCurrency: (val: number) => string;
+    discountMode: 'percentage' | 'manual';
+    onPriceChange: (id: string, val: number) => void;
 }
 
 /**
@@ -37,7 +39,9 @@ export function QuoteItemRow({
     onDiscountChange,
     onNotesClick,
     onRemove,
-    formatCurrency
+    formatCurrency,
+    discountMode,
+    onPriceChange
 }: QuoteItemRowProps) {
 
     const skuId = Number(item.product?.sku);
@@ -61,6 +65,13 @@ export function QuoteItemRow({
     // Ajuste: A política também deve ser exibida como preço de caixa (Unit * Embalagem)
     const policyPrice = policyPriceRaw ? policyPriceRaw * embalagemQty : null;
 
+    const isManualMode = discountMode === 'manual';
+
+    const handlePriceValueChange = (val: string) => {
+        const num = parseFloat(val);
+        if (!isNaN(num)) onPriceChange(item.id, num);
+    };
+
     return (
         <TableRow className="group hover:bg-muted/30 transition-colors">
             <TableCell className="max-w-[300px]">
@@ -81,6 +92,7 @@ export function QuoteItemRow({
             </TableCell>
 
             <TableCell className="text-center">
+                {/* Quantity Controls - Unchanged */}
                 <div className="flex items-center justify-center gap-2 bg-muted/20 p-1 rounded-lg border border-muted-foreground/10">
                     <Button
                         variant="ghost"
@@ -105,14 +117,29 @@ export function QuoteItemRow({
             </TableCell>
 
             <TableCell className="text-right">
-                <div className="flex flex-col items-end">
-                    <span className={`font-mono text-xs ${manualDiscount > 0 ? "text-muted-foreground line-through opacity-50" : "font-bold"}`}>
-                        {formatCurrency(item.unitPrice)}
-                    </span>
-                    {manualDiscount > 0 && (
-                        <span className="font-black text-primary text-sm">
-                            {formatCurrency(displayUnitPrice)}
-                        </span>
+                <div className="flex flex-col items-end justify-center h-full">
+                    {isManualMode ? (
+                        <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground">R$</span>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                className="h-8 w-24 text-right pl-6 font-black border-primary/30 focus-visible:ring-primary/20 bg-primary/5"
+                                value={item.unitPrice}
+                                onChange={(e) => handlePriceValueChange(e.target.value)}
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            <span className={`font-mono text-xs ${manualDiscount > 0 ? "text-muted-foreground line-through opacity-50" : "font-bold"}`}>
+                                {formatCurrency(item.unitPrice)}
+                            </span>
+                            {manualDiscount > 0 && (
+                                <span className="font-black text-primary text-sm">
+                                    {formatCurrency(displayUnitPrice)}
+                                </span>
+                            )}
+                        </>
                     )}
                 </div>
             </TableCell>
@@ -162,16 +189,24 @@ export function QuoteItemRow({
 
             <TableCell>
                 <div className="flex items-center justify-end gap-1">
-                    <Input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        max="100"
-                        className="h-8 w-16 text-right font-black border-primary/20 text-primary focus-visible:ring-primary/20"
-                        value={manualDiscount}
-                        onChange={(e) => onDiscountChange(item.id, parseFloat(e.target.value) || 0)}
-                    />
-                    <span className="text-[10px] font-black text-primary">%</span>
+                    {isManualMode ? (
+                        <div className="h-8 w-16 bg-muted/20 rounded flex items-center justify-center border border-muted-foreground/10 opacity-50 cursor-not-allowed">
+                            <span className="text-[10px] text-muted-foreground font-bold">-</span>
+                        </div>
+                    ) : (
+                        <>
+                            <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                max="100"
+                                className="h-8 w-16 text-right font-black border-primary/20 text-primary focus-visible:ring-primary/20"
+                                value={manualDiscount}
+                                onChange={(e) => onDiscountChange(item.id, parseFloat(e.target.value) || 0)}
+                            />
+                            <span className="text-[10px] font-black text-primary">%</span>
+                        </>
+                    )}
                 </div>
             </TableCell>
 
