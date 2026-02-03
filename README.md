@@ -1,93 +1,93 @@
 # Pardis SellerFlow
 
-> A high-performance B2B Quotation Management Portal bridging VTEX Commerce and Supabase.
+> Portal de Gestão de Cotações B2B de alta performance, integrando VTEX Commerce e Supabase.
 
-Pardis SellerFlow is a specialized micro-service designed to empower B2B sales teams with complex pricing logic, automated tax calculations, and a streamlined approval workflow.
+O Pardis SellerFlow é um micro-serviço especializado projetado para capacitar equipes de vendas B2B com lógica de precificação complexa, cálculos tributários automatizados e um fluxo de aprovação simplificado.
 
 ---
 
-## 🏗️ Technical Architecture
+## 🏗️ Arquitetura Técnica
 
 ### Core Stack
 - **Frontend**: React 18 + Vite + TypeScript.
-- **Styling**: TailwindCSS + shadcn/ui (customized for high-fidelity B2B dashboards).
+- **Estilização**: TailwindCSS + shadcn/ui (customizado para dashboards B2B de alta fidelidade).
 - **Backend-as-a-Service**: Supabase (PostgreSQL, Realtime, Auth).
-- **Integration Layer**: Supabase Edge Functions (TypeScript/Deno) for VTEX syncing.
-- **Domain Logic**: Decoupled `PricingService` for precise packaging/unit B2B calculations.
+- **Camada de Integração**: Supabase Edge Functions (TypeScript/Deno) para sincronização com VTEX.
+- **Lógica de Domínio**: `PricingService` desacoplado para cálculos precisos de unidades e embalagens B2B.
 
-### System Design
+### Design do Sistema
 ```mermaid
 graph TD
     VTEX[VTEX Commerce Cloud] -- Sync --> SEF[Supabase Edge Functions]
     SEF -- Materialized Views --> DB[(PostgreSQL)]
     DB -- RPC / Realtime --> APP[React Frontend]
-    APP -- Approval Request --> APP_AUTH[Director Approval]
-    APP_AUTH -- Trigger Status --> DB
+    APP -- Pedido de Aprovação --> APP_AUTH[Aprovação da Diretoria]
+    APP_AUTH -- Gatilho de Status --> DB
 ```
 
 ---
 
-## 💎 Key Features & UX Standards
+## 💎 Principais Funcionalidades e Padrões UX
 
-### 1. B2B Pricing Engine
-- **Packaging-First Display**: Sellers focus on packaging totals, while the engine handles unit breakdowns and tax implications (ST, ICMS, etc. - extensible via RPC).
-- **Dynamic Pricing Modes**: Integrated directly into the product selector, allowing instant switches between Discount-based and Manual-override pricing.
-- **Margin Security**: Advanced permission logic hides numeric margins from sellers, showing only qualitative "Clearance" badges (Authorized/Pending) to maintain profit confidentiality.
+### 1. Engine de Precificação B2B
+- **Exibição Focada em Embalagem**: Vendedores focam nos totais por embalagem, enquanto a engine gerencia o detalhamento por unidade e implicações fiscais (ST, ICMS, etc. - extensível via RPC).
+- **Modos de Precificação Dinâmicos**: Integrados diretamente no seletor de produtos, permitindo alternar instantaneamente entre descontos percentuais e ajustes manuais.
+- **Segurança de Margem**: Lógica de permissão avançada que oculta margens numéricas dos vendedores, exibindo apenas badges de status ("Autorizado/Pendente") para manter a confidencialidade do lucro.
 
-### 2. VTEX Integration
-- **Materialized Catalog**: Data from VTEX (Products, SKUs, Prices, Inventory) is normalized into Supabase views for sub-second search performance.
-- **Automated Sync**: Edge Functions handle periodic and manual data refreshes from VTEX Master Data and Catalog APIs.
+### 2. Integração VTEX
+- **Catálogo Materializado**: Dados da VTEX (Produtos, SKUs, Preços, Estoque) são normalizados em views do Supabase para performance de busca inferior a um segundo.
+- **Sincronização Automatizada**: Edge Functions gerenciam atualizações periódicas e manuais via APIs de Master Data e Catálogo da VTEX.
 
 ---
 
-## 🚀 Development
+## 🚀 Desenvolvimento
 
-### Prerequisites
+### Pré-requisitos
 - Node.js 18+
-- Supabase CLI (if working on local DB)
+- Supabase CLI (caso trabalhe com banco de dados local)
 
-### Setup
-1. **Clone & Install**:
+### Configuração
+1. **Clonar e Instalar**:
    ```bash
    git clone <repo-url>
    npm install
    ```
 
-2. **Environment Configuration**:
-   Create a `.env.local` file:
+2. **Configuração de Ambiente**:
+   Crie um arquivo `.env.local`:
    ```env
-   VITE_SUPABASE_URL="https://your-project.supabase.co"
-   VITE_SUPABASE_PUBLISHABLE_KEY="your-anon-key"
+   VITE_SUPABASE_URL="https://seu-projeto.supabase.co"
+   VITE_SUPABASE_PUBLISHABLE_KEY="sua-anon-key"
    ```
 
-3. **Run**:
+3. **Executar**:
    ```bash
    npm run dev
    ```
 
-### Project Structure
-- `/src/pages/seller-flow`: Core quotation and approval processes.
-- `/src/components/seller-flow`: Reusable B2B-specific UI components (Tables, Selectors).
-- `/src/services`: Decoupled business logic (Tax, Pricing, PDF Generation).
-- `/supabase`: Database migrations, RPC definitions, and Edge Functions.
+### Estrutura do Projeto
+- `/src/pages/seller-flow`: Processos centrais de cotação e aprovação.
+- `/src/components/seller-flow`: Componentes UI reaproveitáveis específicos para B2B (Tabelas, Seletores).
+- `/src/services`: Lógica de negócio desacoplada (Impostos, Precificação, Geração de PDF).
+- `/supabase`: Migrações de banco de dados, definições de RPC e Edge Functions.
 
 ---
 
-## 🛠️ Infrastructure & CI/CD
+## 🛠️ Infraestrutura e CI/CD
 
-- **Database Migrations**: Managed via Supabase Workflow (`db push`).
-- **Edge Functions**: Auto-deployed on push to `main` via GitHub Actions.
-- **Frontend**: Hosted on Vercel with SPA rewrite rules for `react-router`.
-
----
-
-## 📄 Documentation
-
-Comprehensive documentation is available in the `/docs` directory:
-- [Architecture Overview](file:///docs/ARCHITECTURE.md)
-- [Deployment Guide](file:///docs/DEPLOYMENT.md)
-- [Database Schema](file:///docs/DATABASE.md)
-- [Operations & Syncing](file:///docs/OPERATIONS.md)
+- **Migrações de Banco**: Gerenciadas via fluxo de trabalho do Supabase (`db push`).
+- **Edge Functions**: Deploy automático no push para a branch `main` via GitHub Actions.
+- **Frontend**: Hospedado na Vercel com regras de rewrite SPA para o `react-router`.
 
 ---
-*Maintained by the Pardis Dev Team.*
+
+## 📄 Documentação
+
+Documentação detalhada disponível no diretório `/docs`:
+- [Visão Geral da Arquitetura](file:///docs/ARCHITECTURE.md)
+- [Guia de Deploy](file:///docs/DEPLOYMENT.md)
+- [Schema do Banco de Dados](file:///docs/DATABASE.md)
+- [Operações e Sincronização](file:///docs/OPERATIONS.md)
+
+---
+*Mantido pela Equipe de Desenvolvimento Pardis.*
