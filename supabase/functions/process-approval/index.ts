@@ -6,6 +6,69 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface BusinessHour {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_open: boolean;
+}
+
+function calculateSLAExpiry(startDate: Date, slaHours: number, businessHours: BusinessHour[]): Date {
+  let currentMoment = new Date(startDate);
+  let remainingHours = slaHours;
+
+  const getBusinessDay = (date: Date) => businessHours.find(bh => bh.day_of_week === date.getDay());
+
+  // Limite de segurança para evitar loops infinitos caso não haja horários configurados
+  let safetyCounter = 0;
+  const maxDays = 100;
+
+  while (remainingHours > 0 && safetyCounter < maxDays) {
+    const dayConfig = getBusinessDay(currentMoment);
+
+    if (!dayConfig || !dayConfig.is_open) {
+      currentMoment.setDate(currentMoment.getDate() + 1);
+      currentMoment.setHours(0, 0, 0, 0);
+      safetyCounter++;
+      continue;
+    }
+
+    const [startH, startM] = dayConfig.start_time.split(':').map(Number);
+    const [endH, endM] = dayConfig.end_time.split(':').map(Number);
+
+    const openingTime = new Date(currentMoment);
+    openingTime.setHours(startH, startM, 0, 0);
+
+    const closingTime = new Date(currentMoment);
+    closingTime.setHours(endH, endM, 0, 0);
+
+    if (currentMoment < openingTime) {
+      currentMoment = openingTime;
+    }
+
+    if (currentMoment >= closingTime) {
+      currentMoment.setDate(currentMoment.getDate() + 1);
+      currentMoment.setHours(0, 0, 0, 0);
+      safetyCounter++;
+      continue;
+    }
+
+    const hoursLeftInDay = (closingTime.getTime() - currentMoment.getTime()) / (1000 * 60 * 60);
+
+    if (remainingHours <= hoursLeftInDay) {
+      currentMoment.setMilliseconds(currentMoment.getMilliseconds() + remainingHours * 3600000);
+      remainingHours = 0;
+    } else {
+      remainingHours -= hoursLeftInDay;
+      currentMoment.setDate(currentMoment.getDate() + 1);
+      currentMoment.setHours(0, 0, 0, 0);
+      safetyCounter++;
+    }
+  }
+
+  return currentMoment;
+}
+
 interface ApprovalRequest {
   action: 'create' | 'approve' | 'reject';
   requestId?: string;
@@ -113,9 +176,20 @@ serve(async (req) => {
         }
       }
 
+      // Fetch business hours
+      const { data: businessHours } = await supabaseAdmin
+        .from('vtex_business_hours')
+        .select('*');
+
       // Calculate expiry
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + slaHours);
+      let expiresAt: Date;
+      if (businessHours && businessHours.length > 0) {
+        expiresAt = calculateSLAExpiry(new Date(), slaHours, businessHours);
+      } else {
+        // Fallback para SLA corrido caso não haja configuração
+        expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + slaHours);
+      }
 
       // Create approval request
       const { data: approvalRequest, error: createError } = await supabaseAdmin
@@ -144,7 +218,7 @@ serve(async (req) => {
       // Update quote status
       await supabaseAdmin
         .from('quotes')
-        .update({ 
+        .update({
           status: 'pending_approval',
           requires_approval: true,
           updated_at: new Date().toISOString()
@@ -167,8 +241,8 @@ serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           approvalRequest,
           requiredRole,
           expiresAt: expiresAt.toISOString()
@@ -213,9 +287,9 @@ serve(async (req) => {
 
       if (!canApprove) {
         return new Response(
-          JSON.stringify({ 
-            error: 'Permissão negada', 
-            details: `Apenas ${requiredRole} ou superior pode processar esta solicitação` 
+          JSON.stringify({
+            error: 'Permissão negada',
+            details: `Apenas ${requiredRole} ou superior pode processar esta solicitação`
           }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -253,7 +327,7 @@ serve(async (req) => {
       const quoteStatus = action === 'approve' ? 'approved' : 'rejected';
       await supabaseAdmin
         .from('quotes')
-        .update({ 
+        .update({
           status: quoteStatus,
           is_authorized: action === 'approve',
           updated_at: new Date().toISOString()
@@ -267,7 +341,7 @@ serve(async (req) => {
         entity_type: 'approval_request',
         entity_id: requestId,
         old_values: { status: 'pending' },
-        new_values: { 
+        new_values: {
           status: newStatus,
           comments,
           quoteId: approvalReq.quote_id
@@ -275,8 +349,8 @@ serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           status: newStatus,
           quoteId: approvalReq.quote_id
         }),

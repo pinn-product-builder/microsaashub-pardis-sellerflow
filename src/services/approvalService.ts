@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EdgeFunctions } from "./edgeFunctions";
 import { ApprovalStatus, ApprovalStatusType } from "@/domain/approval/value-objects/ApprovalStatus";
 import { ApprovalStatusExtended } from "@/types/domain";
+import { calculateBusinessHoursElapsed, BusinessHour } from "@/utils/businessHoursUtils";
 
 export type ApprovalStatusLegacy = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'ESCALATED';
 
@@ -237,28 +238,46 @@ export class ApprovalService {
       return { pending: 0, approved: 0, rejected: 0, expired: 0, averageTime: 0 };
     }
 
-    const pending = data.filter(r => 
+    const pending = data.filter(r =>
       r.status === 'pending' && r.expires_at && new Date(r.expires_at) > new Date()
     ).length;
 
     const approved = data.filter(r => r.status === 'approved').length;
     const rejected = data.filter(r => r.status === 'rejected').length;
 
-    const expired = data.filter(r => 
+    const expired = data.filter(r =>
       r.status === 'pending' && r.expires_at && new Date(r.expires_at) <= new Date()
     ).length;
 
-    // Calcular tempo médio de aprovação (em horas)
-    const processedRequests = data.filter(r => 
+    // Calcular tempo médio de aprovação em horas úteis
+    const processedRequests = data.filter(r =>
       r.status !== 'pending' && r.decided_at
     );
 
-    const averageTime = processedRequests.length > 0
-      ? processedRequests.reduce((sum, r) => {
+    let averageTime = 0;
+    if (processedRequests.length > 0) {
+      // Buscar configurações de horário comercial para o cálculo
+      const { data: businessHours } = await supabase
+        .from('vtex_business_hours' as any)
+        .select('*');
+
+      if (businessHours && businessHours.length > 0) {
+        const totalBusinessHours = processedRequests.reduce((sum, r) => {
+          return sum + calculateBusinessHoursElapsed(
+            new Date(r.created_at),
+            new Date(r.decided_at!),
+            businessHours as unknown as BusinessHour[]
+          );
+        }, 0);
+        averageTime = totalBusinessHours / processedRequests.length;
+      } else {
+        // Fallback para horas corridas se não houver configuração
+        averageTime = processedRequests.reduce((sum, r) => {
           const diff = new Date(r.decided_at!).getTime() - new Date(r.created_at).getTime();
           return sum + (diff / (1000 * 60 * 60));
-        }, 0) / processedRequests.length
-      : 0;
+        }, 0) / processedRequests.length;
+      }
+    }
 
     return { pending, approved, rejected, expired, averageTime };
   }
@@ -291,7 +310,7 @@ export class ApprovalService {
   private static mapToApprovalRequest(row: any): ApprovalRequest {
     const isExpired = row.expires_at && new Date(row.expires_at) <= new Date();
     const status = ApprovalService.mapStatus(row.status, isExpired && row.status === 'pending');
-    
+
     // Criar Value Object para validação de transições
     let statusVO: ApprovalStatus | undefined;
     try {

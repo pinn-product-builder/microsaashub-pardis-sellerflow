@@ -7,6 +7,7 @@ import { ApprovalRulesTab } from '@/components/seller-flow/config/ApprovalRulesT
 import { PaymentConditionsTab } from '@/components/seller-flow/config/PaymentConditionsTab';
 import { ValidityConfigTab } from '@/components/seller-flow/config/ValidityConfigTab';
 import { EngineConfigTab } from '@/components/seller-flow/config/EngineConfigTab';
+import { BusinessHoursTab } from '@/components/seller-flow/config/BusinessHoursTab';
 import { PricingFormulaCard } from '@/components/seller-flow/config/PricingFormulaCard';
 import { MarginSimulator } from '@/components/seller-flow/config/MarginSimulator';
 import { AuthRequiredCard } from '@/components/seller-flow/config/AuthRequiredCard';
@@ -20,7 +21,7 @@ export default function Configuracoes() {
   const { data: engineConfig } = usePricingEngineConfig();
   const { data: approvalRules } = useActiveApprovalRulesForEngine();
   const [activeTab, setActiveTab] = useState('pricing');
-  
+
   // Se não autenticado, mostrar card de autenticação
   if (!isAuthenticated) {
     return (
@@ -48,7 +49,7 @@ export default function Configuracoes() {
       />
       <PageContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               <span className="hidden sm:inline">Pricing</span>
@@ -69,20 +70,24 @@ export default function Configuracoes() {
               <Clock className="h-4 w-4" />
               <span className="hidden sm:inline">Validade</span>
             </TabsTrigger>
+            <TabsTrigger value="hours" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span className="hidden sm:inline">Horário</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pricing" className="space-y-6">
             {/* Fórmula explicativa */}
-            <PricingFormulaCard 
-              config={configs?.[0]} 
+            <PricingFormulaCard
+              config={configs?.[0]}
               engineConfig={engineConfig}
               approvalRules={approvalRules}
               onNavigateToTab={handleNavigateToTab}
             />
-            
+
             {/* Simulador de margem */}
             <MarginSimulator configs={configs} />
-            
+
             {/* Tabela de configuração */}
             <PricingConfigTab />
           </TabsContent>
@@ -101,6 +106,10 @@ export default function Configuracoes() {
 
           <TabsContent value="validity">
             <ValidityConfigTab />
+          </TabsContent>
+
+          <TabsContent value="hours">
+            <BusinessHoursTab />
           </TabsContent>
         </Tabs>
       </PageContent>
