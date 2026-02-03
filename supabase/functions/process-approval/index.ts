@@ -129,233 +129,158 @@ serve(async (req) => {
     const body: ApprovalRequest = await req.json();
     const { action, requestId, quoteId, reason, comments, marginPercent, totalValue } = body;
 
-    if (action === 'create') {
-      // Validate input
-      if (!quoteId || marginPercent === undefined || totalValue === undefined) {
-        return new Response(
-          JSON.stringify({ error: 'Parâmetros obrigatórios: quoteId, marginPercent, totalValue' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Fetch quote
-      const { data: quote, error: quoteError } = await supabaseClient
-        .from('quotes')
-        .select('*')
-        .eq('id', quoteId)
-        .single();
-
-      if (quoteError || !quote) {
-        return new Response(
-          JSON.stringify({ error: 'Cotação não encontrada' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Determine required approver based on margin
-      const { data: approvalRules } = await supabaseAdmin
+    // Helper: Determinar passos da regra baseado na margem
+    async function getApprovalSteps(margin: number) {
+      const { data: rules } = await supabaseAdmin
         .from('approval_rules')
-        .select('*')
+        .select(`
+          id, approver_role, sla_hours, priority, margin_min, margin_max,
+          approval_rule_steps (*)
+        `)
         .eq('is_active', true)
         .order('margin_min', { ascending: true });
 
-      let requiredRole = 'gerente';
-      let priority = 'medium';
-      let ruleId = null;
-      let slaHours = 24;
+      if (!rules) return null;
 
-      if (approvalRules) {
-        for (const rule of approvalRules) {
-          if (marginPercent >= (rule.margin_min ?? 0) && marginPercent <= (rule.margin_max ?? 100)) {
-            requiredRole = rule.approver_role;
-            priority = rule.priority ?? 'medium';
-            ruleId = rule.id;
-            slaHours = rule.sla_hours ?? 24;
-            break;
-          }
-        }
+      // Encontrar a regra que se aplica à margem
+      const rule = rules.find(r => margin >= (r.margin_min ?? -100) && margin <= (r.margin_max ?? 100));
+      if (!rule) return null;
+
+      // Se não houver steps explícitos, criar um step virtual baseado na regra base
+      const steps = rule.approval_rule_steps && rule.approval_rule_steps.length > 0
+        ? rule.approval_rule_steps.sort((a: any, b: any) => a.step_order - b.step_order)
+        : [{
+          approver_role: rule.approver_role,
+          step_order: 1,
+          sla_hours: rule.sla_hours,
+          rule_id: rule.id
+        }];
+
+      return { rule, steps };
+    }
+
+    if (action === 'create') {
+      if (!quoteId || marginPercent === undefined || totalValue === undefined) {
+        return new Response(JSON.stringify({ error: 'Parâmetros ausentes' }), { status: 400, headers: corsHeaders });
       }
 
-      // Fetch business hours
-      const { data: businessHours } = await supabaseAdmin
-        .from('vtex_business_hours')
-        .select('*');
-
-      // Calculate expiry
-      let expiresAt: Date;
-      if (businessHours && businessHours.length > 0) {
-        expiresAt = calculateSLAExpiry(new Date(), slaHours, businessHours);
-      } else {
-        // Fallback para SLA corrido caso não haja configuração
-        expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + slaHours);
+      const flow = await getApprovalSteps(marginPercent);
+      if (!flow) {
+        return new Response(JSON.stringify({ error: 'Nenhuma regra de aprovação encontrada para esta margem' }), { status: 404, headers: corsHeaders });
       }
 
-      // Create approval request
+      const firstStep = flow.steps[0];
+
+      // Fetch business hours para o SLA
+      const { data: businessHours } = await supabaseAdmin.from('vtex_business_hours').select('*');
+      const expiresAt = calculateSLAExpiry(new Date(), firstStep.sla_hours ?? 24, businessHours || []);
+
       const { data: approvalRequest, error: createError } = await supabaseAdmin
-        .from('approval_requests')
+        .from('vtex_approval_requests')
         .insert({
           quote_id: quoteId,
           requested_by: user.id,
-          reason: reason ?? `Margem de ${marginPercent.toFixed(2)}% requer aprovação`,
+          reason: reason ?? `Margem de ${marginPercent.toFixed(2)}% requer aprovação (${flow.rule.name})`,
           quote_total: totalValue,
           quote_margin_percent: marginPercent,
           status: 'pending',
-          priority,
-          rule_id: ruleId,
+          priority: flow.rule.priority || 'medium',
+          rule_id: flow.rule.id,
+          current_step_order: 1,
+          total_steps: flow.steps.length,
           expires_at: expiresAt.toISOString()
         })
         .select()
         .single();
 
-      if (createError) {
-        return new Response(
-          JSON.stringify({ error: 'Erro ao criar solicitação', details: createError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      if (createError) throw createError;
 
-      // Update quote status
-      await supabaseAdmin
-        .from('quotes')
-        .update({
-          status: 'pending_approval',
-          requires_approval: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', quoteId);
+      // Bloquear cotação
+      await supabaseAdmin.from('vtex_quotes').update({ status: 'pending_approval', requires_approval: true }).eq('id', quoteId);
 
-      // Log audit
-      await supabaseAdmin.from('audit_logs').insert({
-        user_id: user.id,
-        action: 'CREATE_APPROVAL_REQUEST',
-        entity_type: 'approval_request',
-        entity_id: approvalRequest.id,
-        new_values: {
-          quoteId,
-          marginPercent,
-          totalValue,
-          requiredRole,
-          priority
-        }
-      });
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          approvalRequest,
-          requiredRole,
-          expiresAt: expiresAt.toISOString()
-        }),
-        { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: true, approvalRequest, currentStep: firstStep }), { status: 201, headers: corsHeaders });
     }
 
     if (action === 'approve' || action === 'reject') {
-      if (!requestId) {
-        return new Response(
-          JSON.stringify({ error: 'Parâmetro obrigatório: requestId' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      if (!requestId) return new Response(JSON.stringify({ error: 'requestId ausente' }), { status: 400, headers: corsHeaders });
 
-      // Fetch approval request
-      const { data: approvalReq, error: fetchError } = await supabaseAdmin
-        .from('approval_requests')
-        .select('*, approval_rules(approver_role)')
+      const { data: currentReq, error: fetchError } = await supabaseAdmin
+        .from('vtex_approval_requests')
+        .select(`
+          *,
+          approval_rules (
+            *,
+            approval_rule_steps (*)
+          )
+        `)
         .eq('id', requestId)
         .single();
 
-      if (fetchError || !approvalReq) {
-        return new Response(
-          JSON.stringify({ error: 'Solicitação não encontrada' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      if (fetchError || !currentReq) throw new Error('Solicitação não encontrada');
+      if (currentReq.status !== 'pending') throw new Error('Solicitação já processada');
 
-      if (approvalReq.status !== 'pending') {
-        return new Response(
-          JSON.stringify({ error: 'Solicitação já processada' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      // Validar permissão (quem está aprovando tem a role do step atual ou superior?)
+      // Buscamos o papel necessário para este passo específico
+      const flowSteps = currentReq.approval_rules?.approval_rule_steps || [];
+      const currentStepConfig = flowSteps.find((s: any) => s.step_order === currentReq.current_step_order)
+        || { approver_role: currentReq.approval_rules?.approver_role };
 
-      // Check if user can approve
-      const requiredRole = approvalReq.approval_rules?.approver_role ?? 'gerente';
-      const { data: canApprove } = await supabaseAdmin
-        .rpc('can_approve', { _user_id: user.id, _required_role: requiredRole });
-
-      if (!canApprove) {
-        return new Response(
-          JSON.stringify({
-            error: 'Permissão negada',
-            details: `Apenas ${requiredRole} ou superior pode processar esta solicitação`
-          }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Rejection requires comments
-      if (action === 'reject' && !comments) {
-        return new Response(
-          JSON.stringify({ error: 'Comentário obrigatório para rejeição' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Update approval request
-      const newStatus = action === 'approve' ? 'approved' : 'rejected';
-      const { error: updateError } = await supabaseAdmin
-        .from('approval_requests')
-        .update({
-          status: newStatus,
-          approved_by: user.id,
-          comments: comments ?? null,
-          decided_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requestId);
-
-      if (updateError) {
-        return new Response(
-          JSON.stringify({ error: 'Erro ao atualizar solicitação', details: updateError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Update quote status
-      const quoteStatus = action === 'approve' ? 'approved' : 'rejected';
-      await supabaseAdmin
-        .from('quotes')
-        .update({
-          status: quoteStatus,
-          is_authorized: action === 'approve',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', approvalReq.quote_id);
-
-      // Log audit
-      await supabaseAdmin.from('audit_logs').insert({
-        user_id: user.id,
-        action: action === 'approve' ? 'APPROVE_REQUEST' : 'REJECT_REQUEST',
-        entity_type: 'approval_request',
-        entity_id: requestId,
-        old_values: { status: 'pending' },
-        new_values: {
-          status: newStatus,
-          comments,
-          quoteId: approvalReq.quote_id
-        }
+      const { data: canApprove } = await supabaseAdmin.rpc('can_approve', {
+        _user_id: user.id,
+        _required_role: currentStepConfig.approver_role
       });
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          status: newStatus,
-          quoteId: approvalReq.quote_id
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (!canApprove) return new Response(JSON.stringify({ error: 'Permissao negada' }), { status: 403, headers: corsHeaders });
+
+      if (action === 'reject') {
+        await supabaseAdmin.from('vtex_approval_requests').update({ status: 'rejected', approved_by: user.id, decided_at: new Date().toISOString(), comments }).eq('id', requestId);
+        await supabaseAdmin.from('vtex_quotes').update({ status: 'rejected', is_authorized: false }).eq('id', currentReq.quote_id);
+        return new Response(JSON.stringify({ success: true, status: 'rejected' }), { status: 200, headers: corsHeaders });
+      }
+
+      // Ação: APPROVE
+      // 1. Marcar atual como aprovada
+      await supabaseAdmin.from('vtex_approval_requests').update({
+        status: 'approved',
+        approved_by: user.id,
+        decided_at: new Date().toISOString(),
+        comments
+      }).eq('id', requestId);
+
+      // 2. Verificar se existe um próximo passo
+      const nextStep = flowSteps.find((s: any) => s.step_order === currentReq.current_step_order + 1);
+
+      if (nextStep) {
+        // Criar próxima solicitação na cadeia
+        const { data: businessHours } = await supabaseAdmin.from('vtex_business_hours').select('*');
+        const expiresAt = calculateSLAExpiry(new Date(), nextStep.sla_hours ?? 24, businessHours || []);
+
+        await supabaseAdmin.from('vtex_approval_requests').insert({
+          quote_id: currentReq.quote_id,
+          requested_by: currentReq.requested_by,
+          reason: currentReq.reason,
+          quote_total: currentReq.quote_total,
+          quote_margin_percent: currentReq.quote_margin_percent,
+          status: 'pending',
+          priority: currentReq.priority,
+          rule_id: currentReq.rule_id,
+          current_step_order: nextStep.step_order,
+          total_steps: currentReq.total_steps,
+          parent_request_id: currentReq.id,
+          expires_at: expiresAt.toISOString()
+        });
+
+        return new Response(JSON.stringify({ success: true, status: 'escalated', nextStep: nextStep.approver_role }), { status: 200, headers: corsHeaders });
+      } else {
+        // Fim da linha: Aprovação total!
+        await supabaseAdmin.from('vtex_quotes').update({
+          status: 'approved',
+          is_authorized: true,
+          updated_at: new Date().toISOString()
+        }).eq('id', currentReq.quote_id);
+
+        return new Response(JSON.stringify({ success: true, status: 'approved' }), { status: 200, headers: corsHeaders });
+      }
     }
 
     return new Response(

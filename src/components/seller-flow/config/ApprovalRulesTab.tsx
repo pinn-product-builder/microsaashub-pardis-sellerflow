@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { ApprovalFlowStepConfig } from './ApprovalFlowStepConfig';
 
 const ROLE_LABELS: Record<AppRole, string> = {
   vendedor: 'Vendedor',
@@ -61,7 +62,7 @@ export function ApprovalRulesTab() {
   const { data: rules, isLoading, refetch } = useApprovalRules();
   const updateRule = useUpdateApprovalRule();
   const queryClient = useQueryClient();
-  
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<ApprovalRule | null>(null);
   const [formData, setFormData] = useState<RuleFormData>(defaultFormData);
@@ -124,7 +125,7 @@ export function ApprovalRulesTab() {
 
   const handleDelete = async (rule: ApprovalRule) => {
     if (!confirm(`Deseja realmente excluir a regra "${rule.name}"?`)) return;
-    
+
     try {
       const { error } = await supabase.from('approval_rules').delete().eq('id', rule.id);
       if (error) throw error;
@@ -263,9 +264,9 @@ export function ApprovalRulesTab() {
                   type="number"
                   step="0.01"
                   value={formData.margin_min ?? ''}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    margin_min: e.target.value ? parseFloat(e.target.value) : null 
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    margin_min: e.target.value ? parseFloat(e.target.value) : null
                   })}
                   placeholder="Ex: -10"
                 />
@@ -277,9 +278,9 @@ export function ApprovalRulesTab() {
                   type="number"
                   step="0.01"
                   value={formData.margin_max ?? ''}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    margin_max: e.target.value ? parseFloat(e.target.value) : null 
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    margin_max: e.target.value ? parseFloat(e.target.value) : null
                   })}
                   placeholder="Ex: -5"
                 />
@@ -342,6 +343,12 @@ export function ApprovalRulesTab() {
               />
               <Label htmlFor="is_active">Regra ativa</Label>
             </div>
+
+            {editingRule && (
+              <div className="mt-2">
+                <ApprovalFlowStepConfig ruleId={editingRule.id} />
+              </div>
+            )}
           </div>
 
           <DialogFooter>

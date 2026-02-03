@@ -457,6 +457,9 @@ export interface ApprovalRequest {
   quote_margin_percent?: number;
   reason?: string;
   comments?: string;
+  total_steps: number;
+  current_step_order: number;
+  parent_request_id?: string;
   requested_at: string;
   decided_at?: string;
   expires_at?: string;

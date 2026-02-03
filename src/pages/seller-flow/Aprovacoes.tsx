@@ -229,6 +229,12 @@ export default function Aprovacoes() {
                               Ver Cotação
                             </Link>
                             {getPriorityBadge(approval.priority || 'medium')}
+
+                            {approval.total_steps > 1 && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                Nível {approval.current_step_order} de {approval.total_steps}
+                              </Badge>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -336,6 +342,12 @@ export default function Aprovacoes() {
                   <span className="text-sm text-muted-foreground">Margem:</span>
                   <MarginIndicator marginPercent={selectedRequest.quote_margin_percent || 0} showValue={false} />
                 </div>
+                {selectedRequest.total_steps > 1 && (
+                  <div className="flex justify-between items-center text-xs mt-1 border-t pt-2">
+                    <span className="text-muted-foreground">Progresso do Fluxo:</span>
+                    <span className="font-semibold text-blue-700">Passo {selectedRequest.current_step_order} de {selectedRequest.total_steps}</span>
+                  </div>
+                )}
               </div>
             )}
 
