@@ -482,22 +482,6 @@ export function VtexProductSelector({
                                 <CardContent className="space-y-4">
                                     <div className="space-y-4 pt-4 border-t">
                                         <div className="space-y-2">
-                                            <Label>Modo de precificação</Label>
-                                            <Select
-                                                value={pricingMode}
-                                                onValueChange={(v) => onPricingModeChange?.(v as any)}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="percent">Desconto (%)</SelectItem>
-                                                    <SelectItem value="manual">Manual (por item)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
                                             <Label>Quantidade</Label>
                                             <Input
                                                 type="number"
@@ -507,10 +491,28 @@ export function VtexProductSelector({
                                             />
                                         </div>
                                     </div>
+
                                     <Button onClick={handleAdd} disabled={!selected || isAdding} className="w-full">
                                         <Plus className="h-4 w-4 mr-2" />
                                         {isAdding ? "Adicionando..." : "Adicionar"}
                                     </Button>
+
+                                    <div className="space-y-2 pt-4 border-t">
+                                        <Label>Modo de precificação</Label>
+                                        <Select
+                                            value={pricingMode}
+                                            onValueChange={(v) => onPricingModeChange?.(v as any)}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="percent">Desconto (%)</SelectItem>
+                                                <SelectItem value="manual">Manual (por item)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     <div className="text-xs text-muted-foreground mt-2">
                                         Se o preço “computed” estiver ausente, usamos fallback automático (fixed/list/base) para não
                                         quebrar a cotação.
