@@ -235,6 +235,8 @@ export interface QuoteItemLegacy {
   manualUnitPrice?: boolean;
   /** Preço original antes do override manual (para voltar ao modo percentual) */
   originalUnitPrice?: number;
+  /** Observações específicas deste item (competição, condições especiais, etc) */
+  itemNotes?: string;
 }
 
 // -----------------------------------------------------------------------------

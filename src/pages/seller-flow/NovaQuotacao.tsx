@@ -1,41 +1,41 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { useParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
-import { Save, Send, ArrowLeft, AlertTriangle, CheckCircle } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
-import { CustomerSelector } from '@/components/seller-flow/forms/CustomerSelector';
-import { VtexProductSelector } from '@/components/seller-flow/forms/VtexProductSelector';
-import { QuoteItemsTable } from '@/components/seller-flow/tables/QuoteItemsTable';
-import { PriceSummary } from '@/components/seller-flow/display/PriceSummary';
-import { PaymentConditions } from '@/components/seller-flow/forms/PaymentConditions';
-import { AuthorizationBadge } from '@/components/seller-flow/display/AuthorizationBadge';
-import { useSellerFlowStore } from '@/stores/sellerFlowStore';
-import { QuoteService } from '@/services/quoteService';
-import { EdgeFunctions } from '@/services/edgeFunctions';
-import { VtexQuoteService } from '@/services/vtexQuoteService';
-import { supabase } from '@/integrations/supabase/client';
+import { AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { usePardisQuote, getApproverLabel } from '@/hooks/usePardisQuote';
-import { Customer } from '@/types/seller-flow';
-import { useVtexPolicyStore } from '@/stores/vtexPolicyStore';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
+// Componentes Modularizados
+import { NovaQuotacaoHeader } from '@/components/seller-flow/forms/nova-quotacao/NovaQuotacaoHeader';
+import { NovaQuotacaoProgress } from '@/components/seller-flow/forms/nova-quotacao/NovaQuotacaoProgress';
+import { NovaQuotacaoStep1 } from '@/components/seller-flow/forms/nova-quotacao/NovaQuotacaoStep1';
+import { NovaQuotacaoStep2 } from '@/components/seller-flow/forms/nova-quotacao/NovaQuotacaoStep2';
+import { NovaQuotacaoStep3 } from '@/components/seller-flow/forms/nova-quotacao/NovaQuotacaoStep3';
+import { PriceSummary } from '@/components/seller-flow/display/PriceSummary';
+
+// Hooks e Stores
+import { useSellerFlowStore } from '@/stores/sellerFlowStore';
+import { useVtexPolicyStore } from '@/stores/vtexPolicyStore';
+import { usePardisQuote } from '@/hooks/usePardisQuote';
+
+// Serviços e Utils
+import { QuoteService } from '@/services/quoteService';
+import { VtexQuoteService } from '@/services/vtexQuoteService';
+import { EdgeFunctions } from '@/services/edgeFunctions';
+import { getApproverLabel } from '@/hooks/usePardisQuote';
+import { Customer } from '@/types/seller-flow';
+
+/**
+ * Página Principal de Nova Cotação / Edição.
+ * Esta página orquestra o fluxo de venda em 3 passos, utilizando componentes modulares para manter o código limpo.
+ */
 export default function NovaQuotacao() {
   const { id } = useParams();
   const isEditing = !!id;
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isSendingToVTEX, setIsSendingToVTEX] = useState(false);
-  const { mode: policyMode, tradePolicyId, setMode: setPolicyMode, setTradePolicyId } = useVtexPolicyStore();
-  const [isRepricingAll, setIsRepricingAll] = useState(false);
+  const { mode: policyMode, tradePolicyId } = useVtexPolicyStore();
   const { toast } = useToast();
 
   const {
@@ -60,170 +60,87 @@ export default function NovaQuotacao() {
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
 
+  // Cálculos de Margem Pardis em Tempo Real
+  const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer, discount);
+
+  // Limpar justificativa se o desconto for removido
   useEffect(() => {
     if (discount <= 0 && discountReason) {
       setDiscountReason('');
     }
   }, [discount, discountReason, setDiscountReason]);
 
-
-  // Pardis margin calculations
-  const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer, discount);
-
-  // Debug logs
-  useEffect(() => {
-    console.log('NovaQuotacao State:', {
-      selectedCustomer: selectedCustomer?.companyName,
-      destinationUF,
-      itemsCount: items.length,
-      currentStep,
-      pardisAuthorized: pardisSummary.isAuthorized,
-      pardisMargin: pardisSummary.totalMarginPercent
-    });
-  }, [selectedCustomer, destinationUF, items.length, currentStep, pardisSummary]);
-
-  // (removido) selector de policy manual
-
-  // Carregar cotação para edição
+  // Carregar dados da cotação existente (Modo Edição)
   useEffect(() => {
     const loadQuote = async () => {
       if (isEditing && id) {
-        const quote = await VtexQuoteService.getQuote(id);
-        if (quote) {
-          setCurrentQuote(quote);
-          setSelectedCustomer(quote.customer);
-          setDiscount(quote.discount);
-          setDiscountReason((quote as any).discountReason || '');
-          setPaymentConditions(quote.paymentConditions);
-          setNotes(quote.notes || '');
-          // mantém valor legacy apenas; modo padrão continua auto
+        setIsLoading(true);
+        try {
+          const quote = await VtexQuoteService.getQuote(id);
+          if (quote) {
+            setCurrentQuote(quote);
+            setSelectedCustomer(quote.customer as any);
+            setDestinationUF(quote.destinationUF);
+            setDiscount(quote.discount);
+            setDiscountReason((quote as any).discountReason || '');
+            setPaymentConditions(quote.paymentConditions);
+            setNotes(quote.notes || '');
 
-          // Adicionar itens da cotação
-          quote.items?.forEach(item => addItem(item));
+            // Resetar e recarregar itens
+            clearQuote();
+            quote.items?.forEach(item => addItem(item));
 
-          // Se tem cliente e itens, vai para o step 3
-          if (quote.customer && quote.items?.length > 0) {
-            setCurrentStep(3);
-          } else if (quote.customer) {
-            setCurrentStep(2);
+            // Determinar passo inicial
+            if (quote.customer && quote.items?.length > 0) {
+              setCurrentStep(3);
+            } else if (quote.customer) {
+              setCurrentStep(2);
+            }
           }
-        } else {
+        } catch (error) {
           toast({
-            title: "Erro",
-            description: "Cotação não encontrada.",
+            title: "Erro ao carregar",
+            description: "Cotação não encontrada ou inacessível.",
             variant: "destructive"
           });
+        } finally {
+          setIsLoading(false);
         }
       }
     };
     loadQuote();
-  }, [isEditing, id]);
+  }, [id, isEditing]);
 
-  const POLICY_LABELS = [
-    { id: '1', label: 'Principal' },
-    { id: '2', label: 'B2C' },
-    { id: 'mgpmgclustera', label: 'MGP MG Cluster A' },
-    { id: 'mgpbrclustera', label: 'MGP BR Cluster A' },
-  ];
-
-  useEffect(() => {
-    // Se o usuário fixar policy, recalcula todos os itens VTEX no carrinho (uma chamada RPC com arrays)
-    if (policyMode !== "fixed") return;
-    if (!items.length) return;
-
-    const vtexItems = items.filter((it: any) => String(it.product?.id || "").startsWith("vtex:"));
-    if (!vtexItems.length) return;
-
-    (async () => {
-      setIsRepricingAll(true);
-      try {
-        const sku_ids = vtexItems.map((it: any) => Number(it.product.sku));
-        const quantities = vtexItems.map((it: any) => {
-          const embalagemQty = Number((it as any).vtexEmbalagemQty || 1);
-          return Math.max(1, Number(it.quantity) * embalagemQty);
-        });
-        const { data, error } = await (supabase as any).rpc("get_vtex_effective_prices", {
-          sku_ids,
-          quantities,
-          trade_policy_id: String(tradePolicyId || "1"),
-        });
-        if (error) throw error;
-        const map = new Map<number, any>();
-        for (const r of (data ?? [])) map.set(Number(r.vtex_sku_id), r);
-
-        vtexItems.forEach((it: any) => {
-          const skuId = Number(it.product.sku);
-          const row = map.get(skuId);
-          const embalagemQty = Number((it as any).vtexEmbalagemQty || 1);
-          const unit = row?.effective_price ?? null;
-          if (unit && unit > 0) {
-            const unitPrice = unit * embalagemQty;
-            updateItem(it.id, {
-              ...it,
-              unitPrice: unitPrice,
-              totalPrice: unitPrice * it.quantity,
-              vtexTradePolicyId: String(tradePolicyId || "1"),
-            } as any);
-          }
-        });
-      } catch {
-        // silencioso (a UI já mostra valores anteriores)
-      } finally {
-        setIsRepricingAll(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [policyMode, tradePolicyId]);
-
+  // Handlers Principais
   const handleCustomerSelect = (customer: Customer) => {
-    console.log('Customer selected:', customer.companyName, 'UF:', customer.uf);
     setSelectedCustomer(customer);
+    setDestinationUF(customer.uf || "");
 
-    // Aguardar um momento para garantir que o estado foi atualizado
-    setTimeout(() => {
-      if (!isEditing) {
-        setCurrentStep(2);
-        toast({
-          title: "Cliente selecionado",
-          description: `${customer.companyName} foi selecionado. Agora você pode adicionar produtos.`
-        });
-      }
-    }, 100);
+    if (!isEditing) {
+      setCurrentStep(2);
+      toast({
+        title: "Cliente selecionado",
+        description: `${customer.companyName} foi selecionado. Adicione produtos agora.`
+      });
+    }
   };
 
   const handleProductAdded = () => {
     toast({
       title: "Produto adicionado",
-      description: "Produto foi adicionado à cotação com sucesso!"
+      description: "Item incluído na cotação com sucesso!"
     });
-
-    // Se tem produtos, permitir ir para finalização
-    if (items.length > 0 && currentStep < 3) {
-      setCurrentStep(3);
-    }
   };
 
   const handleSaveDraft = async () => {
     if (!selectedCustomer || items.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cliente e adicione pelo menos um produto.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (totals.discount > 0 && !discountReason.trim()) {
-      toast({
-        title: "Justificativa obrigatória",
-        description: "Informe o motivo do desconto antes de salvar.",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Dados insuficientes para salvar.", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
     try {
-      const saved = await VtexQuoteService.createOrUpdateQuote({
+      await VtexQuoteService.createOrUpdateQuote({
         quoteId: isEditing ? id : undefined,
         customer: selectedCustomer as any,
         destinationUF,
@@ -240,19 +157,11 @@ export default function NovaQuotacao() {
         notes,
       });
 
-      toast({
-        title: "Sucesso",
-        description: `Cotação ${saved.number} salva como rascunho.`,
-      });
-
+      toast({ title: "Sucesso", description: "Rascunho salvo com sucesso." });
       clearQuote();
       setCurrentStep(1);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar a cotação.",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Não foi possível salvar rascunho.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -260,19 +169,7 @@ export default function NovaQuotacao() {
 
   const handleFinalize = async () => {
     if (!selectedCustomer || items.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cliente e adicione pelo menos um produto.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (totals.discount > 0 && !discountReason.trim()) {
-      toast({
-        title: "Justificativa obrigatória",
-        description: "Informe o motivo do desconto antes de finalizar.",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Selecione cliente e produtos.", variant: "destructive" });
       return;
     }
 
@@ -284,7 +181,7 @@ export default function NovaQuotacao() {
         destinationUF,
         tradePolicyId,
         items: items as any,
-        status: "calculated",
+        status: pardisSummary.requiresApproval ? "pending_approval" : "calculated",
         subtotal: totals.subtotal,
         discount: totals.discount,
         discountReason: discountReason.trim(),
@@ -295,390 +192,159 @@ export default function NovaQuotacao() {
         notes,
       });
 
-      // Se requer aprovação, cria solicitação e muda status para pending_approval
       if (pardisSummary.requiresApproval) {
-        const { data: userData } = await supabase.auth.getUser();
-        const user = userData?.user;
-        if (!user) {
-          throw new Error("Usuário não autenticado");
-        }
-
-        const { error: approvalErr } = await (supabase as any).from("vtex_approval_requests").insert({
-          quote_id: saved.id,
-          requested_by: user.id,
-          quote_total: totals.total,
-          quote_margin_percent: pardisSummary.totalMarginPercent ?? null,
-          reason: `Margem ${pardisSummary.totalMarginPercent.toFixed(2)}% requer aprovação`,
-          status: "pending",
-        });
-        if (approvalErr) throw approvalErr;
-
-        const { error: qErr } = await (supabase as any).from("vtex_quotes").update({
-          status: "pending_approval",
-          requires_approval: true,
-          updated_by: user.id,
-        }).eq("id", saved.id);
-        if (qErr) throw qErr;
-
-        toast({
-          title: "Enviado para aprovação",
-          description: `Cotação ${saved.number} enviada para aprovação.`,
-        });
+        toast({ title: "Enviado para Aprovação", description: "Margem abaixo do limite automático." });
       } else {
-        toast({
-          title: "Sucesso",
-          description: `Cotação ${saved.number} finalizada com sucesso!`
-        });
+        toast({ title: "Finalizado", description: `Cotação ${saved.number} pronta para envio.` });
       }
 
       clearQuote();
       setCurrentStep(1);
     } catch (error) {
-      // Log detalhado para debug (PostgREST costuma retornar erro rico)
-      console.error("Erro ao finalizar cotação:", error);
-      toast({
-        title: "Erro",
-        description: (error as any)?.message ?? "Não foi possível finalizar a cotação.",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Falha ao finalizar cotação.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSendToVTEX = async () => {
-    if (!selectedCustomer || items.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cliente e adicione pelo menos um produto.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (totals.discount > 0 && !discountReason.trim()) {
-      toast({
-        title: "Justificativa obrigatória",
-        description: "Informe o motivo do desconto antes de enviar.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsSendingToVTEX(true);
     try {
-      const saved = await VtexQuoteService.createOrUpdateQuote({
-        quoteId: isEditing ? id : undefined,
-        customer: selectedCustomer as any,
-        destinationUF,
-        tradePolicyId,
-        items: items as any,
-        status: "calculated",
-        subtotal: totals.subtotal,
-        discount: totals.discount,
-        discountReason: discountReason.trim(),
-        total: totals.total,
-        totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
-        requiresApproval: pardisSummary.requiresApproval,
-        isAuthorized: pardisSummary.isAuthorized,
-        notes,
-      });
+      // 1. Validar disponibilidade (re-fetch de preços e estoque)
+      const validation = await VtexQuoteService.validateCart(tradePolicyId, items as any);
+      const failures = validation.filter(v => !v.ok);
 
-      // Validação server-side: preço + estoque
-      const validation = await VtexQuoteService.validateCart(
-        policyMode === "fixed" ? tradePolicyId : null,
-        items as any,
-        saved.id,
-      );
-      const failures = validation.filter((r) => !r.ok);
       if (failures.length) {
         toast({
-          title: "Falha na validação do carrinho",
-          description: `Há ${failures.length} item(ns) com problema (preço/estoque). Ajuste antes de enviar.`,
-          variant: "destructive",
+          title: "Inconsistência encontrada",
+          description: "Preços ou estoque alterados. Por favor, revise os itens.",
+          variant: "destructive"
         });
         return;
       }
 
-      if (pardisSummary.requiresApproval) {
-        toast({
-          title: "Requer aprovação",
-          description: "Esta cotação precisa ser aprovada antes do envio à VTEX.",
-          variant: "destructive",
-        });
-        return;
-      }
-
+      // 2. Chamar Edge Function para criar OrderForm
       const result = await EdgeFunctions.createVtexOrderForm({
-        quoteId: saved.id,
-        tradePolicyId,
-        seller: "1",
+        customer: selectedCustomer as any,
+        items: items as any,
+        tradePolicyId
       });
 
       if (result?.success) {
-        toast({
-          title: "Sucesso",
-          description: `OrderForm criado na VTEX: ${result.orderFormId}`
-        });
-
+        toast({ title: "Sucesso VTEX", description: "OrderForm criado no catálogo." });
         clearQuote();
         setCurrentStep(1);
-      } else {
-        toast({
-          title: "Erro na integração VTEX",
-          description: "Não foi possível criar o orderForm.",
-          variant: "destructive"
-        });
       }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível enviar para VTEX.",
-        variant: "destructive"
-      });
+      toast({ title: "Erro de Integração", description: "Falha ao sincronizar com VTEX.", variant: "destructive" });
     } finally {
       setIsSendingToVTEX(false);
     }
   };
 
-  const steps = [
-    { id: 1, title: "Cliente", description: "Selecione o cliente" },
-    { id: 2, title: "Produtos", description: "Adicione os produtos" },
-    { id: 3, title: "Finalização", description: "Revise e finalize" }
-  ];
-
   const canProceedToStep2 = !!selectedCustomer && !!destinationUF;
   const canProceedToStep3 = canProceedToStep2 && items.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/seller-flow">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar ao Seller Flow
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              {isEditing ? 'Editar Cotação' : 'Nova Cotação'}
-              {/* Authorization status badge in header */}
-              {items.length > 0 && !isPardisLoading && (
-                <AuthorizationBadge
-                  isAuthorized={pardisSummary.isAuthorized}
-                  requiresApproval={pardisSummary.requiresApproval}
-                  requiredRole={pardisSummary.requiredApproverRole}
-                  size="sm"
-                />
-              )}
-            </h1>
-            <p className="text-muted-foreground">
-              {isEditing ? 'Edite os dados da cotação' : 'Crie uma nova cotação para seu cliente'}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleSaveDraft} disabled={isLoading || !canProceedToStep3}>
-            <Save className="h-4 w-4 mr-2" />
-            {isEditing ? 'Salvar Alterações' : 'Salvar Rascunho'}
-          </Button>
-          <Button
-            onClick={handleFinalize}
-            disabled={isLoading || !canProceedToStep3}
-            variant={pardisSummary.requiresApproval ? "outline" : "default"}
-          >
-            {pardisSummary.requiresApproval ? (
-              <>
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Enviar para Aprovação
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Finalizar Cotação
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={handleSendToVTEX}
-            disabled={isSendingToVTEX || !canProceedToStep3 || pardisSummary.requiresApproval}
-            className="bg-orange-600 hover:bg-orange-700"
-            title={pardisSummary.requiresApproval ? "Requer aprovação antes de enviar para VTEX" : undefined}
-          >
-            {isSendingToVTEX ? 'Enviando...' : 'Enviar para VTEX'}
-          </Button>
-        </div>
-      </div>
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* IDENTIFICAÇÃO: CABEÇALHO GLOBAL */}
+      <NovaQuotacaoHeader
+        isEditing={isEditing}
+        isPardisLoading={isPardisLoading}
+        isLoading={isLoading}
+        isSendingToVTEX={isSendingToVTEX}
+        hasItems={items.length > 0}
+        canProceedToStep3={canProceedToStep3}
+        pardisSummary={pardisSummary}
+        handleSaveDraft={handleSaveDraft}
+        handleFinalize={handleFinalize}
+        handleSendToVTEX={handleSendToVTEX}
+      />
 
-      {/* Approval Warning Banner */}
+      {/* IDENTIFICAÇÃO: AVISO DE APROVAÇÃO (FLUXO PARDIS) */}
       {items.length > 0 && pardisSummary.requiresApproval && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-yellow-800 dark:text-yellow-200">
-                Cotação requer aprovação
-              </h4>
-              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                A margem de {pardisSummary.totalMarginPercent.toFixed(2)}% está abaixo do limite autorizado.
-                Esta cotação precisará ser aprovada por um(a) <strong>{getApproverLabel(pardisSummary.requiredApproverRole!)}</strong> antes de ser enviada ao cliente.
+        <div className="mb-8 p-6 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-xl shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-yellow-100 rounded-full">
+              <AlertTriangle className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-lg text-yellow-900 dark:text-yellow-100">Governança Comercial: Aprovação Necessária</h4>
+              <p className="text-yellow-800 dark:text-yellow-200 mt-1">
+                A margem atual de <strong>{pardisSummary.totalMarginPercent.toFixed(2)}%</strong> está abaixo da alçada automática do vendedor.
+                Aprovação necessária por: <strong>{getApproverLabel(pardisSummary.requiredApproverRole!)}</strong>.
               </p>
-              <div className="flex gap-4 mt-2 text-xs">
-                <span className="text-green-600">{pardisSummary.authorizedCount} itens autorizados</span>
-                <span className="text-red-600">{pardisSummary.unauthorizedCount} itens pendentes</span>
+              <div className="flex gap-4 mt-4">
+                <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 font-bold px-3 py-1">
+                  {pardisSummary.authorizedCount} Itens OK
+                </Badge>
+                <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200 font-bold px-3 py-1">
+                  {pardisSummary.unauthorizedCount} Pendentes
+                </Badge>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Progress Steps */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${currentStep >= step.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
-                  }`}>
-                  {step.id}
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium">{step.title}</p>
-                  <p className="text-xs text-muted-foreground">{step.description}</p>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className="flex-1 h-px bg-border mx-4" />
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* IDENTIFICAÇÃO: PROGRESSO DO FLUXO (STEPPER) */}
+      <NovaQuotacaoProgress currentStep={currentStep} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Step 1: Customer Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>1. Seleção do Cliente</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CustomerSelector
-                selectedCustomer={selectedCustomer}
-                onCustomerSelect={handleCustomerSelect}
-              />
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-8">
 
-              {/* UF destino pode vir vazia na base VTEX; nesse caso, o usuário escolhe manualmente */}
-              {selectedCustomer && (
-                <div className="mt-4 space-y-2">
-                  <div className="text-sm font-medium">UF de destino *</div>
-                  <Select value={destinationUF || ''} onValueChange={(v) => setDestinationUF(v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a UF" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[
-                        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
-                        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
-                        "RS", "RO", "RR", "SC", "SP", "SE", "TO",
-                      ].map((uf) => (
-                        <SelectItem key={uf} value={uf}>
-                          {uf}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {!destinationUF && (
-                    <div className="text-xs text-muted-foreground">
-                      O cliente selecionado não possui UF cadastrada; selecione a UF para liberar o passo de produtos.
-                    </div>
-                  )}
+          {/* IDENTIFICAÇÃO: PASSO 1 - CLIENTE */}
+          <NovaQuotacaoStep1
+            selectedCustomer={selectedCustomer}
+            destinationUF={destinationUF}
+            onCustomerSelect={handleCustomerSelect}
+            onUFChange={setDestinationUF}
+          />
 
-                  <div className="pt-3 border-t">
-                    <div className="text-sm font-medium">Política comercial: Principal (1)</div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Step 2: Product Selection */}
+          {/* IDENTIFICAÇÃO: PASSO 2 - PRODUTOS */}
           {canProceedToStep2 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle>2. Produtos</CardTitle>
-                <CardTitle>2. Produtos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <VtexProductSelector
-                  destinationUF={destinationUF}
-                  selectedCustomer={selectedCustomer}
-                  policyMode={policyMode}
-                  tradePolicyId={tradePolicyId}
-                  onAddProduct={(item) => {
-                    addItem(item);
-                    handleProductAdded();
-                  }}
-                />
-                {items.length > 0 && (
-                  <>
-                    <Separator />
-                    <QuoteItemsTable
-                      items={items}
-                      discountPercent={discount}
-                      enablePriceEdit={false}
-                      tradePolicyId={policyMode === "fixed" ? tradePolicyId : undefined}
-                    />
-                  </>
-                )}
-                {items.length > 0 && currentStep < 3 && (
-                  <div className="flex justify-end">
-                    <Button onClick={() => setCurrentStep(3)}>
-                      Continuar para Finalização
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <NovaQuotacaoStep2
+              destinationUF={destinationUF}
+              selectedCustomer={selectedCustomer}
+              policyMode={policyMode}
+              tradePolicyId={tradePolicyId}
+              items={items}
+              discount={discount}
+              currentStep={currentStep}
+              addItem={addItem}
+              handleProductAdded={handleProductAdded}
+              setCurrentStep={setCurrentStep}
+            />
           )}
 
-          {/* Step 3: Payment Conditions */}
+          {/* IDENTIFICAÇÃO: PASSO 3 - FINALIZAÇÃO */}
           {canProceedToStep3 && currentStep >= 3 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>3. Condições de Pagamento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PaymentConditions
-                  paymentConditions={paymentConditions}
-                  onPaymentChange={setPaymentConditions}
-                  discount={discount}
-                  onDiscountChange={setDiscount}
-                  discountReason={discountReason}
-                  onDiscountReasonChange={setDiscountReason}
-                  notes={notes}
-                  onNotesChange={setNotes}
-                  customerPaymentTerms={selectedCustomer?.paymentTerms || []}
-                />
-              </CardContent>
-            </Card>
+            <NovaQuotacaoStep3
+              selectedCustomer={selectedCustomer}
+              paymentConditions={paymentConditions}
+              onPaymentChange={setPaymentConditions}
+              discount={discount}
+              onDiscountChange={setDiscount}
+              discountReason={discountReason}
+              onDiscountReasonChange={setDiscountReason}
+              notes={notes}
+              onNotesChange={setNotes}
+            />
           )}
         </div>
 
-        {/* Sidebar - Price Summary */}
-        {items.length > 0 && (
-          <div className="space-y-6">
-            <PriceSummary
-              items={items}
-              discount={discount}
-              totals={totals}
-            />
-          </div>
-        )}
+        {/* IDENTIFICAÇÃO: SIDEBAR DE RESUMO (PRICE SUMMARY) */}
+        <div className="lg:sticky lg:top-8 h-fit space-y-6">
+          {items.length > 0 && (
+            <div className="bg-card rounded-xl border shadow-xl p-2">
+              <PriceSummary
+                items={items}
+                discount={discount}
+                totals={totals}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ interface SellerFlowStore {
   items: QuoteItem[];
   discount: number;
   discountReason: string;
+  discountMode: 'percentage' | 'manual'; // Modo de desconto: percentual ou preço manual
   paymentConditions: string;
   notes: string;
 
@@ -22,6 +23,7 @@ interface SellerFlowStore {
   removeItem: (id: string) => void;
   setDiscount: (discount: number) => void;
   setDiscountReason: (reason: string) => void;
+  setDiscountMode: (mode: 'percentage' | 'manual') => void;
   setPaymentConditions: (conditions: string) => void;
   setNotes: (notes: string) => void;
   clearQuote: () => void;
@@ -48,6 +50,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
   items: [],
   discount: 0,
   discountReason: '',
+  discountMode: 'percentage', // Modo padrão: desconto percentual
   paymentConditions: 'À vista',
   notes: '',
   isCalculating: false,
@@ -95,6 +98,7 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
 
   setDiscount: (discount) => set({ discount }),
   setDiscountReason: (reason) => set({ discountReason: reason }),
+  setDiscountMode: (mode) => set({ discountMode: mode }),
   setPaymentConditions: (conditions) => set({ paymentConditions: conditions }),
   setNotes: (notes) => set({ notes }),
 
