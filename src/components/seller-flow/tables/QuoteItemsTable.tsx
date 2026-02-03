@@ -259,7 +259,7 @@ export function QuoteItemsTable({
           <TableRow>
             <TableHead>Produto</TableHead>
             <TableHead className="text-center">Qtd</TableHead>
-            <TableHead className="text-right">Preço (Embalagem)</TableHead>
+            <TableHead className="text-right">Preço Unit. (Emb.)</TableHead>
             <TableHead>
               <div className="flex items-center gap-2">
                 <span>Policy (Principal)</span>

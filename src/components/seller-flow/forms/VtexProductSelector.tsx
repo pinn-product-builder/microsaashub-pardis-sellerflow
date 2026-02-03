@@ -16,6 +16,13 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     Table,
     TableBody,
     TableCell,
@@ -77,6 +84,8 @@ interface VtexProductSelectorProps {
     selectedCustomer: Customer | null;
     policyMode?: "auto" | "fixed";
     tradePolicyId?: string; // usado quando policyMode === 'fixed'
+    pricingMode?: "percent" | "manual";
+    onPricingModeChange?: (mode: "percent" | "manual") => void;
     onAddProduct: (item: QuoteItem) => void;
 }
 
@@ -85,6 +94,8 @@ export function VtexProductSelector({
     selectedCustomer,
     policyMode = "auto",
     tradePolicyId = "1",
+    pricingMode = "percent",
+    onPricingModeChange,
     onAddProduct,
 }: VtexProductSelectorProps) {
     const [open, setOpen] = useState(false);
@@ -346,7 +357,6 @@ export function VtexProductSelector({
                                         </div>
                                     ) : (
                                         <>
-                                            {/* min-width evita o "nome quebrado por letra" quando o painel fica estreito */}
                                             <Table className="min-w-[640px]">
                                                 <TableHeader>
                                                     <TableRow>
@@ -469,21 +479,39 @@ export function VtexProductSelector({
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm">Adicionar na Cotação</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="space-y-2">
-                                        <Label>Quantidade</Label>
-                                        <Input
-                                            type="number"
-                                            min={1}
-                                            value={quantity}
-                                            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
-                                        />
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-4 pt-4 border-t">
+                                        <div className="space-y-2">
+                                            <Label>Modo de precificação</Label>
+                                            <Select
+                                                value={pricingMode}
+                                                onValueChange={(v) => onPricingModeChange?.(v as any)}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="percent">Desconto (%)</SelectItem>
+                                                    <SelectItem value="manual">Manual (por item)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Quantidade</Label>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                value={quantity}
+                                                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
+                                            />
+                                        </div>
                                     </div>
                                     <Button onClick={handleAdd} disabled={!selected || isAdding} className="w-full">
                                         <Plus className="h-4 w-4 mr-2" />
                                         {isAdding ? "Adicionando..." : "Adicionar"}
                                     </Button>
-                                    <div className="text-xs text-muted-foreground">
+                                    <div className="text-xs text-muted-foreground mt-2">
                                         Se o preço “computed” estiver ausente, usamos fallback automático (fixed/list/base) para não
                                         quebrar a cotação.
                                     </div>

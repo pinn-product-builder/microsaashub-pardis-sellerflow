@@ -13,7 +13,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Pré-carregar cache de regras fiscais
+// Re-trigger Vercel build
 initializeTaxRulesCache().catch(console.error);
 
 createRoot(document.getElementById("root")!).render(

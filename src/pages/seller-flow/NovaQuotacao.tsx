@@ -638,20 +638,7 @@ export default function NovaQuotacao() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle>2. Produtos</CardTitle>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Modo de precificação:</span>
-                    <Select value={pricingMode} onValueChange={(v) => handlePricingModeChange(v as any)}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percent">Desconto (%)</SelectItem>
-                        <SelectItem value="manual">Manual (por item)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                <CardTitle>2. Produtos</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <VtexProductSelector
@@ -659,6 +646,8 @@ export default function NovaQuotacao() {
                   selectedCustomer={selectedCustomer}
                   policyMode={policyMode}
                   tradePolicyId={tradePolicyId}
+                  pricingMode={pricingMode}
+                  onPricingModeChange={handlePricingModeChange}
                   onAddProduct={(item) => {
                     addItem(item);
                     handleProductAdded();
