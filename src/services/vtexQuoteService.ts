@@ -174,35 +174,38 @@ export class VtexQuoteService {
 
     // FIX: Garantir que existe uma solicitação de aprovação se o status for pending_approval
     if (params.status === 'pending_approval') {
-      try {
-        const { data: existingRequest } = await (supabase as any)
-          .from('vtex_approval_requests')
-          .select('id')
-          .eq('quote_id', quoteId)
-          .eq('status', 'pending')
-          .maybeSingle();
+      const { data: existingRequest, error: searchError } = await (supabase as any)
+        .from('vtex_approval_requests')
+        .select('id')
+        .eq('quote_id', quoteId)
+        .eq('status', 'pending')
+        .maybeSingle();
 
-        if (!existingRequest) {
-          await (supabase as any).from('vtex_approval_requests').insert({
-            quote_id: quoteId,
-            quote_total: params.total,
-            quote_margin_percent: params.totalMarginPercent ?? 0,
-            reason: params.notes ?? 'Margem abaixo do limite', // Fallback reason
-            requested_by: user.id,
-            status: 'pending',
-            requested_at: new Date().toISOString()
-          });
+      if (searchError) throw new Error(`Erro ao verificar aprovações: ${searchError.message}`);
 
-          await this.logEvent({
-            quoteId,
-            eventType: "approval_requested",
-            message: "Solicitação de aprovação criada automaticamente",
-            createdBy: user.id
-          });
+      if (!existingRequest) {
+        const { error: approvalError } = await (supabase as any).from('vtex_approval_requests').insert({
+          quote_id: quoteId,
+          quote_total: params.total,
+          quote_margin_percent: params.totalMarginPercent ?? 0,
+          reason: params.notes ?? 'Margem abaixo do limite',
+          requested_by: user.id,
+          status: 'pending',
+          requested_at: new Date().toISOString(),
+          rule_id: null // Explicit null
+        });
+
+        if (approvalError) {
+          console.error("Erro CRÍTICO ao criar aprovação:", approvalError);
+          throw new Error(`Falha ao criar ticket de aprovação: ${approvalError.message} (Code: ${approvalError.code})`);
         }
-      } catch (err) {
-        console.error("Erro ao criar solicitação de aprovação:", err);
-        // Não lançar erro para não bloquear o fluxo principal, mas logar
+
+        await this.logEvent({
+          quoteId,
+          eventType: "approval_requested",
+          message: "Solicitação de aprovação criada automaticamente",
+          createdBy: user.id
+        });
       }
     }
 
@@ -343,4 +346,3 @@ export class VtexQuoteService {
     return results;
   }
 }
-
