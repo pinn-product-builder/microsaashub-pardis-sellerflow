@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, CheckCircle, Package } from "lucide-react";
+import { Search, Plus, CheckCircle, Package, DollarSign } from "lucide-react";
 import { getEmbalagemQty } from "@/utils/vtexUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -113,6 +113,7 @@ export function VtexProductSelector({
 
     const [selected, setSelected] = useState<CatalogRow | null>(null);
     const [quantity, setQuantity] = useState(1);
+    const [manualPrice, setManualPrice] = useState<string>("");
     const [isAdding, setIsAdding] = useState(false);
     const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
     const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<string, number | null>>({});
@@ -151,6 +152,19 @@ export function VtexProductSelector({
         runSearch((debouncedQ || "").trim());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [debouncedQ, open, off]);
+
+    // Reseta/inicializa manualPrice quando o produto selecionado mudar
+    useEffect(() => {
+        if (selected) {
+            const qty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
+            const price = selected.selling_price ? (selected.selling_price * qty).toFixed(2) : "";
+            setManualPrice(price);
+            setQuantity(1);
+        } else {
+            setManualPrice("");
+            setQuantity(1);
+        }
+    }, [selected]);
 
     const fetchEffectivePriceForPolicy = async (skuId: number, qtyUnits: number, policyId: string) => {
         const args: any = { sku_ids: [skuId], quantities: [qtyUnits], trade_policy_id: policyId };
@@ -247,17 +261,18 @@ export function VtexProductSelector({
                 policyMode === "fixed"
                     ? { row: await fetchEffectivePriceForPolicy(skuId, qtyUnits, String(tradePolicyId || "1")), policyId: String(tradePolicyId || "1") }
                     : await fetchEffectivePriceAuto(skuId, qtyUnits);
-            const unit = picked.row?.effective_price ?? null;
 
-            if (!unit || unit <= 0) {
+            // Prioridade para o preço manual editado no modal
+            const finalPackagingPrice = manualPrice ? parseFloat(manualPrice) : (picked.row?.effective_price ?? 0) * embalagemQty;
+
+            if (finalPackagingPrice <= 0) {
                 toast({
-                    title: "SKU sem preço",
-                    description: `Não encontramos preço para o SKU ${skuId} nas policies permitidas.`,
+                    title: "Preço inválido",
+                    description: `O preço deve ser maior que zero.`,
                     variant: "destructive",
                 });
                 return;
             }
-            const unitPrice = unit * embalagemQty;
 
             const product: Product = {
                 id: `vtex:${skuId}`,
@@ -267,7 +282,7 @@ export function VtexProductSelector({
                 weight: 0.5,
                 dimensions: { length: 10, width: 10, height: 10 },
                 // para margem/validações: usar custo por embalagem quando disponível
-                baseCost: (picked.row?.cost_price ?? unit) * embalagemQty,
+                baseCost: (picked.row?.cost_price ?? (picked.row?.effective_price || 0)) * embalagemQty,
                 description: selected.sku_name ?? undefined,
             };
 
@@ -275,7 +290,7 @@ export function VtexProductSelector({
                 product,
                 quantity,
                 destinationUF,
-                unitPrice,
+                finalPackagingPrice,
                 selectedCustomer
             );
             (quoteItem as any).vtexTradePolicyId = picked.policyId;
@@ -284,12 +299,13 @@ export function VtexProductSelector({
             onAddProduct(quoteItem);
             toast({
                 title: "Produto VTEX adicionado",
-                description: `${product.name} (${formatCurrency(unitPrice)}) foi adicionado à cotação.`,
+                description: `${product.name} (${formatCurrency(finalPackagingPrice)}) foi adicionado à cotação.`,
                 action: <CheckCircle className="h-4 w-4 text-green-600" />,
             });
 
             setSelected(null);
             setQuantity(1);
+            setManualPrice("");
             setOpen(false);
         } catch (e: any) {
             toast({
@@ -313,210 +329,278 @@ export function VtexProductSelector({
                         variant="outline"
                         disabled={!isButtonEnabled}
                         title={!isButtonEnabled ? "Selecione um cliente primeiro" : "Adicionar produto VTEX"}
+                        className="font-medium"
                     >
                         <Plus className="h-4 w-4 mr-2" />
                         Adicionar Produto (VTEX)
                     </Button>
                 </DialogTrigger>
 
-                <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Selecionar Produto (VTEX)</DialogTitle>
-                        Política Comercial: Principal (1)
+                <DialogContent className="max-w-[1200px] w-[95vw] max-h-[95vh] overflow-hidden flex flex-col p-0 gap-0 border-none shadow-2xl">
+                    <DialogHeader className="p-6 pb-4 border-b bg-muted/30">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <DialogTitle className="text-xl font-bold">Catálogo VTEX</DialogTitle>
+                                <p className="text-sm text-muted-foreground mt-1">Política Comercial: <span className="font-semibold text-primary">Principal (1)</span></p>
+                            </div>
+                        </div>
                     </DialogHeader>
 
-                    <div className="space-y-4 flex-1 overflow-hidden">
+                    <div className="flex-1 overflow-hidden flex flex-col p-6 space-y-6">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 value={q}
                                 onChange={(e) => setQ(e.target.value)}
-                                className="pl-10"
-                                placeholder="Buscar no catálogo VTEX (nome, SKU, EAN, ref...)"
+                                className="pl-10 h-11 text-base shadow-sm border-muted-foreground/20 focus-visible:ring-primary/30"
+                                placeholder="Buscar por nome, SKU, EAN ou referência..."
                             />
                         </div>
 
-                        {err && <div className="text-sm text-red-600">{err}</div>}
+                        {err && (
+                            <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md border border-destructive/20">
+                                {err}
+                            </div>
+                        )}
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full overflow-hidden">
-                            <Card className="overflow-hidden">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm">Resultados</CardTitle>
+                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px_300px] gap-6 flex-1 overflow-hidden">
+                            {/* Column 1: Search Results */}
+                            <Card className="flex flex-col overflow-hidden border-muted/60 shadow-sm">
+                                <CardHeader className="py-3 px-4 border-b bg-muted/10">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Resultados da Busca</CardTitle>
+                                        <Badge variant="outline" className="text-[10px]">{rows.length} itens</Badge>
+                                    </div>
                                 </CardHeader>
-                                <CardContent className="p-0 overflow-x-auto overflow-y-auto max-h-96">
+                                <CardContent className="p-0 flex-1 overflow-auto">
                                     {loading ? (
-                                        <div className="p-4 space-y-2">
-                                            {[1, 2, 3, 4, 5].map((i) => (
-                                                <Skeleton key={i} className="h-12 w-full" />
+                                        <div className="p-4 space-y-3">
+                                            {[1, 2, 3, 4, 5, 6].map((i) => (
+                                                <Skeleton key={i} className="h-16 w-full rounded-lg" />
                                             ))}
                                         </div>
                                     ) : rows.length === 0 ? (
-                                        <div className="p-6 text-center text-muted-foreground">
-                                            <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                                            <div>Nenhum item encontrado</div>
+                                        <div className="flex flex-col items-center justify-center h-full py-12 text-center text-muted-foreground">
+                                            <Package className="h-12 w-12 mb-4 opacity-20" />
+                                            <p className="text-base">Nenhum produto encontrado</p>
+                                            <p className="text-xs max-w-[200px] mt-1">Tente ajustar os termos da sua busca</p>
                                         </div>
                                     ) : (
-                                        <>
-                                            <Table className="min-w-[640px]">
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead className="w-[72px]">SKU</TableHead>
-                                                        <TableHead>Produto</TableHead>
-                                                        <TableHead className="text-right w-[84px]">Estoque</TableHead>
-                                                        <TableHead className="text-right w-[120px]">Preço</TableHead>
-                                                        <TableHead className="text-right w-[110px]">Fonte</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {rows.map((r) => (
-                                                        <TableRow
-                                                            key={r.vtex_sku_id}
-                                                            className={`cursor-pointer ${selected?.vtex_sku_id === r.vtex_sku_id ? "bg-muted" : ""}`}
-                                                            onClick={() => setSelected(r)}
-                                                        >
-                                                            <TableCell className="font-mono text-xs align-top whitespace-nowrap">
-                                                                {r.vtex_sku_id}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="font-medium text-sm leading-5 whitespace-normal break-words">
-                                                                    {r.product_name ?? r.sku_name ?? "-"}
+                                        <Table>
+                                            <TableHeader className="bg-muted/5 sticky top-0 z-10">
+                                                <TableRow>
+                                                    <TableHead className="w-[80px] text-xs uppercase font-bold">SKU</TableHead>
+                                                    <TableHead className="text-xs uppercase font-bold">Produto</TableHead>
+                                                    <TableHead className="text-right w-[100px] text-xs uppercase font-bold">Preço (Emb.)</TableHead>
+                                                    <TableHead className="text-right w-[80px] text-xs uppercase font-bold">Estoque</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {rows.map((r) => (
+                                                    <TableRow
+                                                        key={r.vtex_sku_id}
+                                                        className={`cursor-pointer transition-colors hover:bg-primary/5 ${selected?.vtex_sku_id === r.vtex_sku_id ? "bg-primary/10 border-l-2 border-l-primary" : ""}`}
+                                                        onClick={() => setSelected(r)}
+                                                    >
+                                                        <TableCell className="font-mono text-xs align-middle">
+                                                            {r.vtex_sku_id}
+                                                        </TableCell>
+                                                        <TableCell className="align-middle">
+                                                            <div className="font-semibold text-sm line-clamp-1">
+                                                                {r.product_name ?? r.sku_name ?? "-"}
+                                                            </div>
+                                                            {r.sku_name && r.sku_name !== r.product_name && (
+                                                                <div className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
+                                                                    {r.sku_name}
                                                                 </div>
-                                                                {r.sku_name && r.sku_name !== r.product_name && (
-                                                                    <div className="text-xs text-muted-foreground whitespace-normal break-words">
-                                                                        {r.sku_name}
-                                                                    </div>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-right font-mono text-xs whitespace-nowrap align-top">
-                                                                {typeof r.available_quantity === "number"
-                                                                    ? r.available_quantity.toFixed(0)
-                                                                    : "-"}
-                                                            </TableCell>
-                                                            <TableCell className="text-right font-mono text-sm whitespace-nowrap align-top">
-                                                                {(() => {
-                                                                    const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name) ?? 1;
-                                                                    return typeof r.selling_price === "number" ? formatCurrency(r.selling_price * qty) : "-";
-                                                                })()}
-                                                            </TableCell>
-                                                            <TableCell className="text-right align-top whitespace-nowrap">
-                                                                {r.price_available === false ? (
-                                                                    <Badge variant="destructive" className="text-[10px] px-2 py-0.5 inline-flex">
-                                                                        sem preço
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 inline-flex">
-                                                                        {r.price_source ?? "-"}
-                                                                    </Badge>
-                                                                )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold text-sm text-primary align-middle">
+                                                            {(() => {
+                                                                const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name) ?? 1;
+                                                                return typeof r.selling_price === "number" ? formatCurrency(r.selling_price * qty) : "-";
+                                                            })()}
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono text-xs align-middle">
+                                                            {typeof r.available_quantity === "number"
+                                                                ? r.available_quantity.toFixed(0)
+                                                                : "-"}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
                                     )}
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm">{selected ? "Detalhes" : "Selecione um item"}</CardTitle>
+                            {/* Column 2: Product Details */}
+                            <Card className="flex flex-col border-muted/60 shadow-sm">
+                                <CardHeader className="py-3 px-4 border-b bg-muted/10">
+                                    <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Detalhes do Produto</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
+                                <CardContent className="p-5 space-y-5">
                                     {selected ? (
                                         <>
-                                            <div>
-                                                <Label className="text-xs text-muted-foreground">SKU</Label>
-                                                <div className="font-mono">{selected.vtex_sku_id}</div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Identificação</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded">SKU {selected.vtex_sku_id}</span>
+                                                    {selected.ref_id && <span className="text-xs text-muted-foreground">Ref: {selected.ref_id}</span>}
+                                                </div>
                                             </div>
-                                            <div>
-                                                <Label className="text-xs text-muted-foreground">Produto</Label>
-                                                <div className="text-sm font-medium">{selected.product_name ?? "-"}</div>
-                                                <div className="text-xs text-muted-foreground">{selected.sku_name ?? ""}</div>
+
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Nome / SKU Name</Label>
+                                                <div className="text-sm font-bold leading-snug">{selected.product_name ?? "-"}</div>
+                                                <div className="text-[11px] text-muted-foreground italic leading-tight">{selected.sku_name ?? ""}</div>
                                             </div>
-                                            <div className="flex gap-2 flex-wrap">
-                                                {selected.ean && <Badge variant="outline">EAN: {selected.ean}</Badge>}
-                                                {selected.ref_id && <Badge variant="outline">Ref: {selected.ref_id}</Badge>}
-                                                {selected.embalagem && <Badge variant="outline">{selected.embalagem}</Badge>}
-                                                {selected.gramatura && <Badge variant="outline">{selected.gramatura}</Badge>}
+
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {selected.ean && <Badge variant="secondary" className="text-[10px] font-normal px-2">EAN: {selected.ean}</Badge>}
+                                                {selected.embalagem && <Badge variant="secondary" className="text-[10px] font-normal px-2 bg-blue-50 text-blue-700 border-blue-100">{selected.embalagem}</Badge>}
+                                                {selected.gramatura && <Badge variant="secondary" className="text-[10px] font-normal px-2">{selected.gramatura}</Badge>}
                                             </div>
-                                            <div>
-                                                <Label className="text-xs text-muted-foreground">Preço (Policy Principal)</Label>
+
+                                            <div className="space-y-2 pt-4 border-t">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Preço Original (VTEX)</Label>
                                                 {(() => {
                                                     const qty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name);
-                                                    if (typeof selected.selling_price !== "number") return <div className="text-lg font-semibold">-</div>;
+                                                    if (typeof selected.selling_price !== "number") return <div className="text-2xl font-black text-primary">-</div>;
                                                     const total = selected.selling_price * (qty ?? 1);
                                                     return (
-                                                        <>
-                                                            <div className="text-lg font-semibold">{formatCurrency(total)}</div>
+                                                        <div className="space-y-0.5">
+                                                            <div className="text-2xl font-black text-primary tracking-tighter">{formatCurrency(total)}</div>
                                                             {qty && qty > 1 && (
-                                                                <div className="text-sm text-muted-foreground">
-                                                                    Embalagem com {qty} unidades
+                                                                <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                                    <Package className="h-3 w-3" />
+                                                                    Pack com {qty} unidades
                                                                 </div>
                                                             )}
-                                                        </>
+                                                            <div className="text-[9px] text-muted-foreground mt-1 bg-muted px-2 py-0.5 rounded-full inline-block">
+                                                                Origem: <span className="font-mono uppercase">{selected.price_source ?? "computed"}</span>
+                                                            </div>
+                                                        </div>
                                                     );
                                                 })()}
-                                                <div className="text-xs text-muted-foreground mt-1">
-                                                    Fonte:{" "}
-                                                    <span className="font-mono">
-                                                        {selected.price_source ?? (selected.price_available === false ? "missing" : "-")}
+                                            </div>
+
+                                            <div className="space-y-1.5 pt-4 border-t">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Disponibilidade</Label>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-muted-foreground">Estoque Atual:</span>
+                                                    <span className={`text-sm font-bold ${selected.available_quantity && selected.available_quantity > 0 ? "text-green-600" : "text-destructive"}`}>
+                                                        {typeof selected.available_quantity === "number" ? selected.available_quantity.toFixed(0) : "N/I"} un.
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <Label className="text-xs text-muted-foreground">Preços por policy</Label>
-                                                <div className="text-sm text-muted-foreground">Política única configurada: Principal (1)</div>
-                                            </div>
                                         </>
                                     ) : (
-                                        <div className="text-sm text-muted-foreground">Clique em um item da lista para ver detalhes.</div>
+                                        <div className="flex flex-col items-center justify-center h-48 text-center px-4">
+                                            <Package className="h-10 w-10 mb-3 opacity-10" />
+                                            <p className="text-xs text-muted-foreground">Clique em um produto à esquerda para visualizar todos os detalhes técnicos e preços.</p>
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm">Adicionar na Cotação</CardTitle>
+                            {/* Column 3: Add to Quote Form */}
+                            <Card className="flex flex-col border-primary/20 shadow-lg ring-1 ring-primary/5">
+                                <CardHeader className="py-3 px-4 border-b bg-primary/5 text-primary">
+                                    <div className="flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4" />
+                                        <CardTitle className="text-sm font-bold uppercase tracking-wider">Adicionar na Cotação</CardTitle>
+                                    </div>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-4 pt-4 border-t">
-                                        <div className="space-y-2">
-                                            <Label>Quantidade</Label>
-                                            <Input
-                                                type="number"
-                                                min={1}
-                                                value={quantity}
-                                                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
-                                            />
+                                <CardContent className="p-5 flex-1 flex flex-col">
+                                    {!selected ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
+                                            <div className="bg-muted p-4 rounded-full mb-4">
+                                                <Plus className="h-8 w-8 text-muted-foreground" />
+                                            </div>
+                                            <p className="text-xs font-medium">Selecione um produto para configurar a inclusão</p>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="space-y-5 flex-1 flex flex-col">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Quantidade</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={1}
+                                                        value={quantity}
+                                                        onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
+                                                        className="h-10 font-bold border-muted-foreground/30 focus-visible:ring-primary/20"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Modo Preço</Label>
+                                                    <Select
+                                                        value={pricingMode}
+                                                        onValueChange={(v) => onPricingModeChange?.(v as any)}
+                                                    >
+                                                        <SelectTrigger className="h-10 text-xs border-muted-foreground/30 focus:ring-primary/20">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="percent" className="text-xs">Desconto (%)</SelectItem>
+                                                            <SelectItem value="manual" className="text-xs">Manual (Item)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
 
-                                    <Button onClick={handleAdd} disabled={!selected || isAdding} className="w-full">
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        {isAdding ? "Adicionando..." : "Adicionar"}
-                                    </Button>
+                                            <div className="space-y-1.5 bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+                                                <Label className="text-[10px] uppercase font-bold text-primary tracking-tight">Preço de Venda (Embalagem)</Label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">R$</span>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={manualPrice}
+                                                        onChange={(e) => setManualPrice(e.target.value)}
+                                                        className="h-12 pl-10 text-lg font-black bg-white border-primary/20 focus-visible:ring-primary/30 shadow-inner"
+                                                        placeholder="0,00"
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground leading-tight px-1">
+                                                    Ajuste o valor final por embalagem que será enviado para a cotação.
+                                                </p>
+                                            </div>
 
-                                    <div className="space-y-2 pt-4 border-t">
-                                        <Label>Modo de precificação</Label>
-                                        <Select
-                                            value={pricingMode}
-                                            onValueChange={(v) => onPricingModeChange?.(v as any)}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="percent">Desconto (%)</SelectItem>
-                                                <SelectItem value="manual">Manual (por item)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                            <div className="mt-auto space-y-4 pt-4 border-t">
+                                                <div className="flex justify-between items-center px-1">
+                                                    <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-widest">Total do Item</span>
+                                                    <span className="text-xl font-black text-primary">
+                                                        {formatCurrency((parseFloat(manualPrice) || 0) * quantity)}
+                                                    </span>
+                                                </div>
 
-                                    <div className="text-xs text-muted-foreground mt-2">
-                                        Se o preço “computed” estiver ausente, usamos fallback automático (fixed/list/base) para não
-                                        quebrar a cotação.
-                                    </div>
+                                                <Button
+                                                    onClick={handleAdd}
+                                                    disabled={!selected || isAdding}
+                                                    className="w-full h-12 text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform active:scale-[0.98]"
+                                                >
+                                                    {isAdding ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Skeleton className="h-4 w-4 rounded-full bg-white/20 animate-pulse" />
+                                                            <span>Processando...</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <Plus className="h-5 w-5" />
+                                                            <span>ADICIONAR NA COTAÇÃO</span>
+                                                        </div>
+                                                    )}
+                                                </Button>
+
+                                                <div className="text-[9px] text-center text-muted-foreground px-4 leading-normal">
+                                                    Ao adicionar, usaremos o cálculo de margem e impostos baseado no destino:
+                                                    <span className="font-bold text-primary ml-1">{destinationUF}</span>.
+                                                </div>
+                                            </div>
+                                        </div >
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
