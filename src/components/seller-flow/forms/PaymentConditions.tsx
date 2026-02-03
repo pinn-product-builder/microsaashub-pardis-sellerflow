@@ -21,11 +21,9 @@ interface PaymentConditionsProps {
   notes: string;
   onNotesChange: (value: string) => void;
   customerPaymentTerms: string[];
-  pricingMode: 'percent' | 'manual';
 }
 
 export function PaymentConditions({
-  pricingMode,
   paymentConditions,
   onPaymentChange,
   discount,
@@ -59,36 +57,26 @@ export function PaymentConditions({
           </Select>
         </div>
 
-        {pricingMode === 'percent' ? (
-          <div className="space-y-2">
-            <Label htmlFor="discount">Desconto (%)</Label>
-            <Input
-              id="discount"
-              type="number"
-              min="0"
-              max="20"
-              step="0.1"
-              value={discount}
-              onChange={(e) => onDiscountChange(parseFloat(e.target.value) || 0)}
-              placeholder="0.0"
-            />
-            <p className="text-xs text-muted-foreground">
-              Desconto máximo permitido: 20%
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Label className="text-muted-foreground">Desconto (%)</Label>
-            <Input id="discount" value="-" disabled />
-            <p className="text-xs text-muted-foreground">
-              Desabilitado no modo manual.
-            </p>
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label htmlFor="discount">Desconto (%)</Label>
+          <Input
+            id="discount"
+            type="number"
+            min="0"
+            max="20"
+            step="0.1"
+            value={discount}
+            onChange={(e) => onDiscountChange(parseFloat(e.target.value) || 0)}
+            placeholder="0.0"
+          />
+          <p className="text-xs text-muted-foreground">
+            Desconto máximo permitido: 20%
+          </p>
+        </div>
       </div>
 
       <div className="space-y-2">
-        {pricingMode === 'percent' && discount > 0 && (
+        {discount > 0 && (
           <div className="space-y-2">
             <Label htmlFor="discountReason">Justificativa do desconto <span className="text-destructive">*</span></Label>
             <Textarea

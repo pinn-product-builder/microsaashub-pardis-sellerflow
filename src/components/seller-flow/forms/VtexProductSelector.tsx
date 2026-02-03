@@ -84,8 +84,6 @@ interface VtexProductSelectorProps {
     selectedCustomer: Customer | null;
     policyMode?: "auto" | "fixed";
     tradePolicyId?: string; // usado quando policyMode === 'fixed'
-    pricingMode?: "percent" | "manual";
-    onPricingModeChange?: (mode: "percent" | "manual") => void;
     onAddProduct: (item: QuoteItem) => void;
 }
 
@@ -94,8 +92,6 @@ export function VtexProductSelector({
     selectedCustomer,
     policyMode = "auto",
     tradePolicyId = "1",
-    pricingMode = "percent",
-    onPricingModeChange,
     onAddProduct,
 }: VtexProductSelectorProps) {
     const [open, setOpen] = useState(false);
@@ -113,7 +109,7 @@ export function VtexProductSelector({
 
     const [selected, setSelected] = useState<CatalogRow | null>(null);
     const [quantity, setQuantity] = useState(1);
-    const [manualPrice, setManualPrice] = useState<string>("");
+    const [itemDiscount, setItemDiscount] = useState<number>(0);
     const [isAdding, setIsAdding] = useState(false);
     const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
     const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<string, number | null>>({});
@@ -156,13 +152,11 @@ export function VtexProductSelector({
     // Reseta/inicializa manualPrice quando o produto selecionado mudar
     useEffect(() => {
         if (selected) {
-            const qty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
-            const price = selected.selling_price ? (selected.selling_price * qty).toFixed(2) : "";
-            setManualPrice(price);
             setQuantity(1);
+            setItemDiscount(0);
         } else {
-            setManualPrice("");
             setQuantity(1);
+            setItemDiscount(0);
         }
     }, [selected]);
 
@@ -262,8 +256,8 @@ export function VtexProductSelector({
                     ? { row: await fetchEffectivePriceForPolicy(skuId, qtyUnits, String(tradePolicyId || "1")), policyId: String(tradePolicyId || "1") }
                     : await fetchEffectivePriceAuto(skuId, qtyUnits);
 
-            // Prioridade para o preço manual editado no modal
-            const finalPackagingPrice = manualPrice ? parseFloat(manualPrice) : (picked.row?.effective_price ?? 0) * embalagemQty;
+            const packagingPrice = (picked.row?.effective_price ?? 0) * embalagemQty;
+            const finalPackagingPrice = packagingPrice * (1 - itemDiscount / 100);
 
             if (finalPackagingPrice <= 0) {
                 toast({
@@ -296,6 +290,20 @@ export function VtexProductSelector({
             (quoteItem as any).vtexTradePolicyId = picked.policyId;
             (quoteItem as any).vtexEmbalagemQty = embalagemQty;
 
+            // Registrar o desconto manual se houver
+            if (itemDiscount > 0) {
+                quoteItem.discounts = [
+                    ...(quoteItem.discounts || []),
+                    {
+                        type: 'MANUAL',
+                        description: 'Ajuste comercial',
+                        percentage: itemDiscount,
+                        amount: packagingPrice * (itemDiscount / 100),
+                        priority: 1,
+                    }
+                ];
+            }
+
             onAddProduct(quoteItem);
             toast({
                 title: "Produto VTEX adicionado",
@@ -305,7 +313,7 @@ export function VtexProductSelector({
 
             setSelected(null);
             setQuantity(1);
-            setManualPrice("");
+            setItemDiscount(0);
             setOpen(false);
         } catch (e: any) {
             toast({
@@ -522,49 +530,31 @@ export function VtexProductSelector({
                                         </div>
                                     ) : (
                                         <div className="space-y-5 flex-1 flex flex-col">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Quantidade</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min={1}
-                                                        value={quantity}
-                                                        onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
-                                                        className="h-10 font-bold border-muted-foreground/30 focus-visible:ring-primary/20"
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Modo Preço</Label>
-                                                    <Select
-                                                        value={pricingMode}
-                                                        onValueChange={(v) => onPricingModeChange?.(v as any)}
-                                                    >
-                                                        <SelectTrigger className="h-10 text-xs border-muted-foreground/30 focus:ring-primary/20">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="percent" className="text-xs">Desconto (%)</SelectItem>
-                                                            <SelectItem value="manual" className="text-xs">Manual (Item)</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Desconto Item (%)</Label>
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    max={100}
+                                                    step="0.1"
+                                                    value={itemDiscount}
+                                                    onChange={(e) => setItemDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                    className="h-10 font-bold border-muted-foreground/30 focus-visible:ring-primary/20"
+                                                />
                                             </div>
 
                                             <div className="space-y-1.5 bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
-                                                <Label className="text-[10px] uppercase font-bold text-primary tracking-tight">Preço de Venda (Embalagem)</Label>
+                                                <Label className="text-[10px] uppercase font-bold text-primary tracking-tight">Preço Base VTEX (Embalagem)</Label>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">R$</span>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={manualPrice}
-                                                        onChange={(e) => setManualPrice(e.target.value)}
-                                                        className="h-12 pl-10 text-lg font-black bg-white border-primary/20 focus-visible:ring-primary/30 shadow-inner"
-                                                        placeholder="0,00"
-                                                    />
+                                                    <div className="h-12 flex items-center px-4 text-lg font-black bg-muted/30 border border-primary/10 rounded-md">
+                                                        {(() => {
+                                                            const embalagemQty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
+                                                            return formatCurrency((selected.selling_price || 0) * embalagemQty);
+                                                        })()}
+                                                    </div>
                                                 </div>
                                                 <p className="text-[10px] text-muted-foreground leading-tight px-1">
-                                                    Ajuste o valor final por embalagem que será enviado para a cotação.
+                                                    O preço base é derivado do catálogo VTEX e não pode ser editado manualmente.
                                                 </p>
                                             </div>
 
@@ -572,7 +562,11 @@ export function VtexProductSelector({
                                                 <div className="flex justify-between items-center px-1">
                                                     <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-widest">Total do Item</span>
                                                     <span className="text-xl font-black text-primary">
-                                                        {formatCurrency((parseFloat(manualPrice) || 0) * quantity)}
+                                                        {(() => {
+                                                            const embalagemQty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
+                                                            const base = (selected.selling_price || 0) * embalagemQty;
+                                                            return formatCurrency(base * (1 - itemDiscount / 100) * quantity);
+                                                        })()}
                                                     </span>
                                                 </div>
 

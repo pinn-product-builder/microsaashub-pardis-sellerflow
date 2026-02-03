@@ -26,7 +26,6 @@ interface QuoteItemsTableProps {
   showPardisIndicators?: boolean;
   tradePolicyId?: string; // legado (não usado com auto-policy)
   discountPercent?: number;
-  pricingMode?: 'percent' | 'manual';
   enablePriceEdit?: boolean;
 }
 
@@ -43,10 +42,9 @@ export function QuoteItemsTable({
   showPardisIndicators = true,
   tradePolicyId,
   discountPercent = 0,
-  pricingMode = 'percent',
   enablePriceEdit = false,
 }: QuoteItemsTableProps) {
-  const { removeItem, updateItem, selectedCustomer, setPricingMode, setDiscount, setDiscountReason } = useSellerFlowStore();
+  const { removeItem, updateItem, selectedCustomer, setDiscount, setDiscountReason } = useSellerFlowStore();
   const { toast } = useToast();
   const [repricingIds, setRepricingIds] = useState<Record<string, boolean>>({});
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
@@ -96,15 +94,6 @@ export function QuoteItemsTable({
     if (newQuantity >= 1) {
       const item = items.find(i => i.id === itemId);
       if (item) {
-        // Em modo manual, não reprecifica na VTEX; só recalcula total com o preço manual atual.
-        if (enablePriceEdit && pricingMode === 'manual') {
-          updateItem(itemId, {
-            ...item,
-            quantity: newQuantity,
-            totalPrice: item.unitPrice * newQuantity,
-          });
-          return;
-        }
 
         // Itens VTEX: recalcular preço efetivo usando quantidade real (embalagem * qtd).
         // Isso evita preço incorreto em tiers (fixed/min_quantity) e mantém o preço cheio por embalagem.
@@ -167,12 +156,14 @@ export function QuoteItemsTable({
               return;
             }
             const unitPrice = unit * embalagemQty;
+            const currentDiscount = item.discounts?.find(d => d.type === 'MANUAL')?.percentage || 0;
+            const finalUnitPrice = unitPrice * (1 - currentDiscount / 100);
 
             updateItem(itemId, {
               ...item,
               quantity: newQuantity,
-              unitPrice,
-              totalPrice: unitPrice * newQuantity,
+              unitPrice, // Preço base (unitário por embalagem)
+              totalPrice: finalUnitPrice * newQuantity,
               vtexTradePolicyId: picked?.policyId ?? (item as any).vtexTradePolicyId,
             });
           } catch (e: any) {
@@ -188,38 +179,41 @@ export function QuoteItemsTable({
         }
 
         // Itens não-VTEX: mantém unitPrice e apenas ajusta total
+        const currentDiscount = item.discounts?.find(d => d.type === 'MANUAL')?.percentage || 0;
+        const finalUnitPrice = item.unitPrice * (1 - currentDiscount / 100);
+
         updateItem(itemId, {
           ...item,
           quantity: newQuantity,
-          totalPrice: item.unitPrice * newQuantity,
+          totalPrice: finalUnitPrice * newQuantity,
         });
       }
     }
   };
 
-  const handleManualUnitPriceChange = (itemId: string, raw: string) => {
-    const item: any = items.find(i => i.id === itemId);
+  const handleItemDiscountChange = (itemId: string, percent: number) => {
+    const item = items.find(i => i.id === itemId);
     if (!item) return;
-    const next = Number(String(raw).replace(',', '.'));
-    if (!Number.isFinite(next) || next < 0) return;
 
-    // Ao editar manualmente, garantimos exclusividade: desabilita desconto percentual.
-    if (pricingMode !== 'manual') {
-      setPricingMode('manual');
-      setDiscount(0);
-      setDiscountReason('');
-    }
+    const safePercent = Math.min(100, Math.max(0, percent));
+    const qty = Number(item.quantity || 1);
 
-    const original = (typeof item.originalUnitPrice === 'number' && Number.isFinite(item.originalUnitPrice))
-      ? item.originalUnitPrice
-      : item.unitPrice;
+    // Calcula o preço final do item aplicando o desconto sobre o preço unitário base
+    // Nota: O unitPrice aqui já é o preço base da VTEX
+    const finalPrice = item.unitPrice * (1 - safePercent / 100);
 
     updateItem(itemId, {
       ...item,
-      unitPrice: next,
-      totalPrice: next * Number(item.quantity || 1),
-      manualUnitPrice: true,
-      originalUnitPrice: original,
+      totalPrice: finalPrice * qty,
+      discounts: [
+        {
+          type: 'MANUAL',
+          description: 'Ajuste comercial',
+          percentage: safePercent,
+          amount: item.unitPrice * (safePercent / 100),
+          priority: 1,
+        }
+      ]
     });
   };
 
@@ -272,7 +266,7 @@ export function QuoteItemsTable({
               </>
             )}
             <TableHead className="text-right">Total</TableHead>
-            {enablePriceEdit && <TableHead className="text-right">Preço Manual</TableHead>}
+            <TableHead className="text-right">Desc. (%)</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
@@ -321,7 +315,20 @@ export function QuoteItemsTable({
                 <TableCell className="text-right font-mono text-sm">
                   {(() => {
                     const qty = getEmbalagemQty(item.product.embalagem, item.product.name) ?? 1;
-                    return formatCurrency(item.unitPrice * qty);
+                    const discount = item.discounts?.find(d => d.type === 'MANUAL')?.percentage || 0;
+                    const finalUnitPrice = item.unitPrice * (1 - discount / 100);
+                    return (
+                      <div className="flex flex-col">
+                        <span className={discount > 0 ? "text-xs text-muted-foreground line-through" : ""}>
+                          {formatCurrency(item.unitPrice * qty)}
+                        </span>
+                        {discount > 0 && (
+                          <span className="font-bold text-primary">
+                            {formatCurrency(finalUnitPrice * qty)}
+                          </span>
+                        )}
+                      </div>
+                    );
                   })()}
                 </TableCell>
                 <TableCell className="text-xs">
@@ -377,27 +384,19 @@ export function QuoteItemsTable({
                   </>
                 )}
 
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(item.totalPrice)}
+                <TableCell className="text-right">
+                  <div className="flex justify-end">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      className="h-8 w-20 text-right"
+                      value={item.discounts?.find(d => d.type === 'MANUAL')?.percentage || 0}
+                      onChange={(e) => handleItemDiscountChange(item.id, parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
                 </TableCell>
-                {enablePriceEdit && (
-                  <TableCell className="text-right">
-                    {pricingMode === 'manual' ? (
-                      <div className="flex justify-end">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="h-8 w-32 text-right"
-                          value={Number(item.unitPrice ?? 0)}
-                          onChange={(e) => handleManualUnitPriceChange(item.id, e.target.value)}
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                )}
                 <TableCell>
                   <Button
                     variant="ghost"

@@ -8,7 +8,6 @@ interface SellerFlowStore {
   selectedCustomer: Customer | null;
   destinationUF: string;
   items: QuoteItem[];
-  pricingMode: 'percent' | 'manual';
   discount: number;
   discountReason: string;
   paymentConditions: string;
@@ -21,7 +20,6 @@ interface SellerFlowStore {
   addItem: (item: QuoteItem) => void;
   updateItem: (id: string, updates: Partial<QuoteItem>) => void;
   removeItem: (id: string) => void;
-  setPricingMode: (mode: 'percent' | 'manual') => void;
   setDiscount: (discount: number) => void;
   setDiscountReason: (reason: string) => void;
   setPaymentConditions: (conditions: string) => void;
@@ -48,7 +46,6 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
   selectedCustomer: null,
   destinationUF: '',
   items: [],
-  pricingMode: 'percent',
   discount: 0,
   discountReason: '',
   paymentConditions: 'À vista',
@@ -65,49 +62,47 @@ export const useSellerFlowStore = create<SellerFlowStore>((set, get) => ({
 
   // Ações
   setCurrentQuote: (quote) => set({ currentQuote: quote }),
-  
+
   setSelectedCustomer: (customer) => {
     console.log('Setting customer in store:', customer?.companyName, 'UF:', customer?.uf);
-    set({ 
+    set({
       selectedCustomer: customer,
       destinationUF: customer?.uf || ''
     });
   },
-  
+
   setDestinationUF: (uf) => {
     console.log('Setting destinationUF:', uf);
     set({ destinationUF: uf });
   },
-  
+
   addItem: (item) => {
     console.log('Adding item to store:', item.product.name, 'Quantity:', item.quantity);
     set((state) => ({
       items: [...state.items, item]
     }));
   },
-  
+
   updateItem: (id, updates) => set((state) => ({
-    items: state.items.map(item => 
+    items: state.items.map(item =>
       item.id === id ? { ...item, ...updates } : item
     )
   })),
-  
+
   removeItem: (id) => set((state) => ({
     items: state.items.filter(item => item.id !== id)
   })),
-  
-  setPricingMode: (mode) => set({ pricingMode: mode }),
+
   setDiscount: (discount) => set({ discount }),
   setDiscountReason: (reason) => set({ discountReason: reason }),
   setPaymentConditions: (conditions) => set({ paymentConditions: conditions }),
   setNotes: (notes) => set({ notes }),
-  
+
   clearQuote: () => set({
     currentQuote: null,
     selectedCustomer: null,
     destinationUF: '',
     items: [],
-    pricingMode: 'percent',
     discount: 0,
     discountReason: '',
     paymentConditions: 'À vista',
