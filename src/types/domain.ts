@@ -107,6 +107,8 @@ export interface Product {
   status: ProductStatus;
   ncm?: string;
   is_active: boolean;
+  embalagem?: string | null;
+  gramatura?: string | null;
   last_sync_at?: string;
   created_at: string;
   updated_at: string;
@@ -130,6 +132,8 @@ export interface ProductLegacy {
   cest?: string;
   origin?: ProductOrigin;
   taxCategory?: TaxCategory;
+  embalagem?: string | null;
+  gramatura?: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -458,6 +462,7 @@ export interface ApprovalRequest {
   expires_at?: string;
   created_at: string;
   updated_at: string;
+  items?: any[];
 }
 
 // -----------------------------------------------------------------------------

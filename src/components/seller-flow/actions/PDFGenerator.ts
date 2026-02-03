@@ -1,4 +1,4 @@
-
+import { getEmbalagemQty } from '@/utils/vtexUtils';
 import { Quote } from '@/types/seller-flow';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -7,13 +7,13 @@ export class PDFGenerator {
   static async generateQuotePDF(quote: Quote): Promise<void> {
     // Simulação de geração de PDF
     // Em produção, usaria uma biblioteca como jsPDF ou Puppeteer
-    
+
     const content = this.generateHTMLContent(quote);
-    
+
     // Criar um blob com o conteúdo HTML
     const blob = new Blob([content], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    
+
     // Abrir em nova janela para impressão/salvamento
     const printWindow = window.open(url, '_blank');
     if (printWindow) {
@@ -122,23 +122,30 @@ export class PDFGenerator {
           <table>
             <thead>
               <tr>
-                <th>Produto</th>
-                <th>SKU</th>
-                <th>Qtd</th>
-                <th>Preço Unit.</th>
-                <th>Total</th>
+                <th style="width: 40%">Produto</th>
+                <th style="width: 15%">SKU</th>
+                <th style="width: 10%">Qtd</th>
+                <th style="width: 15%">Preço (Emb.)</th>
+                <th style="width: 20%">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${quote.items.map(item => `
-                <tr>
-                  <td>${item.product.name}</td>
-                  <td>${item.product.sku}</td>
-                  <td>${item.quantity}</td>
-                  <td>${formatCurrency(item.unitPrice)}</td>
-                  <td>${formatCurrency(item.totalPrice)}</td>
-                </tr>
-              `).join('')}
+              ${quote.items.map(item => {
+      const qtyPerEmb = getEmbalagemQty(item.product.embalagem, item.product.name) || 1;
+      const embPrice = item.unitPrice * qtyPerEmb;
+      return `
+                  <tr>
+                    <td>
+                      <div><strong>${item.product.name}</strong></div>
+                      ${item.product.embalagem ? `<div style="font-size: 0.8em; color: #666">${item.product.embalagem}</div>` : ''}
+                    </td>
+                    <td>${item.product.sku}</td>
+                    <td style="text-align: center">${item.quantity}</td>
+                    <td style="text-align: right">${formatCurrency(embPrice)}</td>
+                    <td style="text-align: right"><strong>${formatCurrency(item.totalPrice)}</strong></td>
+                  </tr>
+                `;
+    }).join('')}
             </tbody>
           </table>
 

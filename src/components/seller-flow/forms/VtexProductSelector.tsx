@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, CheckCircle, Package } from "lucide-react";
+import { getEmbalagemQty } from "@/utils/vtexUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,30 +111,6 @@ export function VtexProductSelector({
     const formatCurrency = (value: number) =>
         new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-    const getEmbalagemQtyFromText = (text?: string | null) => {
-        if (!text) return null;
-        const direct = text.match(/(?:caixa|cx)\s*(\d+)/i);
-        if (direct?.[1]) {
-            const qty = Number.parseInt(direct[1], 10);
-            return Number.isFinite(qty) && qty > 0 ? qty : null;
-        }
-        const unidades = text.match(/(\d+)\s*(?:unidades?|unid\.?|un\.?)\b/i);
-        if (unidades?.[1]) {
-            const qty = Number.parseInt(unidades[1], 10);
-            return Number.isFinite(qty) && qty > 0 ? qty : null;
-        }
-        return null;
-    };
-
-    const getEmbalagemQty = (embalagem?: string | null, ...fallbacks: Array<string | null | undefined>) => {
-        const base = getEmbalagemQtyFromText(embalagem);
-        if (base) return base;
-        for (const text of fallbacks) {
-            const qty = getEmbalagemQtyFromText(text);
-            if (qty) return qty;
-        }
-        return null;
-    };
 
     const runSearch = async (query: string) => {
         try {
@@ -406,7 +383,10 @@ export function VtexProductSelector({
                                                                     : "-"}
                                                             </TableCell>
                                                             <TableCell className="text-right font-mono text-sm whitespace-nowrap align-top">
-                                                                {typeof r.selling_price === "number" ? formatCurrency(r.selling_price) : "-"}
+                                                                {(() => {
+                                                                    const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name) ?? 1;
+                                                                    return typeof r.selling_price === "number" ? formatCurrency(r.selling_price * qty) : "-";
+                                                                })()}
                                                             </TableCell>
                                                             <TableCell className="text-right align-top whitespace-nowrap">
                                                                 {r.price_available === false ? (
@@ -451,20 +431,20 @@ export function VtexProductSelector({
                                                 {selected.gramatura && <Badge variant="outline">{selected.gramatura}</Badge>}
                                             </div>
                                             <div>
-                                                <Label className="text-xs text-muted-foreground">Preço (Policy Principal, qty=1)</Label>
-                                                <div className="text-lg font-semibold">
-                                                    {typeof selected.selling_price === "number" ? formatCurrency(selected.selling_price) : "-"}
-                                                </div>
+                                                <Label className="text-xs text-muted-foreground">Preço (Policy Principal)</Label>
                                                 {(() => {
                                                     const qty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name);
-                                                    if (!qty || typeof selected.selling_price !== "number") return null;
+                                                    if (typeof selected.selling_price !== "number") return <div className="text-lg font-semibold">-</div>;
+                                                    const total = selected.selling_price * (qty ?? 1);
                                                     return (
-                                                        <div className="text-sm text-muted-foreground mt-1">
-                                                            Preço embalagem ({qty}):{" "}
-                                                            <span className="font-medium text-foreground">
-                                                                {formatCurrency(selected.selling_price * qty)}
-                                                            </span>
-                                                        </div>
+                                                        <>
+                                                            <div className="text-lg font-semibold">{formatCurrency(total)}</div>
+                                                            {qty && qty > 1 && (
+                                                                <div className="text-sm text-muted-foreground">
+                                                                    Embalagem com {qty} unidades
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     );
                                                 })()}
                                                 <div className="text-xs text-muted-foreground mt-1">

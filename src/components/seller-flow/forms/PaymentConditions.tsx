@@ -12,8 +12,6 @@ import {
 } from '@/components/ui/select';
 
 interface PaymentConditionsProps {
-  pricingMode: 'percent' | 'manual';
-  onPricingModeChange: (mode: 'percent' | 'manual') => void;
   paymentConditions: string;
   onPaymentChange: (value: string) => void;
   discount: number;
@@ -23,11 +21,11 @@ interface PaymentConditionsProps {
   notes: string;
   onNotesChange: (value: string) => void;
   customerPaymentTerms: string[];
+  pricingMode: 'percent' | 'manual';
 }
 
 export function PaymentConditions({
   pricingMode,
-  onPricingModeChange,
   paymentConditions,
   onPaymentChange,
   discount,
@@ -43,29 +41,6 @@ export function PaymentConditions({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Label>Modo de precificação</Label>
-        <ToggleGroup
-          type="single"
-          value={pricingMode}
-          onValueChange={(v) => {
-            if (v === 'percent' || v === 'manual') onPricingModeChange(v);
-          }}
-          className="justify-start"
-        >
-          <ToggleGroupItem value="percent" aria-label="Desconto percentual">
-            Desconto (%)
-          </ToggleGroupItem>
-          <ToggleGroupItem value="manual" aria-label="Preço manual por item">
-            Manual (por item)
-          </ToggleGroupItem>
-        </ToggleGroup>
-        {pricingMode === 'manual' && (
-          <p className="text-xs text-muted-foreground">
-            No modo manual, o desconto percentual fica desabilitado e você pode editar o preço item a item.
-          </p>
-        )}
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">

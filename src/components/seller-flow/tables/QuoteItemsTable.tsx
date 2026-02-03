@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react';
+import { getEmbalagemQty } from "@/utils/vtexUtils";
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -252,13 +253,13 @@ export function QuoteItemsTable({
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="w-full rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Produto</TableHead>
             <TableHead className="text-center">Qtd</TableHead>
-            <TableHead className="text-right">Preço Unit.</TableHead>
+            <TableHead className="text-right">Preço (Embalagem)</TableHead>
             <TableHead>
               <div className="flex items-center gap-2">
                 <span>Policy (Principal)</span>
@@ -267,7 +268,6 @@ export function QuoteItemsTable({
             {showPardisIndicators && (
               <>
                 <TableHead className="text-right">Preço Mín.</TableHead>
-                <TableHead className="text-center">Margem</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </>
             )}
@@ -318,8 +318,11 @@ export function QuoteItemsTable({
                     </Button>
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(item.unitPrice)}
+                <TableCell className="text-right font-mono text-sm">
+                  {(() => {
+                    const qty = getEmbalagemQty(item.product.embalagem, item.product.name) ?? 1;
+                    return formatCurrency(item.unitPrice * qty);
+                  })()}
                 </TableCell>
                 <TableCell className="text-xs">
                   {(() => {
@@ -358,18 +361,7 @@ export function QuoteItemsTable({
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      {pardisCalc ? (
-                        <MarginIndicator
-                          marginPercent={pardisCalc.marginPercent}
-                          marginValue={pardisCalc.marginValue}
-                          showValue={false}
-                          size="sm"
-                        />
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          {item.margin?.toFixed(1) || 0}%
-                        </Badge>
-                      )}
+                      <span className="text-muted-foreground">-</span>
                     </TableCell>
                     <TableCell className="text-center">
                       {pardisCalc ? (

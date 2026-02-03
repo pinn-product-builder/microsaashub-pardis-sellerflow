@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Check, 
-  X, 
-  Clock, 
-  AlertTriangle, 
-  Search, 
+import {
+  Check,
+  X,
+  Clock,
+  AlertTriangle,
+  Search,
   TrendingUp,
   TrendingDown,
   ArrowLeft
@@ -37,7 +37,7 @@ export default function Aprovacoes() {
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [comments, setComments] = useState('');
-  
+
   const { data: pendingApprovals = [], isLoading } = usePendingApprovals();
   const { data: stats } = useApprovalStats();
   const approveRequest = useApproveRequest();
@@ -114,7 +114,7 @@ export default function Aprovacoes() {
 
   return (
     <PageContainer>
-      <PageHeader 
+      <PageHeader
         title="Aprovações Pendentes"
         description="Gerencie as solicitações de aprovação de cotações"
       >
@@ -222,7 +222,7 @@ export default function Aprovacoes() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-2">
                           <div className="flex items-center gap-3">
-                            <Link 
+                            <Link
                               to={`/seller-flow/cotacao/${approval.quote_id}`}
                               className="font-medium text-primary hover:underline"
                             >
@@ -230,14 +230,14 @@ export default function Aprovacoes() {
                             </Link>
                             {getPriorityBadge(approval.priority || 'medium')}
                           </div>
-                          
+
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span>
                               Valor: {formatCurrency(approval.quote_total || 0)}
                             </span>
                             <span className="flex items-center gap-1">
-                              Margem: 
-                              <MarginIndicator marginPercent={approval.quote_margin_percent || 0} />
+                              Margem:
+                              <MarginIndicator marginPercent={approval.quote_margin_percent || 0} showValue={false} />
                             </span>
                           </div>
 
@@ -245,6 +245,23 @@ export default function Aprovacoes() {
                             <p className="text-sm text-muted-foreground">
                               <strong>Motivo:</strong> {approval.reason}
                             </p>
+                          )}
+
+                          {approval.items && approval.items.length > 0 && (
+                            <div className="mt-3 space-y-1">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Produtos</p>
+                              {approval.items.slice(0, 3).map((it: any, idx: number) => (
+                                <div key={idx} className="text-sm border-l-2 border-muted pl-2 py-0.5">
+                                  <span className="font-medium">{it.quantity}x</span> {it.product_name || it.name}
+                                  <span className="text-muted-foreground ml-2">({formatCurrency(it.total_price || it.total || 0)})</span>
+                                </div>
+                              ))}
+                              {approval.items.length > 3 && (
+                                <p className="text-xs text-muted-foreground italic pl-2">
+                                  + {approval.items.length - 3} outros itens...
+                                </p>
+                              )}
+                            </div>
                           )}
 
                           <p className="text-xs text-muted-foreground">
@@ -302,7 +319,7 @@ export default function Aprovacoes() {
               {actionType === 'approve' ? 'Aprovar Cotação' : 'Rejeitar Cotação'}
             </DialogTitle>
             <DialogDescription>
-              {actionType === 'approve' 
+              {actionType === 'approve'
                 ? 'Informe a justificativa da aprovação. O vendedor será notificado.'
                 : 'Informe o motivo da rejeição. O vendedor será notificado.'}
             </DialogDescription>
@@ -317,7 +334,7 @@ export default function Aprovacoes() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Margem:</span>
-                  <MarginIndicator marginPercent={selectedRequest.quote_margin_percent || 0} />
+                  <MarginIndicator marginPercent={selectedRequest.quote_margin_percent || 0} showValue={false} />
                 </div>
               </div>
             )}
@@ -327,7 +344,7 @@ export default function Aprovacoes() {
                 Justificativa <span className="text-destructive">*</span>
               </label>
               <Textarea
-                placeholder={actionType === 'approve' 
+                placeholder={actionType === 'approve'
                   ? 'Informe o motivo da aprovação...'
                   : 'Informe o motivo da rejeição...'}
                 value={comments}

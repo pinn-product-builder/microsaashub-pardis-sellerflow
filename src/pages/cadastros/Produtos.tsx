@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Search, RefreshCw, ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { useVtexPolicyStore } from "@/stores/vtexPolicyStore";
+import { getEmbalagemQty } from "@/utils/vtexUtils";
 import {
   Dialog,
   DialogContent,
@@ -74,31 +75,6 @@ export default function ProdutosVtex() {
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-
-  const getEmbalagemQtyFromText = (text?: string | null) => {
-    if (!text) return null;
-    const direct = text.match(/(?:caixa|cx)\s*(\d+)/i);
-    if (direct?.[1]) {
-      const qty = Number.parseInt(direct[1], 10);
-      return Number.isFinite(qty) && qty > 0 ? qty : null;
-    }
-    const unidades = text.match(/(\d+)\s*(?:unidades?|unid\.?|un\.?)\b/i);
-    if (unidades?.[1]) {
-      const qty = Number.parseInt(unidades[1], 10);
-      return Number.isFinite(qty) && qty > 0 ? qty : null;
-    }
-    return null;
-  };
-
-  const getEmbalagemQty = (embalagem?: string | null, ...fallbacks: Array<string | null | undefined>) => {
-    const base = getEmbalagemQtyFromText(embalagem);
-    if (base) return base;
-    for (const text of fallbacks) {
-      const qty = getEmbalagemQtyFromText(text);
-      if (qty) return qty;
-    }
-    return null;
-  };
 
   const getPolicyEffective = (skuId: number, policyId: string) => {
     const rows = policyMatrix[skuId] ?? [];
@@ -172,7 +148,7 @@ export default function ProdutosVtex() {
   }, [page]);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -252,10 +228,7 @@ export default function ProdutosVtex() {
                       <TableHead>Ref</TableHead>
                       <TableHead>Embalagem</TableHead>
                       <TableHead>Gramatura</TableHead>
-                      <TableHead className="text-right">
-                        Preço ({mode === "fixed" ? `policy ${tradePolicyId}` : "auto"})
-                      </TableHead>
-                      <TableHead className="text-right">Preço Embalagem</TableHead>
+                      <TableHead className="text-right">Preço (Embalagem)</TableHead>
                       <TableHead>Fonte</TableHead>
                       <TableHead className="text-right">Disp.</TableHead>
                       <TableHead className="text-center">Em estoque</TableHead>
@@ -275,16 +248,9 @@ export default function ProdutosVtex() {
                         <TableCell>{r.gramatura ?? "-"}</TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {(() => {
-                            const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
+                            const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name) ?? 1;
                             if (typeof r.selling_price !== "number") return "-";
-                            return formatCurrency((qty ?? 1) * r.selling_price);
-                          })()}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {(() => {
-                            const qty = getEmbalagemQty(r.embalagem);
-                            if (!qty || typeof r.selling_price !== "number") return "-";
-                            return formatCurrency(r.selling_price * qty);
+                            return formatCurrency(qty * r.selling_price);
                           })()}
                         </TableCell>
                         <TableCell className="text-xs">
