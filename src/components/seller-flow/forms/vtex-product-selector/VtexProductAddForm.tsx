@@ -44,8 +44,8 @@ export function VtexProductAddForm({
     }
 
     const embalagemQty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
-    // Correção: Assumindo que selling_price é o preço do SKU (caixa), não multiplicamos.
-    const basePrice = (selected.selling_price || 0);
+    // Retomando multiplicação para garantir preço da caixa
+    const basePrice = (selected.selling_price || 0) * embalagemQty;
     const totalPrice = basePrice * (1 - itemDiscount / 100) * quantity;
 
     return (

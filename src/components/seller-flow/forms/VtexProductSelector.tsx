@@ -149,12 +149,15 @@ export function VtexProductSelector({
 
             // Busca preço final por política
             const priceRow = await fetchEffectivePrice(skuId, qtyUnits, String(tradePolicyId || "1"));
-            // Correção: O preço vindo da VTEX já refere-se ao SKU (que pode ser uma caixa).
-            // Não devemos multiplicar pela quantidade da embalagem novamente.
-            const packagingPrice = (priceRow?.effective_price ?? 0);
+            // Correção: Multiplicando pelo tamanho da embalagem para obter o preço da CAIXA
+            const packagingPrice = (priceRow?.effective_price ?? 0) * embalagemQty;
             const finalPackagingPrice = packagingPrice * (1 - itemDiscount / 100);
 
             if (finalPackagingPrice <= 0) throw new Error("Preço calculado inválido.");
+
+            // Custo também deve ser multiplicado se vier unitário
+            const unitCost = priceRow?.cost_price ?? (priceRow?.effective_price ?? 0);
+            const totalCost = unitCost * embalagemQty;
 
             const product: Product = {
                 id: `vtex:${skuId}`,
@@ -163,7 +166,7 @@ export function VtexProductSelector({
                 category: "VTEX",
                 weight: 0.5,
                 dimensions: { length: 1, width: 1, height: 1 },
-                baseCost: (priceRow?.cost_price ?? packagingPrice),
+                baseCost: totalCost,
                 description: selected.sku_name ?? undefined,
             };
 
