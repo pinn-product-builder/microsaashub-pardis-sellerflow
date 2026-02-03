@@ -52,6 +52,7 @@ export class VtexQuoteService {
     totalMarginPercent?: number | null;
     requiresApproval?: boolean;
     isAuthorized?: boolean;
+    discountMode?: 'percentage' | 'manual';
     notes?: string;
   }): Promise<{ id: string; number: string }> {
     const { data: userData } = await supabase.auth.getUser();
@@ -79,6 +80,7 @@ export class VtexQuoteService {
       discount_reason: params.discountReason ?? null,
       total: params.total,
       total_margin_percent: params.totalMarginPercent ?? null,
+      discount_mode: params.discountMode ?? 'percentage',
       requires_approval: !!params.requiresApproval,
       is_authorized: !!params.isAuthorized,
       notes: params.notes ?? null,
@@ -138,6 +140,7 @@ export class VtexQuoteService {
         tradePolicyId: params.tradePolicyId,
         items: params.items.length,
         discount: params.discount,
+        discountMode: params.discountMode,
         discountReason: params.discountReason ?? null,
         duplicatedFrom: params.duplicatedFromQuoteId ?? null,
       },
@@ -236,6 +239,7 @@ export class VtexQuoteService {
       updatedAt: new Date(q.updated_at),
       createdBy: q.created_by,
       notes: q.notes ?? undefined,
+      discountMode: (q.discount_mode as any) ?? 'percentage',
       discountReason: q.discount_reason ?? undefined,
       tradePolicyId: String(q.trade_policy_id ?? "1"),
       duplicatedFromQuoteId: q.duplicated_from_quote_id ?? undefined,

@@ -161,6 +161,7 @@ export interface Quote {
   is_authorized: boolean;
   requires_approval: boolean;
   vtex_order_id?: string;
+  discount_mode?: 'percentage' | 'manual';
   created_at: string;
   updated_at: string;
   items?: QuoteItem[];
@@ -188,6 +189,7 @@ export interface QuoteLegacy {
   notes?: string;
   duplicatedFromQuoteId?: string;
   duplicatedFromQuoteNumber?: string;
+  discountMode?: 'percentage' | 'manual';
 }
 
 /** Item de Cotação - modelo de banco (snake_case) */

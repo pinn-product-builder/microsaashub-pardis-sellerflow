@@ -55,7 +55,9 @@ export default function NovaQuotacao() {
     setPaymentConditions,
     setNotes,
     clearQuote,
-    setCurrentQuote
+    setCurrentQuote,
+    discountMode,
+    setDiscountMode
   } = useSellerFlowStore();
 
   const totals = QuoteService.calculateQuoteTotals(items, discount);
@@ -82,6 +84,7 @@ export default function NovaQuotacao() {
             setSelectedCustomer(quote.customer as any);
             setDestinationUF(quote.destinationUF);
             setDiscount(quote.discount);
+            setDiscountMode((quote as any).discountMode || 'percentage');
             setDiscountReason((quote as any).discountReason || '');
             setPaymentConditions(quote.paymentConditions);
             setNotes(quote.notes || '');
@@ -149,6 +152,7 @@ export default function NovaQuotacao() {
         status: "draft",
         subtotal: totals.subtotal,
         discount: totals.discount,
+        discountMode,
         discountReason: discountReason.trim(),
         total: totals.total,
         totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
@@ -184,6 +188,7 @@ export default function NovaQuotacao() {
         status: pardisSummary.requiresApproval ? "pending_approval" : "calculated",
         subtotal: totals.subtotal,
         discount: totals.discount,
+        discountMode,
         discountReason: discountReason.trim(),
         total: totals.total,
         totalMarginPercent: pardisSummary.totalMarginPercent ?? null,
