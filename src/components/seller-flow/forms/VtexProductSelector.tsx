@@ -530,17 +530,30 @@ export function VtexProductSelector({
                                         </div>
                                     ) : (
                                         <div className="space-y-5 flex-1 flex flex-col">
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Desconto Item (%)</Label>
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={100}
-                                                    step="0.1"
-                                                    value={itemDiscount}
-                                                    onChange={(e) => setItemDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                                                    className="h-10 font-bold border-muted-foreground/30 focus-visible:ring-primary/20"
-                                                />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-tight">Quantidade</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={1}
+                                                        value={quantity}
+                                                        onChange={(e) => setQuantity(Math.max(1, Number(e.target.value || 1)))}
+                                                        className="h-10 font-bold border-muted-foreground/30 focus-visible:ring-primary/20"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] uppercase font-bold text-primary tracking-tight">Desconto (%)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        step="0.1"
+                                                        value={itemDiscount}
+                                                        onChange={(e) => setItemDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                        className="h-10 font-black border-primary/30 text-primary focus-visible:ring-primary/20"
+                                                        placeholder="0.0"
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div className="space-y-1.5 bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
