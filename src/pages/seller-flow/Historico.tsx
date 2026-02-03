@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,20 +10,44 @@ import { QuoteFilters } from '@/components/seller-flow/tables/QuoteFilters';
 import { useQuotes } from '@/hooks/useQuotes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Historico() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: quotes = [], isLoading } = useQuotes();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('historico-quotes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'vtex_quotes'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const filteredQuotes = useMemo(() => {
     return quotes.filter((quote) => {
       // Search filter
       const customerName = (quote as any).client?.company_name || '';
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         String((quote as any).quote_number ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         customerName.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -35,7 +59,7 @@ export default function Historico() {
       if (dateFilter !== 'all') {
         const quoteDate = new Date(quote.created_at);
         const now = new Date();
-        
+
         switch (dateFilter) {
           case 'today':
             matchesDate = quoteDate.toDateString() === now.toDateString();
@@ -251,7 +275,7 @@ export default function Historico() {
               />
             </div>
           )}
-          
+
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3, 4, 5].map((i) => (

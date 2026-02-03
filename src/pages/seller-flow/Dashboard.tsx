@@ -5,14 +5,39 @@ import { Plus, TrendingUp, FileText, Users, DollarSign, AlertTriangle, Clock } f
 import { Link } from 'react-router-dom';
 import { useQuotes, useQuoteStats } from '@/hooks/useQuotes';
 import { usePendingApprovals } from '@/hooks/useApprovals';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { PageContainer, PageHeader, PageContent } from '@/components/layout/Page';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function CPQDashboard() {
   const { data: quotes = [], isLoading: quotesLoading } = useQuotes();
   const { data: pendingApprovals = [], isLoading: approvalsLoading } = usePendingApprovals();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard-quotes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'vtex_quotes'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['quotes'] });
+          queryClient.invalidateQueries({ queryKey: ['quote-stats'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const stats = useMemo(() => {
     const total = quotes.length;
@@ -64,7 +89,7 @@ export default function CPQDashboard() {
 
   return (
     <PageContainer>
-      <PageHeader 
+      <PageHeader
         title="Dashboard Cotações"
         description="Visão geral das cotações do sistema"
       >
@@ -217,7 +242,7 @@ export default function CPQDashboard() {
                     recentQuotes.map((quote) => (
                       <div key={quote.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                         <div className="min-w-0 flex-1">
-                          <Link 
+                          <Link
                             to={`/seller-flow/cotacao/${quote.id}`}
                             className="font-medium text-primary hover:underline block"
                           >
