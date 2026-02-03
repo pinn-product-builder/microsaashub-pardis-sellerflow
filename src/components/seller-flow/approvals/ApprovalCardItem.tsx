@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X } from 'lucide-react';
+import { Check, X, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MarginIndicator } from '@/components/seller-flow/display/MarginIndicator';
@@ -102,6 +102,17 @@ export function ApprovalCardItem({ approval, formatCurrency, onApprove, onReject
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className="font-bold text-gray-700"
+                            asChild
+                        >
+                            <Link to={`/seller-flow/cotacao/${approval.quote_id}`} target="_blank">
+                                <Eye className="h-4 w-4 mr-1" />
+                                VER DETALHES
+                            </Link>
+                        </Button>
                         <Button
                             size="sm"
                             variant="outline"
