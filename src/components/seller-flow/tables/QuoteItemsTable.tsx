@@ -261,18 +261,7 @@ export function QuoteItemsTable({
             <TableHead className="text-right">Preço Unit.</TableHead>
             <TableHead>
               <div className="flex items-center gap-2">
-                <span>Policy</span>
-                <select
-                  className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                  value={selectedPolicyId}
-                  onChange={(e) => setSelectedPolicyId(e.target.value)}
-                >
-                  {POLICY_LABELS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+                <span>Policy (Principal)</span>
               </div>
             </TableHead>
             {showPardisIndicators && (

@@ -567,8 +567,8 @@ export default function NovaQuotacao() {
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${currentStep >= step.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
                   }`}>
                   {step.id}
                 </div>
@@ -626,36 +626,7 @@ export default function NovaQuotacao() {
                   )}
 
                   <div className="pt-3 border-t">
-                    <div className="text-sm font-medium">Política comercial (para preço VTEX)</div>
-                    <div className="flex flex-col md:flex-row gap-2 mt-2">
-                      <select
-                        className="h-10 rounded-md border border-input bg-background px-3 text-sm md:w-56"
-                        value={policyMode}
-                        onChange={(e) => setPolicyMode(e.target.value as any)}
-                      >
-                        <option value="auto">Automático</option>
-                        <option value="fixed">Fixar policy</option>
-                      </select>
-                      {policyMode === "fixed" && (
-                        <select
-                          className="h-10 rounded-md border border-input bg-background px-3 text-sm md:w-72"
-                          value={tradePolicyId}
-                          onChange={(e) => setTradePolicyId(e.target.value)}
-                        >
-                          {POLICY_LABELS.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-2">
-                      {policyMode === "auto"
-                        ? "Automático: escolhe a policy com preço disponível (prioridade: 1 → 2 → mgpmgclustera → mgpbrclustera)."
-                        : `Fixado: todos os preços serão recalculados usando "${tradePolicyId}".`}
-                      {isRepricingAll ? " Recalculando itens..." : ""}
-                    </div>
+                    <div className="text-sm font-medium">Política comercial: Principal (1)</div>
                   </div>
                 </div>
               )}

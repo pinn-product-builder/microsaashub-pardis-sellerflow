@@ -58,7 +58,6 @@ export default function ProdutosVtex() {
   const debouncedQ = useDebouncedValue(q, 350);
 
   const [onlyActive, setOnlyActive] = useState(true);
-  const [showAllPolicies, setShowAllPolicies] = useState(true);
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
   const [policyMatrixQty, setPolicyMatrixQty] = useState<Record<number, Record<string, number | null>>>({});
   const [openSkuPolicies, setOpenSkuPolicies] = useState<number | null>(null);
@@ -151,41 +150,6 @@ export default function ProdutosVtex() {
       if (error) throw error;
 
       setRows((data ?? []) as CatalogRow[]);
-      // Carrega matriz de preços (todas as policies) para os SKUs retornados
-      if (showAllPolicies) {
-        const skuIds = (data ?? []).map((r: any) => Number(r.vtex_sku_id)).filter((n: number) => Number.isFinite(n));
-        const { data: matrix } = await (supabase as any).rpc("get_vtex_prices_matrix", { sku_ids: skuIds });
-        const map: Record<number, any[]> = {};
-        for (const row of (matrix ?? [])) {
-          map[Number(row.vtex_sku_id)] = (row.prices ?? []) as any[];
-        }
-        setPolicyMatrix(map);
-        const quantities = (data ?? []).map((r: any) => {
-          const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name);
-          return Math.max(1, Number(qty ?? 1));
-        });
-        const qtyMap: Record<number, Record<string, number | null>> = {};
-        const policies = POLICY_LABELS.map((p) => p.id);
-        await Promise.all(
-          policies.map(async (policyId) => {
-            const { data: rows } = await (supabase as any).rpc("get_vtex_effective_prices", {
-              sku_ids: skuIds,
-              quantities,
-              trade_policy_id: policyId,
-            });
-            for (const row of (rows ?? [])) {
-              const skuId = Number((row as any).vtex_sku_id);
-              if (!Number.isFinite(skuId)) continue;
-              if (!qtyMap[skuId]) qtyMap[skuId] = {};
-              qtyMap[skuId][policyId] = (row as any).effective_price ?? null;
-            }
-          })
-        );
-        setPolicyMatrixQty(qtyMap);
-      } else {
-        setPolicyMatrix({});
-        setPolicyMatrixQty({});
-      }
       if (resetPage) setPage(1);
     } catch (e: any) {
       setRows([]);
@@ -199,7 +163,7 @@ export default function ProdutosVtex() {
   useEffect(() => {
     runSearch((debouncedQ || "").trim(), true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQ, onlyActive, showAllPolicies, mode, tradePolicyId]);
+  }, [debouncedQ, onlyActive, mode, tradePolicyId]);
 
   // Paginação: refaz consulta mudando offset
   useEffect(() => {
@@ -240,39 +204,7 @@ export default function ProdutosVtex() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="text-sm text-muted-foreground">Somente ativos</div>
-              <Switch checked={onlyActive} onCheckedChange={setOnlyActive} />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-muted-foreground">Policy</div>
-              <div className="flex items-center gap-3">
-                <select
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as any)}
-                >
-                  <option value="auto">Automático</option>
-                  <option value="fixed">Fixar policy</option>
-                </select>
-                {mode === "fixed" && (
-                  <select
-                    className="h-10 rounded-md border border-input bg-background px-3 text-sm min-w-[220px]"
-                    value={tradePolicyId}
-                    onChange={(e) => setTradePolicyId(e.target.value)}
-                  >
-                    {POLICY_LABELS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-muted-foreground">Mostrar todas</div>
-                  <Switch checked={showAllPolicies} onCheckedChange={setShowAllPolicies} />
-                </div>
-              </div>
+              <div className="text-sm text-muted-foreground">Política: Principal (1)</div>
             </div>
           </div>
 
@@ -324,24 +256,7 @@ export default function ProdutosVtex() {
                         Preço ({mode === "fixed" ? `policy ${tradePolicyId}` : "auto"})
                       </TableHead>
                       <TableHead className="text-right">Preço Embalagem</TableHead>
-                      <TableHead>
-                        <div className="flex items-center gap-2">
-                          <span>Policy</span>
-                          <select
-                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                            value={selectedPolicyId}
-                            onChange={(e) => setSelectedPolicyId(e.target.value)}
-                          >
-                            {POLICY_LABELS.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </TableHead>
                       <TableHead>Fonte</TableHead>
-                      <TableHead>Policies</TableHead>
                       <TableHead className="text-right">Disp.</TableHead>
                       <TableHead className="text-center">Em estoque</TableHead>
                       <TableHead className="text-center">Ativo</TableHead>
@@ -373,54 +288,10 @@ export default function ProdutosVtex() {
                           })()}
                         </TableCell>
                         <TableCell className="text-xs">
-                          {(() => {
-                            const effective = getPolicyEffective(r.vtex_sku_id, selectedPolicyId);
-                            const qty = getEmbalagemQty(r.embalagem, r.product_name, r.sku_name) ?? 1;
-                            const qtyEffective = getPolicyEffectiveForQty(r.vtex_sku_id, selectedPolicyId);
-                            const base =
-                              typeof qtyEffective === "number"
-                                ? qtyEffective
-                                : typeof effective === "number"
-                                  ? effective
-                                  : null;
-                            if (typeof base !== "number") return <span className="text-muted-foreground">-</span>;
-                            return (
-                              <div className="font-mono text-right">
-                                {formatCurrency(base)}
-                                <div className="text-[10px] text-muted-foreground">
-                                  emb {qty}: {formatCurrency(base * qty)}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell className="text-xs">
                           {r.price_available === false ? (
                             <Badge variant="destructive">sem preço</Badge>
                           ) : (
                             <Badge variant="outline">{r.price_source ?? "-"}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {showAllPolicies ? (
-                            <div className="flex items-center gap-2">
-                              {mode !== "fixed" && r.trade_policy_id ? (
-                                <Badge variant="secondary" className="font-mono">{r.trade_policy_id}</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setOpenSkuPolicies(r.vtex_sku_id)}
-                                disabled={!policyMatrix[r.vtex_sku_id]?.length}
-                              >
-                                Detalhes ({policyMatrix[r.vtex_sku_id]?.length ?? 0})
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
@@ -445,66 +316,6 @@ export default function ProdutosVtex() {
                 </Table>
               </div>
 
-              <Dialog open={openSkuPolicies !== null} onOpenChange={(v) => setOpenSkuPolicies(v ? openSkuPolicies : null)}>
-                <DialogContent className="max-w-3xl">
-                  <DialogHeader>
-                    <DialogTitle>Preços por policy — SKU {openSkuPolicies ?? ""}</DialogTitle>
-                  </DialogHeader>
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Policy</TableHead>
-                          <TableHead className="text-right">Efetivo</TableHead>
-                          <TableHead className="text-right">
-                            Efetivo (emb{openSkuQty ? ` x${openSkuQty}` : ""})
-                          </TableHead>
-                          <TableHead>Fonte</TableHead>
-                          <TableHead className="text-right">Selling</TableHead>
-                          <TableHead className="text-right">Fixed</TableHead>
-                          <TableHead className="text-right">List</TableHead>
-                          <TableHead className="text-right">Cost</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(openSkuPolicies ? (policyMatrix[openSkuPolicies] ?? []) : []).map((p: any) => (
-                          <TableRow key={String(p.tradePolicyId)}>
-                            <TableCell className="font-mono text-xs">{p.tradePolicyId}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {typeof p.effectivePrice === "number"
-                                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.effectivePrice)
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {openSkuQty
-                                ? (() => {
-                                  const qtyEff = getPolicyEffectiveForQty(openSkuPolicies ?? 0, String(p.tradePolicyId));
-                                  return typeof qtyEff === "number"
-                                    ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(qtyEff * openSkuQty)
-                                    : "-";
-                                })()
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-xs">{p.priceSource ?? "-"}</TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {typeof p.sellingPrice === "number" ? p.sellingPrice : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {typeof p.fixedValue === "number" ? p.fixedValue : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {typeof p.listPrice === "number" ? p.listPrice : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {typeof p.costPrice === "number" ? p.costPrice : "-"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </DialogContent>
-              </Dialog>
 
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
