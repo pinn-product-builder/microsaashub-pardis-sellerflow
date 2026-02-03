@@ -478,11 +478,11 @@ export default function ProdutosVtex() {
                             <TableCell className="text-right font-mono text-sm">
                               {openSkuQty
                                 ? (() => {
-                                    const qtyEff = getPolicyEffectiveForQty(openSkuPolicies ?? 0, String(p.tradePolicyId));
-                                    return typeof qtyEff === "number"
-                                      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(qtyEff * openSkuQty)
-                                      : "-";
-                                  })()
+                                  const qtyEff = getPolicyEffectiveForQty(openSkuPolicies ?? 0, String(p.tradePolicyId));
+                                  return typeof qtyEff === "number"
+                                    ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(qtyEff * openSkuQty)
+                                    : "-";
+                                })()
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-xs">{p.priceSource ?? "-"}</TableCell>

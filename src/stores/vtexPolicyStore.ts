@@ -21,7 +21,7 @@ interface VtexPolicyStore {
 }
 
 export const useVtexPolicyStore = create<VtexPolicyStore>((set, get) => ({
-  mode: "auto",
+  mode: "fixed",
   tradePolicyId: "1",
   policies: [],
   loadingPolicies: false,

@@ -36,8 +36,8 @@ const POLICY_LABELS = [
   { id: 'mgpbrclustera', label: 'MGP BR Cluster A' },
 ];
 
-export function QuoteItemsTable({ 
-  items, 
+export function QuoteItemsTable({
+  items,
   customer,
   showPardisIndicators = true,
   tradePolicyId,
@@ -50,10 +50,10 @@ export function QuoteItemsTable({
   const [repricingIds, setRepricingIds] = useState<Record<string, boolean>>({});
   const [policyMatrix, setPolicyMatrix] = useState<Record<number, any[]>>({});
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>(tradePolicyId || '1');
-  
+
   // Use customer from props or from store
   const effectiveCustomer = customer || selectedCustomer;
-  
+
   // Calculate Pardis margins
   const { itemCalculations } = usePardisQuote(items, effectiveCustomer, discountPercent);
 
@@ -290,7 +290,7 @@ export function QuoteItemsTable({
         <TableBody>
           {items.map((item) => {
             const pardisCalc = getItemCalc(item.id);
-            
+
             return (
               <TableRow key={item.id}>
                 <TableCell>
@@ -356,7 +356,7 @@ export function QuoteItemsTable({
                     );
                   })()}
                 </TableCell>
-                
+
                 {showPardisIndicators && (
                   <>
                     <TableCell className="text-right text-sm">
@@ -370,8 +370,8 @@ export function QuoteItemsTable({
                     </TableCell>
                     <TableCell className="text-center">
                       {pardisCalc ? (
-                        <MarginIndicator 
-                          marginPercent={pardisCalc.marginPercent} 
+                        <MarginIndicator
+                          marginPercent={pardisCalc.marginPercent}
                           marginValue={pardisCalc.marginValue}
                           showValue={false}
                           size="sm"
@@ -384,7 +384,7 @@ export function QuoteItemsTable({
                     </TableCell>
                     <TableCell className="text-center">
                       {pardisCalc ? (
-                        <AuthorizationBadge 
+                        <AuthorizationBadge
                           isAuthorized={pardisCalc.isAuthorized}
                           requiredRole={pardisCalc.requiredApproverRole}
                           size="sm"
@@ -395,7 +395,7 @@ export function QuoteItemsTable({
                     </TableCell>
                   </>
                 )}
-                
+
                 <TableCell className="text-right font-medium">
                   {formatCurrency(item.totalPrice)}
                 </TableCell>

@@ -37,7 +37,7 @@ export default function NovaQuotacao() {
   const { mode: policyMode, tradePolicyId, setMode: setPolicyMode, setTradePolicyId } = useVtexPolicyStore();
   const [isRepricingAll, setIsRepricingAll] = useState(false);
   const { toast } = useToast();
-  
+
   const {
     selectedCustomer,
     destinationUF,
@@ -93,7 +93,7 @@ export default function NovaQuotacao() {
     }
     setPricingMode('percent');
   };
-  
+
   // Pardis margin calculations
   const { summary: pardisSummary, isLoading: isPardisLoading } = usePardisQuote(items, selectedCustomer, discount);
 
@@ -124,10 +124,10 @@ export default function NovaQuotacao() {
           setPaymentConditions(quote.paymentConditions);
           setNotes(quote.notes || '');
           // mantém valor legacy apenas; modo padrão continua auto
-          
+
           // Adicionar itens da cotação
           quote.items?.forEach(item => addItem(item));
-          
+
           // Se tem cliente e itens, vai para o step 3
           if (quote.customer && quote.items?.length > 0) {
             setCurrentStep(3);
@@ -205,7 +205,7 @@ export default function NovaQuotacao() {
   const handleCustomerSelect = (customer: Customer) => {
     console.log('Customer selected:', customer.companyName, 'UF:', customer.uf);
     setSelectedCustomer(customer);
-    
+
     // Aguardar um momento para garantir que o estado foi atualizado
     setTimeout(() => {
       if (!isEditing) {
@@ -223,7 +223,7 @@ export default function NovaQuotacao() {
       title: "Produto adicionado",
       description: "Produto foi adicionado à cotação com sucesso!"
     });
-    
+
     // Se tem produtos, permitir ir para finalização
     if (items.length > 0 && currentStep < 3) {
       setCurrentStep(3);
@@ -352,10 +352,10 @@ export default function NovaQuotacao() {
           description: `Cotação ${saved.number} enviada para aprovação.`,
         });
       } else {
-      toast({
-        title: "Sucesso",
-        description: `Cotação ${saved.number} finalizada com sucesso!`
-      });
+        toast({
+          title: "Sucesso",
+          description: `Cotação ${saved.number} finalizada com sucesso!`
+        });
       }
 
       clearQuote();
@@ -440,7 +440,7 @@ export default function NovaQuotacao() {
         tradePolicyId,
         seller: "1",
       });
-      
+
       if (result?.success) {
         toast({
           title: "Sucesso",
@@ -492,7 +492,7 @@ export default function NovaQuotacao() {
               {isEditing ? 'Editar Cotação' : 'Nova Cotação'}
               {/* Authorization status badge in header */}
               {items.length > 0 && !isPardisLoading && (
-                <AuthorizationBadge 
+                <AuthorizationBadge
                   isAuthorized={pardisSummary.isAuthorized}
                   requiresApproval={pardisSummary.requiresApproval}
                   requiredRole={pardisSummary.requiredApproverRole}
@@ -510,8 +510,8 @@ export default function NovaQuotacao() {
             <Save className="h-4 w-4 mr-2" />
             {isEditing ? 'Salvar Alterações' : 'Salvar Rascunho'}
           </Button>
-          <Button 
-            onClick={handleFinalize} 
+          <Button
+            onClick={handleFinalize}
             disabled={isLoading || !canProceedToStep3}
             variant={pardisSummary.requiresApproval ? "outline" : "default"}
           >
@@ -527,8 +527,8 @@ export default function NovaQuotacao() {
               </>
             )}
           </Button>
-          <Button 
-            onClick={handleSendToVTEX} 
+          <Button
+            onClick={handleSendToVTEX}
             disabled={isSendingToVTEX || !canProceedToStep3 || pardisSummary.requiresApproval}
             className="bg-orange-600 hover:bg-orange-700"
             title={pardisSummary.requiresApproval ? "Requer aprovação antes de enviar para VTEX" : undefined}
@@ -548,7 +548,7 @@ export default function NovaQuotacao() {
                 Cotação requer aprovação
               </h4>
               <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                A margem de {pardisSummary.totalMarginPercent.toFixed(2)}% está abaixo do limite autorizado. 
+                A margem de {pardisSummary.totalMarginPercent.toFixed(2)}% está abaixo do limite autorizado.
                 Esta cotação precisará ser aprovada por um(a) <strong>{getApproverLabel(pardisSummary.requiredApproverRole!)}</strong> antes de ser enviada ao cliente.
               </p>
               <div className="flex gap-4 mt-2 text-xs">
@@ -566,11 +566,10 @@ export default function NovaQuotacao() {
           <div className="flex items-center space-x-4">
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                  currentStep >= step.id 
-                    ? 'bg-primary text-primary-foreground' 
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${currentStep >= step.id
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-muted-foreground'
-                }`}>
+                  }`}>
                   {step.id}
                 </div>
                 <div className="ml-3">
@@ -595,7 +594,7 @@ export default function NovaQuotacao() {
               <CardTitle>1. Seleção do Cliente</CardTitle>
             </CardHeader>
             <CardContent>
-              <CustomerSelector 
+              <CustomerSelector
                 selectedCustomer={selectedCustomer}
                 onCustomerSelect={handleCustomerSelect}
               />
@@ -610,9 +609,9 @@ export default function NovaQuotacao() {
                     </SelectTrigger>
                     <SelectContent>
                       {[
-                        "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
-                        "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
-                        "RS","RO","RR","SC","SP","SE","TO",
+                        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+                        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+                        "RS", "RO", "RR", "SC", "SP", "SE", "TO",
                       ].map((uf) => (
                         <SelectItem key={uf} value={uf}>
                           {uf}
@@ -731,7 +730,7 @@ export default function NovaQuotacao() {
         {/* Sidebar - Price Summary */}
         {items.length > 0 && (
           <div className="space-y-6">
-            <PriceSummary 
+            <PriceSummary
               items={items}
               discount={discount}
               totals={totals}
