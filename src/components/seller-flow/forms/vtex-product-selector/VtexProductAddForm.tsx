@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEmbalagemQty } from "@/utils/vtexUtils";
+import { DiscountModeSelector } from "../DiscountModeSelector";
 
 interface VtexProductAddFormProps {
     selected: any | null;
@@ -69,21 +70,11 @@ export function VtexProductAddForm({
     };
 
     return (
-        <div className="space-y-5 flex-1 flex flex-col">
-            <div className="flex p-0.5 bg-muted rounded-lg border border-muted-foreground/10">
-                <button
-                    onClick={() => onDiscountModeChange('percentage')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-md transition-all ${discountMode === 'percentage' ? 'bg-white shadow-sm text-primary ring-1 ring-black/5' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                    Desconto %
-                </button>
-                <button
-                    onClick={() => onDiscountModeChange('manual')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-md transition-all ${discountMode === 'manual' ? 'bg-white shadow-sm text-primary ring-1 ring-black/5' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                    Preço Manual
-                </button>
-            </div>
+        <div className="space-y-5 flex-1 flex flex-col pt-2">
+            <DiscountModeSelector
+                mode={discountMode}
+                onModeChange={onDiscountModeChange}
+            />
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">

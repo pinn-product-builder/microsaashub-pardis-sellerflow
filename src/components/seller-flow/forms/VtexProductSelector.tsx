@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { PricingService } from "@/services/pricingService";
 import { Customer, Product, QuoteItem } from "@/types/seller-flow";
 
+import { useSellerFlowStore } from "@/stores/sellerFlowStore";
+
 // Sub-componentes Modularizados
 import { VtexProductTable } from "./vtex-product-selector/VtexProductTable";
 import { VtexProductDetails } from "./vtex-product-selector/VtexProductDetails";
@@ -85,7 +87,7 @@ export function VtexProductSelector({
     const [quantity, setQuantity] = useState(1);
     const [itemDiscount, setItemDiscount] = useState<number>(0);
     const [manualPrice, setManualPrice] = useState<number>(0);
-    const [discountMode, setDiscountMode] = useState<'percentage' | 'manual'>('percentage');
+    const { discountMode, setDiscountMode } = useSellerFlowStore();
     const [isAdding, setIsAdding] = useState(false);
 
     const { toast } = useToast();
