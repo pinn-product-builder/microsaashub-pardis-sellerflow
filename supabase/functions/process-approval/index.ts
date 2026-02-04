@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { sendEmail, getBaseTemplate } from "../_shared/email-utils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -159,6 +160,53 @@ serve(async (req) => {
       return { rule, steps };
     }
 
+    // Helper: Notificar aprovadores
+    async function notifyApprovers(quoteId: string, role: string, margin: number, total: number) {
+      // 1. Buscar emails de usuários com esta role
+      const { data: approvers } = await supabaseAdmin
+        .from('profiles')
+        .select('email, full_name')
+        .in('user_id', (
+          await supabaseAdmin
+            .from('user_roles')
+            .select('user_id')
+            .eq('role', role)
+        ).data?.map(r => r.user_id) || []);
+
+      if (!approvers || approvers.length === 0) {
+        console.warn(`Nenhum aprovador encontrado para a role: ${role}`);
+        return;
+      }
+
+      const emails = approvers.map(a => a.email);
+      const subject = `[PENDENTE] Nova Aprovação de Cotação - Margem ${margin.toFixed(2)}%`;
+
+      const content = `
+        <p>Olá,</p>
+        <p>Uma nova cotação requer sua aprovação.</p>
+        <ul>
+          <li><strong>ID da Cotação:</strong> ${quoteId}</li>
+          <li><strong>Valor Total:</strong> R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</li>
+          <li><strong>Margem:</strong> <span class="highlight">${margin.toFixed(2)}%</span></li>
+          <li><strong>Papel Necessário:</strong> ${role.toUpperCase()}</li>
+        </ul>
+        <p>Por favor, acesse o painel de aprovações para tomar uma decisão.</p>
+      `;
+
+      // Idealmente passar a URL real do sistema
+      const appUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://pardis-sellerflow.vercel.app';
+      const actionUrl = `${appUrl}/approvals`;
+
+      const html = getBaseTemplate('Nova Solicitação de Aprovação', content, actionUrl, 'Ver Solicitações');
+
+      try {
+        await sendEmail({ to: emails, subject, html });
+        console.log(`Notificação enviada para ${emails.length} aprovadores (${role})`);
+      } catch (err) {
+        console.error('Falha ao enviar e-mail de notificação:', err);
+      }
+    }
+
     if (action === 'create') {
       if (!quoteId || marginPercent === undefined || totalValue === undefined) {
         return new Response(JSON.stringify({ error: 'Parâmetros ausentes' }), { status: 400, headers: corsHeaders });
@@ -197,6 +245,9 @@ serve(async (req) => {
 
       // Bloquear cotação
       await supabaseAdmin.from('vtex_quotes').update({ status: 'pending_approval', requires_approval: true }).eq('id', quoteId);
+
+      // Notificar primeiro nível
+      await notifyApprovers(quoteId, firstStep.approver_role, marginPercent, totalValue);
 
       return new Response(JSON.stringify({ success: true, approvalRequest, currentStep: firstStep }), { status: 201, headers: corsHeaders });
     }
@@ -269,6 +320,9 @@ serve(async (req) => {
           parent_request_id: currentReq.id,
           expires_at: expiresAt.toISOString()
         });
+
+        // Notificar próximo nível
+        await notifyApprovers(currentReq.quote_id, nextStep.approver_role, currentReq.quote_margin_percent, currentReq.quote_total);
 
         return new Response(JSON.stringify({ success: true, status: 'escalated', nextStep: nextStep.approver_role }), { status: 200, headers: corsHeaders });
       } else {
