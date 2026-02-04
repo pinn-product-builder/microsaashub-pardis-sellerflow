@@ -84,6 +84,8 @@ export function VtexProductSelector({
     const [selected, setSelected] = useState<CatalogRow | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [itemDiscount, setItemDiscount] = useState<number>(0);
+    const [manualPrice, setManualPrice] = useState<number>(0);
+    const [discountMode, setDiscountMode] = useState<'percentage' | 'manual'>('percentage');
     const [isAdding, setIsAdding] = useState(false);
 
     const { toast } = useToast();
@@ -125,6 +127,14 @@ export function VtexProductSelector({
     useEffect(() => {
         setQuantity(1);
         setItemDiscount(0);
+        setDiscountMode('percentage');
+
+        if (selected) {
+            const embalagemQty = getEmbalagemQty(selected.embalagem, selected.product_name, selected.sku_name) ?? 1;
+            setManualPrice((selected.selling_price || 0) * embalagemQty);
+        } else {
+            setManualPrice(0);
+        }
     }, [selected]);
 
     // Lógica de Preço Efetivo (RPC)
@@ -149,9 +159,11 @@ export function VtexProductSelector({
 
             // Busca preço final por política
             const priceRow = await fetchEffectivePrice(skuId, qtyUnits, String(tradePolicyId || "1"));
-            // Correção: Multiplicando pelo tamanho da embalagem para obter o preço da CAIXA
-            const packagingPrice = (priceRow?.effective_price ?? 0) * embalagemQty;
-            const finalPackagingPrice = packagingPrice * (1 - itemDiscount / 100);
+            // Preço base da embalagem (antes do desconto/ajuste manual)
+            const packagingBasePrice = (priceRow?.effective_price ?? 0) * embalagemQty;
+
+            // O manualPrice já está sincronizado com o itemDiscount, então usamos o manualPrice diretamente como preço final da embalagem
+            const finalPackagingPrice = manualPrice;
 
             if (finalPackagingPrice <= 0) throw new Error("Preço calculado inválido.");
 
@@ -182,12 +194,12 @@ export function VtexProductSelector({
             (quoteItem as any).vtexTradePolicyId = tradePolicyId;
             (quoteItem as any).vtexEmbalagemQty = embalagemQty;
 
-            if (itemDiscount > 0) {
+            if (itemDiscount !== 0) {
                 quoteItem.discounts = [{
                     type: 'MANUAL',
-                    description: 'Ajuste comercial',
+                    description: discountMode === 'percentage' ? 'Ajuste comercial (%)' : 'Ajuste comercial (Valor)',
                     percentage: itemDiscount,
-                    amount: packagingPrice * (itemDiscount / 100),
+                    amount: packagingBasePrice * (itemDiscount / 100),
                     priority: 1,
                 }];
             }
@@ -284,10 +296,14 @@ export function VtexProductSelector({
                                         selected={selected}
                                         quantity={quantity}
                                         itemDiscount={itemDiscount}
+                                        manualPrice={manualPrice}
+                                        discountMode={discountMode}
                                         destinationUF={destinationUF}
                                         isAdding={isAdding}
                                         onQuantityChange={setQuantity}
                                         onDiscountChange={setItemDiscount}
+                                        onManualPriceChange={setManualPrice}
+                                        onDiscountModeChange={setDiscountMode}
                                         onAdd={handleAdd}
                                         formatCurrency={formatCurrency}
                                     />
