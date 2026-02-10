@@ -154,24 +154,64 @@ serve(async (req) => {
           approver_role: rule.approver_role,
           step_order: 1,
           sla_hours: rule.sla_hours,
-          rule_id: rule.id
+          rule_id: rule.id,
+          primary_approver_id: null,
+          substitute_approver_id: null
         }];
 
       return { rule, steps };
     }
 
+    // Helper: Verificar se um usuário está ausente
+    async function isUserAbsent(userId: string): Promise<boolean> {
+      if (!userId) return false;
+      const now = new Date().toISOString();
+      const { data: absence } = await supabaseAdmin
+        .from('user_absences')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .lte('start_date', now)
+        .gte('end_date', now)
+        .maybeSingle();
+
+      return !!absence;
+    }
+
+    // Helper: Determinar o aprovador efetivo baseado em ausência
+    async function getEffectiveApprover(step: any): Promise<{ userId: string | null; isRedirected: boolean; redirectedFrom: string | null }> {
+      const primaryId = step.primary_approver_id;
+      const substituteId = step.substitute_approver_id;
+
+      if (!primaryId) {
+        return { userId: null, isRedirected: false, redirectedFrom: null };
+      }
+
+      const absent = await isUserAbsent(primaryId);
+      if (absent && substituteId) {
+        return { userId: substituteId, isRedirected: true, redirectedFrom: primaryId };
+      }
+
+      return { userId: primaryId, isRedirected: false, redirectedFrom: null };
+    }
+
     // Helper: Notificar aprovadores
-    async function notifyApprovers(quoteId: string, role: string, margin: number, total: number) {
-      // 1. Buscar emails de usuários com esta role
-      const { data: approvers } = await supabaseAdmin
-        .from('profiles')
-        .select('email, full_name')
-        .in('user_id', (
+    async function notifyApprovers(quoteId: string, role: string, margin: number, total: number, specificUserId?: string | null) {
+      // 1. Buscar emails de usuários alvos
+      let query = supabaseAdmin.from('profiles').select('email, full_name');
+
+      if (specificUserId) {
+        query = query.eq('user_id', specificUserId);
+      } else {
+        query = query.in('user_id', (
           await supabaseAdmin
             .from('user_roles')
             .select('user_id')
             .eq('role', role)
         ).data?.map(r => r.user_id) || []);
+      }
+
+      const { data: approvers } = await query;
 
       if (!approvers || approvers.length === 0) {
         console.warn(`Nenhum aprovador encontrado para a role: ${role}`);
@@ -218,6 +258,7 @@ serve(async (req) => {
       }
 
       const firstStep = flow.steps[0];
+      const effective = await getEffectiveApprover(firstStep);
 
       // Fetch business hours para o SLA
       const { data: businessHours } = await supabaseAdmin.from('vtex_business_hours').select('*');
@@ -236,7 +277,10 @@ serve(async (req) => {
           rule_id: flow.rule.id,
           current_step_order: 1,
           total_steps: flow.steps.length,
-          expires_at: expiresAt.toISOString()
+          expires_at: expiresAt.toISOString(),
+          is_redirected: effective.isRedirected,
+          redirected_from_user_id: effective.redirectedFrom,
+          assigned_to_user_id: effective.userId // Assumindo que vamos usar esta coluna para atribuir a um usuário específico
         })
         .select()
         .single();
@@ -247,9 +291,9 @@ serve(async (req) => {
       await supabaseAdmin.from('vtex_quotes').update({ status: 'pending_approval', requires_approval: true }).eq('id', quoteId);
 
       // Notificar primeiro nível
-      await notifyApprovers(quoteId, firstStep.approver_role, marginPercent, totalValue);
+      await notifyApprovers(quoteId, firstStep.approver_role, marginPercent, totalValue, effective.userId);
 
-      return new Response(JSON.stringify({ success: true, approvalRequest, currentStep: firstStep }), { status: 201, headers: corsHeaders });
+      return new Response(JSON.stringify({ success: true, approvalRequest, currentStep: firstStep, redirected: effective.isRedirected }), { status: 201, headers: corsHeaders });
     }
 
     if (action === 'approve' || action === 'reject') {
@@ -302,6 +346,9 @@ serve(async (req) => {
       const nextStep = flowSteps.find((s: any) => s.step_order === currentReq.current_step_order + 1);
 
       if (nextStep) {
+        // Verificar redirecionamento por ausência no próximo passo
+        const effectiveNext = await getEffectiveApprover(nextStep);
+
         // Criar próxima solicitação na cadeia
         const { data: businessHours } = await supabaseAdmin.from('vtex_business_hours').select('*');
         const expiresAt = calculateSLAExpiry(new Date(), nextStep.sla_hours ?? 24, businessHours || []);
@@ -318,13 +365,21 @@ serve(async (req) => {
           current_step_order: nextStep.step_order,
           total_steps: currentReq.total_steps,
           parent_request_id: currentReq.id,
-          expires_at: expiresAt.toISOString()
+          expires_at: expiresAt.toISOString(),
+          is_redirected: effectiveNext.isRedirected,
+          redirected_from_user_id: effectiveNext.redirectedFrom,
+          assigned_to_user_id: effectiveNext.userId
         });
 
         // Notificar próximo nível
-        await notifyApprovers(currentReq.quote_id, nextStep.approver_role, currentReq.quote_margin_percent, currentReq.quote_total);
+        await notifyApprovers(currentReq.quote_id, nextStep.approver_role, currentReq.quote_margin_percent, currentReq.quote_total, effectiveNext.userId);
 
-        return new Response(JSON.stringify({ success: true, status: 'escalated', nextStep: nextStep.approver_role }), { status: 200, headers: corsHeaders });
+        return new Response(JSON.stringify({
+          success: true,
+          status: 'escalated',
+          nextStep: nextStep.approver_role,
+          redirected: effectiveNext.isRedirected
+        }), { status: 200, headers: corsHeaders });
       } else {
         // Fim da linha: Aprovação total!
         await supabaseAdmin.from('vtex_quotes').update({

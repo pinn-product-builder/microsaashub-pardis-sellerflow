@@ -14,6 +14,8 @@ interface ApprovalStep {
     approver_role: AppRole;
     step_order: number;
     sla_hours: number;
+    primary_approver_id?: string | null;
+    substitute_approver_id?: string | null;
 }
 
 interface ApprovalFlowStepConfigProps {
@@ -30,12 +32,24 @@ const ROLE_LABELS: Record<AppRole, string> = {
 
 export function ApprovalFlowStepConfig({ ruleId }: ApprovalFlowStepConfigProps) {
     const [steps, setSteps] = useState<ApprovalStep[]>([]);
+    const [profiles, setProfiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         fetchSteps();
+        fetchProfiles();
     }, [ruleId]);
+
+    const fetchProfiles = async () => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, email')
+            .order('full_name');
+        if (!error && data) {
+            setProfiles(data);
+        }
+    };
 
     const fetchSteps = async () => {
         setLoading(true);
@@ -156,6 +170,46 @@ export function ApprovalFlowStepConfig({ ruleId }: ApprovalFlowStepConfigProps) 
                                     value={step.sla_hours}
                                     onChange={(e) => updateStep(index, 'sla_hours', parseInt(e.target.value) || 0)}
                                 />
+                            </div>
+
+                            <div className="space-y-1">
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold px-1">Titular (Opcional)</p>
+                                <Select
+                                    value={step.primary_approver_id || "none"}
+                                    onValueChange={(val) => updateStep(index, 'primary_approver_id', val === "none" ? null : val)}
+                                >
+                                    <SelectTrigger className="h-8">
+                                        <SelectValue placeholder="Selecione..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Padrão da Role</SelectItem>
+                                        {profiles.map(p => (
+                                            <SelectItem key={p.user_id} value={p.user_id}>
+                                                {p.full_name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold px-1">Suplente (Opcional)</p>
+                                <Select
+                                    value={step.substitute_approver_id || "none"}
+                                    onValueChange={(val) => updateStep(index, 'substitute_approver_id', val === "none" ? null : val)}
+                                >
+                                    <SelectTrigger className="h-8">
+                                        <SelectValue placeholder="Selecione..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Nenhum</SelectItem>
+                                        {profiles.map(p => (
+                                            <SelectItem key={p.user_id} value={p.user_id}>
+                                                {p.full_name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
 

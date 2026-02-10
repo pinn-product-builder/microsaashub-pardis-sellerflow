@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { PageContainer, PageHeader, PageContent } from '@/components/layout/Page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calculator, Shield, CreditCard, Clock, Settings } from 'lucide-react';
+import { Calculator, Shield, CreditCard, Clock, Settings, Calendar } from 'lucide-react';
 import { PricingConfigTab } from '@/components/seller-flow/config/PricingConfigTab';
 import { ApprovalRulesTab } from '@/components/seller-flow/config/ApprovalRulesTab';
 import { PaymentConditionsTab } from '@/components/seller-flow/config/PaymentConditionsTab';
 import { ValidityConfigTab } from '@/components/seller-flow/config/ValidityConfigTab';
 import { EngineConfigTab } from '@/components/seller-flow/config/EngineConfigTab';
 import { BusinessHoursTab } from '@/components/seller-flow/config/BusinessHoursTab';
+import { UserAbsenceManagement } from '@/components/profile/UserAbsenceManagement';
 import { PricingFormulaCard } from '@/components/seller-flow/config/PricingFormulaCard';
 import { MarginSimulator } from '@/components/seller-flow/config/MarginSimulator';
 import { AuthRequiredCard } from '@/components/seller-flow/config/AuthRequiredCard';
@@ -49,7 +50,7 @@ export default function Configuracoes() {
       />
       <PageContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               <span className="hidden sm:inline">Pricing</span>
@@ -73,6 +74,10 @@ export default function Configuracoes() {
             <TabsTrigger value="hours" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               <span className="hidden sm:inline">Horário</span>
+            </TabsTrigger>
+            <TabsTrigger value="absences" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Ausências</span>
             </TabsTrigger>
           </TabsList>
 
@@ -110,6 +115,10 @@ export default function Configuracoes() {
 
           <TabsContent value="hours">
             <BusinessHoursTab />
+          </TabsContent>
+
+          <TabsContent value="absences">
+            <UserAbsenceManagement />
           </TabsContent>
         </Tabs>
       </PageContent>
